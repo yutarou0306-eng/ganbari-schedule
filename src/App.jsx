@@ -180,6 +180,8 @@ export default function KidsScheduleApp() {
   const [locked, setLocked] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [celebrateDay, setCelebrateDay] = useState(null);
   const [celebrateWeek, setCelebrateWeek] = useState(false);
   const [toast, setToast] = useState("");
@@ -362,6 +364,22 @@ export default function KidsScheduleApp() {
     showToast("スタンプを取り消したよ");
   }
 
+  async function handleDeleteSchedule() {
+    setDeleting(true);
+    try {
+      await window.storage.delete(STORAGE_KEY, false);
+    } catch (e) {
+      // even if the network call fails, still leave via the top page —
+      // there is nothing more this screen can usefully do about it
+    }
+    try {
+      window.location.href = window.location.pathname;
+    } catch (e) {
+      setDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  }
+
   function doUnlock() {
     setLocked(false);
     setShowConfirmModal(false);
@@ -437,6 +455,7 @@ export default function KidsScheduleApp() {
           initial={config}
           hasExisting={!!config.title}
           onCancel={config.title ? () => setView("main") : null}
+          onRequestDelete={config.title ? () => setShowDeleteConfirm(true) : null}
           onSave={(cfg) => {
             setConfig(cfg);
             setWeekStart(getMonday(parseDate(cfg.startDate) || new Date()));
@@ -499,6 +518,18 @@ export default function KidsScheduleApp() {
           onSuccess={doUnlock}
           onFail={() => showToast("あんしょう番号がちがいます")}
           onCancel={() => setShowPinModal(false)}
+        />
+      )}
+
+      {showDeleteConfirm && (
+        <ConfirmModal
+          title="このスケジュールを削除しますか？"
+          message={`「${config.title}」を削除します。これまでの記録もすべて消え、元に戻せません。`}
+          confirmLabel={deleting ? "削除中…" : "削除する"}
+          cancelLabel="やめる"
+          onConfirm={handleDeleteSchedule}
+          onCancel={() => setShowDeleteConfirm(false)}
+          danger
         />
       )}
 
@@ -622,7 +653,7 @@ function SubjectCard({ subject, onChange, onRemove }) {
   );
 }
 
-function SetupScreen({ initial, onSave, onCancel, hasExisting }) {
+function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }) {
   const [title, setTitle] = useState(initial.title || "");
   const [startDate, setStartDate] = useState(initial.startDate || todayStr());
   const [endDate, setEndDate] = useState(initial.endDate || defaultEndDate());
@@ -718,6 +749,12 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting }) {
         <button style={styles.saveBtn} onClick={handleSave}>
           このスケジュールではじめる
         </button>
+
+        {onRequestDelete && (
+          <button style={styles.deleteScheduleBtn} onClick={onRequestDelete}>
+            🗑 このスケジュールを削除する
+          </button>
+        )}
       </div>
     </div>
   );
@@ -1019,7 +1056,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear }) {
 
 /* ---------------- Overlays ---------------- */
 
-function ConfirmModal({ title, message, confirmLabel, cancelLabel, onConfirm, onCancel }) {
+function ConfirmModal({ title, message, confirmLabel, cancelLabel, onConfirm, onCancel, danger }) {
   return (
     <div style={styles.modalOverlay}>
       <div style={styles.modalCard}>
@@ -1029,7 +1066,7 @@ function ConfirmModal({ title, message, confirmLabel, cancelLabel, onConfirm, on
           <button style={styles.modalCancel} onClick={onCancel}>
             {cancelLabel}
           </button>
-          <button style={styles.modalConfirm} onClick={onConfirm}>
+          <button style={danger ? styles.modalDanger : styles.modalConfirm} onClick={onConfirm}>
             {confirmLabel}
           </button>
         </div>
@@ -1240,6 +1277,7 @@ const styles = {
 
   addBtn: { display: "inline-flex", alignItems: "center", gap: 4, background: "#14588C", color: "#fff", border: "none", borderRadius: 14, padding: "10px 18px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 14, marginBottom: 20 },
   saveBtn: { width: "100%", padding: "14px 0", borderRadius: 16, border: "none", background: "linear-gradient(135deg, #FFB6C9, #F4C95D)", color: "#fff", fontWeight: 900, fontSize: 16, cursor: "pointer", boxShadow: "0 10px 20px rgba(255,143,163,0.4)", fontFamily: "inherit" },
+  deleteScheduleBtn: { width: "100%", padding: "12px 0", borderRadius: 16, border: "2px solid #FBD4DB", background: "#fff", color: "#E0526B", fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", marginTop: 14 },
 
   mainWrap: { position: "relative", background: oceanBg, minHeight: 560, overflow: "hidden", paddingBottom: 30 },
   header: { position: "relative", padding: "24px 18px 16px", zIndex: 2 },
@@ -1307,6 +1345,7 @@ const styles = {
   modalBtns: { display: "flex", gap: 10 },
   modalCancel: { flex: 1, padding: "10px 0", borderRadius: 12, border: "2px solid #d7ecf3", background: "#fff", color: "#5a7d94", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   modalConfirm: { flex: 1, padding: "10px 0", borderRadius: 12, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  modalDanger: { flex: 1, padding: "10px 0", borderRadius: 12, border: "none", background: "#E0526B", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
 
   dayCelebrateOverlay: { position: "absolute", inset: 0, background: "rgba(11,61,98,0.25)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 45 },
   dayCelebrateBadge: { background: "#fff", borderRadius: 20, padding: "20px 30px", textAlign: "center", animation: "popIn 0.3s ease-out", boxShadow: "0 20px 40px rgba(0,0,0,0.25)" },

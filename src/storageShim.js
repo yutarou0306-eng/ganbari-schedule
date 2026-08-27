@@ -9,7 +9,7 @@
 
 import { supabase } from "./db.js";
 import { getScheduleIdFromUrl } from "./scheduleId.js";
-import { upsertKnownSchedule } from "./registry.js";
+import { upsertKnownSchedule, removeKnownSchedule } from "./registry.js";
 import { computeOverallStats } from "./progress.js";
 
 export const scheduleId = getScheduleIdFromUrl();
@@ -56,6 +56,7 @@ window.storage = {
   async delete(key, shared = false) {
     if (!scheduleId) return null;
     await supabase.from("schedules").delete().eq("id", scheduleId);
+    removeKnownSchedule(scheduleId);
     return { key, deleted: true, shared };
   },
 
