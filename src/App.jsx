@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Lock, Unlock, Settings, ChevronLeft, ChevronRight, Plus, X, ArrowLeft } from "lucide-react";
+import { Lock, Unlock, Settings, ArrowLeft } from "lucide-react";
 
 const STORAGE_KEY = "pearl-sea-schedule-v2";
 const DAY_LABELS = ["月", "火", "水", "木", "金", "土", "日"]; // index 0=Mon ... 6=Sun
@@ -156,18 +156,22 @@ function defaultEndDate() {
   return dateKey(d);
 }
 
-const DEFAULT_SUBJECTS = () => [
-  { id: uid(), name: "こくご", color: PASTELS[0].hex, freqType: "daily", intervalDays: 2, weekdays: [0, 2, 4], durationMinutes: 10 },
-  { id: uid(), name: "さんすう", color: PASTELS[5].hex, freqType: "daily", intervalDays: 2, weekdays: [0, 2, 4], durationMinutes: 10 },
-  { id: uid(), name: "ピアノ", color: PASTELS[6].hex, freqType: "weekday", intervalDays: 2, weekdays: [1, 3], durationMinutes: 20 },
-];
+const DEFAULT_SUBJECT = () => ({
+  id: uid(),
+  name: "",
+  color: PASTELS[0].hex,
+  freqType: "daily",
+  intervalDays: 2,
+  weekdays: [0, 1, 2, 3, 4],
+  durationMinutes: 10,
+});
 
 function freshConfig() {
   return {
     title: "",
     startDate: todayStr(),
     endDate: defaultEndDate(),
-    subjects: DEFAULT_SUBJECTS(),
+    subjects: [DEFAULT_SUBJECT()],
     pin: "",
     reward: "",
   };
@@ -179,14 +183,12 @@ export default function KidsScheduleApp() {
   const [config, setConfig] = useState(freshConfig());
   const [completions, setCompletions] = useState({});
   const [recoveries, setRecoveries] = useState({});
-  const [weekStart, setWeekStart] = useState(getMonday(new Date()));
   const [locked, setLocked] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [celebrateDay, setCelebrateDay] = useState(null);
-  const [celebrateWeek, setCelebrateWeek] = useState(false);
   const [celebrateSchedule, setCelebrateSchedule] = useState(false);
   const [toast, setToast] = useState("");
   const skipSave = useRef(true);
@@ -203,10 +205,6 @@ export default function KidsScheduleApp() {
             setConfig(data.config);
             setCompletions(data.completions || {});
             setRecoveries(data.recoveries || {});
-            const sd = parseDate(data.config.startDate);
-            const today = new Date();
-            const anchor = sd && today < sd ? sd : today;
-            setWeekStart(getMonday(anchor));
             // A "?edit=1" URL flag (used by the top-page's edit button) jumps
             // straight into the setup/edit screen instead of the main view.
             let wantsEdit = false;
@@ -318,19 +316,6 @@ export default function KidsScheduleApp() {
       const allDone = need.length > 0 && need.every((id) => (day[id] || 0) >= 1);
       if (allDone) setTimeout(() => setCelebrateDay(dKey), 50);
 
-      const weekDates = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).filter((d) =>
-        isBetween(d, startDate, endDate)
-      );
-      if (weekDates.length > 0) {
-        const weekAllDone = weekDates.every((d) => {
-          const req = daySubjectsFor(d).map((s) => s.id);
-          if (req.length === 0) return true;
-          const rec = updated[dateKey(d)] || {};
-          return req.every((id) => (rec[id] || 0) >= 1);
-        });
-        if (weekAllDone) setTimeout(() => setCelebrateWeek(true), 400);
-      }
-
       if (dateKey(today) === dateKey(endDate)) {
         const allDays = [];
         for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) allDays.push(d);
@@ -416,9 +401,7 @@ export default function KidsScheduleApp() {
   function totalStats() {
     let done = 0,
       need = 0;
-    for (let i = 0; i < 7; i++) {
-      const d = addDays(weekStart, i);
-      if (!isBetween(d, startDate, endDate)) continue;
+    for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) {
       const req = daySubjectsFor(d).map((s) => s.id);
       need += req.length;
       const rec = completions[dateKey(d)] || {};
@@ -474,7 +457,6 @@ export default function KidsScheduleApp() {
           onRequestDelete={config.title ? () => setShowDeleteConfirm(true) : null}
           onSave={(cfg) => {
             setConfig(cfg);
-            setWeekStart(getMonday(parseDate(cfg.startDate) || new Date()));
             setView("main");
             // Clear the ?edit=1 flag so a later refresh lands on the main view.
             try {
@@ -491,8 +473,6 @@ export default function KidsScheduleApp() {
         <MainScreen
           config={config}
           completions={completions}
-          weekStart={weekStart}
-          setWeekStart={setWeekStart}
           startDate={startDate}
           endDate={endDate}
           todayKey={todayKey}
@@ -550,7 +530,6 @@ export default function KidsScheduleApp() {
       )}
 
       {celebrateDay && <DayCelebration onClose={() => setCelebrateDay(null)} />}
-      {celebrateWeek && <WeekCelebration onClose={() => setCelebrateWeek(false)} title={config.title} />}
       {celebrateSchedule && (
         <ScheduleCompleteCelebration
           onClose={() => setCelebrateSchedule(false)}
@@ -565,7 +544,7 @@ export default function KidsScheduleApp() {
 
 /* ---------------- Setup Screen ---------------- */
 
-function SubjectCard({ subject, onChange, onRemove }) {
+function SubjectCard({ subject, onChange }) {
   function set(patch) {
     onChange({ ...subject, ...patch });
   }
@@ -580,12 +559,9 @@ function SubjectCard({ subject, onChange, onRemove }) {
         <input
           value={subject.name}
           onChange={(e) => set({ name: e.target.value })}
-          placeholder="やることの名前（例：ピアノ）"
+          placeholder="なにをがんばる？（例：ピアノ）"
           style={styles.subjNameInput}
         />
-        <button style={styles.chipX} onClick={onRemove} aria-label="削除">
-          <X size={14} />
-        </button>
       </div>
 
       <div style={styles.swatchRow}>
@@ -683,41 +659,25 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
   const [endDate, setEndDate] = useState(initial.endDate || defaultEndDate());
   const [pin, setPin] = useState(initial.pin || "");
   const [reward, setReward] = useState(initial.reward || "");
-  const [subjects, setSubjects] = useState(
-    initial.subjects && initial.subjects.length ? initial.subjects : DEFAULT_SUBJECTS()
+  const [subject, setSubject] = useState(
+    initial.subjects && initial.subjects[0] ? initial.subjects[0] : DEFAULT_SUBJECT()
   );
-
-  function addSubject() {
-    setSubjects((prev) => [
-      ...prev,
-      {
-        id: uid(),
-        name: "",
-        color: PASTELS[prev.length % PASTELS.length].hex,
-        freqType: "daily",
-        intervalDays: 2,
-        weekdays: [0, 1, 2, 3, 4],
-        durationMinutes: 10,
-      },
-    ]);
-  }
-
-  function updateSubject(id, next) {
-    setSubjects((prev) => prev.map((s) => (s.id === id ? next : s)));
-  }
-
-  function removeSubject(id) {
-    setSubjects((prev) => prev.filter((s) => s.id !== id));
-  }
 
   function handleSave() {
     const t = title.trim() || "がんばりスケジュール";
-    const cleanSubjects = subjects.filter((s) => s.name.trim().length > 0).map((s) => ({ ...s, name: s.name.trim() }));
-    if (cleanSubjects.length === 0) return;
+    const subjName = subject.name.trim();
+    if (!subjName) return;
     let sd = startDate,
       ed = endDate;
     if (parseDate(ed) < parseDate(sd)) ed = sd;
-    onSave({ title: t, startDate: sd, endDate: ed, subjects: cleanSubjects, pin: pin.trim(), reward: reward.trim() });
+    onSave({
+      title: t,
+      startDate: sd,
+      endDate: ed,
+      subjects: [{ ...subject, name: subjName }],
+      pin: pin.trim(),
+      reward: reward.trim(),
+    });
   }
 
   return (
@@ -729,13 +689,13 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
           </button>
         )}
         <h1 style={styles.setupHeading}>{hasExisting ? "スケジュールを編集する" : "スケジュールをつくろう"}</h1>
-        <p style={styles.setupSub}>だれの、なんのためのスケジュールか、まず名前をつけてね</p>
+        <p style={styles.setupSub}>1つのスケジュールにつき、がんばることは1つです。だれの、なにをがんばるスケジュールか、名前をつけてね</p>
 
         <label style={styles.label}>タイトル</label>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="例）ゆうたろうの夏休みチャレンジ"
+          placeholder="例）ゆうたろうのピアノチャレンジ"
           style={styles.input}
         />
 
@@ -763,22 +723,12 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
           placeholder="例）アイスをたべる！／こうえんに行く！"
           style={styles.input}
         />
-        <p style={styles.tinyNote}>期間の最後まで、すべてのやることを達成したときにお祝いのメッセージとして表示されます。</p>
+        <p style={styles.tinyNote}>期間の最後まで、すべての日を達成したときにお祝いのメッセージとして表示されます。</p>
 
-        <label style={{ ...styles.label, marginTop: 20 }}>やること（教科・習い事）</label>
+        <label style={{ ...styles.label, marginTop: 20 }}>なにを がんばる？</label>
         <div style={styles.subjList}>
-          {subjects.map((s) => (
-            <SubjectCard
-              key={s.id}
-              subject={s}
-              onChange={(next) => updateSubject(s.id, next)}
-              onRemove={() => removeSubject(s.id)}
-            />
-          ))}
+          <SubjectCard subject={subject} onChange={setSubject} />
         </div>
-        <button style={styles.addBtn} onClick={addSubject}>
-          <Plus size={20} /> やることを追加
-        </button>
 
         <button style={styles.saveBtn} onClick={handleSave}>
           このスケジュールではじめる
@@ -799,8 +749,6 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
 function MainScreen({
   config,
   completions,
-  weekStart,
-  setWeekStart,
   startDate,
   endDate,
   todayKey,
@@ -817,13 +765,6 @@ function MainScreen({
   todayStats,
   streak,
 }) {
-  const weekMonday = getMonday(startDate);
-  const lastMonday = getMonday(endDate);
-  const canPrev = weekStart.getTime() > weekMonday.getTime();
-  const canNext = weekStart.getTime() < lastMonday.getTime();
-
-  const weekEnd = addDays(weekStart, 6);
-  const rangeLabel = `${weekStart.getMonth() + 1}/${weekStart.getDate()} 〜 ${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
   const pct = stats.need > 0 ? Math.round((stats.done / stats.need) * 100) : 0;
   const pearlCount = 10;
   const filledPearls = stats.need > 0 ? Math.round((stats.done / stats.need) * pearlCount) : 0;
@@ -838,21 +779,20 @@ function MainScreen({
       ? "いいちょうし！ あと すこし！"
       : "きょうも パーフェクト！すごいね！";
 
-  const visibleDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).filter((d) =>
-    isBetween(d, startDate, endDate)
-  );
+  const allDays = [];
+  for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) allDays.push(d);
 
-  const allSubjectsInWeek = [];
-  const seen = new Set();
-  visibleDays.forEach((d) => {
-    daySubjectsFor(d).forEach((s) => {
-      if (!seen.has(s.id)) {
-        seen.add(s.id);
-        allSubjectsInWeek.push(s);
+  const columns = config.subjects;
+
+  const todayColRef = useRef(null);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (todayColRef.current) {
+        todayColRef.current.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
       }
-    });
-  });
-  const columns = allSubjectsInWeek.length > 0 ? allSubjectsInWeek : config.subjects;
+    }, 250);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <div style={styles.mainWrap}>
@@ -906,7 +846,7 @@ function MainScreen({
               }}
             />
           ))}
-          <span style={styles.pearlPct}>{pct}%（こんしゅう）</span>
+          <span style={styles.pearlPct}>{pct}%（きかん全体）</span>
         </div>
 
         {config.reward && (
@@ -916,44 +856,42 @@ function MainScreen({
         )}
       </header>
 
-      <div style={styles.weekNav}>
-        <button style={{ ...styles.navBtn, opacity: canPrev ? 1 : 0.4 }} disabled={!canPrev} onClick={() => setWeekStart(addDays(weekStart, -7))}>
-          <ChevronLeft size={22} /> 前の週
-        </button>
-        <div style={styles.weekLabel}>{rangeLabel}</div>
-        <button style={{ ...styles.navBtn, opacity: canNext ? 1 : 0.4 }} disabled={!canNext} onClick={() => setWeekStart(addDays(weekStart, 7))}>
-          次の週 <ChevronRight size={22} />
-        </button>
-      </div>
-
       <div style={styles.tablePanel}>
         <p style={styles.tableHint}>💡 スタンプは「今日」だけ押せるよ。できなかった日は、今日2かいタップで取り戻せる！</p>
         <div style={styles.tableScroll}>
           <table style={styles.scheduleTable}>
             <thead>
               <tr>
-                <th style={styles.cornerHeadCell}>
+                <th style={styles.cornerHeadCell} rowSpan={2}>
                   <span style={{ fontSize: 20 }}>🐚</span>
                 </th>
-                {Array.from({ length: 7 }).map((_, i) => {
-                  const d = addDays(weekStart, i);
-                  const inRange = isBetween(d, startDate, endDate);
+                {allDays.map((d, i) => {
+                  const isToday = todayKey === dateKey(d);
+                  return (
+                    <th key={`dow-${i}`} style={{ ...styles.dayHeadCell, ...(isToday ? styles.dayHeadToday : {}) }}>
+                      <div style={styles.dayHeadDow}>{DAY_LABELS[dayIndexMon0(d)]}</div>
+                    </th>
+                  );
+                })}
+              </tr>
+              <tr>
+                {allDays.map((d, i) => {
                   const dKey = dateKey(d);
                   const isToday = todayKey === dKey;
-                  const dayReq = inRange ? daySubjectsFor(d) : [];
+                  const dayReq = daySubjectsFor(d);
                   const doneCount = dayReq.filter((s) => isStamped(dKey, s.id)).length;
                   const dayComplete = dayReq.length > 0 && doneCount === dayReq.length;
                   return (
                     <th
-                      key={i}
+                      key={`date-${i}`}
+                      ref={isToday ? todayColRef : null}
                       style={{
                         ...styles.dayHeadCell,
                         ...(isToday ? styles.dayHeadToday : {}),
                         ...(dayComplete ? styles.dayHeadComplete : {}),
                       }}
                     >
-                      <div style={styles.dayHeadDow}>{DAY_LABELS[i]}</div>
-                      <div style={styles.dayHeadDate}>{inRange ? `${d.getMonth() + 1}/${d.getDate()}` : "―"}</div>
+                      <div style={styles.dayHeadDate}>{`${d.getMonth() + 1}/${d.getDate()}`}</div>
                       {isToday && <div style={styles.dayHeadTodayTag}>きょう</div>}
                       {dayComplete && <div style={styles.dayHeadTrophy}>🏆</div>}
                     </th>
@@ -976,16 +914,7 @@ function MainScreen({
                         {backlog > 0 && <div style={styles.backlogBadge}>🔁 のこり{backlog}</div>}
                       </div>
                     </td>
-                    {Array.from({ length: 7 }).map((_, i) => {
-                      const d = addDays(weekStart, i);
-                      const inRange = isBetween(d, startDate, endDate);
-                      if (!inRange) {
-                        return (
-                          <td key={i} style={styles.dashCell}>
-                            <span style={styles.dashMark}>―</span>
-                          </td>
-                        );
-                      }
+                    {allDays.map((d, i) => {
                       const dKey = dateKey(d);
                       const applies = daySubjectsFor(d).some((x) => x.id === s.id);
                       if (!applies) {
@@ -1163,23 +1092,6 @@ function DayCelebration({ onClose }) {
       <div style={styles.dayCelebrateBadge}>
         <span style={{ fontSize: 46 }}>🐚</span>
         <div style={{ fontSize: 18, fontWeight: 700, color: "#0B3D62", marginTop: 4 }}>今日はぜんぶ できたね！</div>
-      </div>
-    </div>
-  );
-}
-
-function WeekCelebration({ onClose, title }) {
-  return (
-    <div style={styles.weekCelebrateOverlay}>
-      <Confetti />
-      <div style={styles.weekCelebrateCard}>
-        <div style={styles.chestEmoji}>🏆✨</div>
-        <h2 style={styles.weekCelebrateTitle}>今週のミッション達成！</h2>
-        <p style={styles.weekCelebrateSub}>{title} がんばったね。おおきなスタンプをプレゼント！</p>
-        <div style={styles.bigStamp}>GREAT!</div>
-        <button style={styles.weekCelebrateBtn} onClick={onClose}>
-          とじる
-        </button>
       </div>
     </div>
   );
