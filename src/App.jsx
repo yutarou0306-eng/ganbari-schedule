@@ -142,6 +142,12 @@ function todayStr() {
   return dateKey(new Date());
 }
 
+function clampDuration(v) {
+  let n = Math.round(Number(v) / 10) * 10;
+  if (!Number.isFinite(n) || n <= 0) n = 10;
+  return Math.max(10, Math.min(100, n));
+}
+
 function defaultEndDate() {
   const d = new Date();
   d.setDate(d.getDate() + 27);
@@ -149,9 +155,9 @@ function defaultEndDate() {
 }
 
 const DEFAULT_SUBJECTS = () => [
-  { id: uid(), name: "こくご", color: PASTELS[0].hex, freqType: "daily", intervalDays: 2, weekdays: [0, 2, 4] },
-  { id: uid(), name: "さんすう", color: PASTELS[5].hex, freqType: "daily", intervalDays: 2, weekdays: [0, 2, 4] },
-  { id: uid(), name: "ピアノ", color: PASTELS[6].hex, freqType: "weekday", intervalDays: 2, weekdays: [1, 3] },
+  { id: uid(), name: "こくご", color: PASTELS[0].hex, freqType: "daily", intervalDays: 2, weekdays: [0, 2, 4], durationMinutes: 10 },
+  { id: uid(), name: "さんすう", color: PASTELS[5].hex, freqType: "daily", intervalDays: 2, weekdays: [0, 2, 4], durationMinutes: 10 },
+  { id: uid(), name: "ピアノ", color: PASTELS[6].hex, freqType: "weekday", intervalDays: 2, weekdays: [1, 3], durationMinutes: 20 },
 ];
 
 function freshConfig() {
@@ -195,7 +201,13 @@ export default function KidsScheduleApp() {
             const today = new Date();
             const anchor = sd && today < sd ? sd : today;
             setWeekStart(getMonday(anchor));
-            setView("main");
+            // A "?edit=1" URL flag (used by the top-page's edit button) jumps
+            // straight into the setup/edit screen instead of the main view.
+            let wantsEdit = false;
+            try {
+              wantsEdit = new URLSearchParams(window.location.search).get("edit") === "1";
+            } catch (e) {}
+            setView(wantsEdit ? "setup" : "main");
           } else {
             setView("setup");
           }
@@ -401,6 +413,14 @@ export default function KidsScheduleApp() {
             setConfig(cfg);
             setWeekStart(getMonday(parseDate(cfg.startDate) || new Date()));
             setView("main");
+            // Clear the ?edit=1 flag so a later refresh lands on the main view.
+            try {
+              const url = new URL(window.location.href);
+              if (url.searchParams.has("edit")) {
+                url.searchParams.delete("edit");
+                window.history.replaceState(null, "", url.toString());
+              }
+            } catch (e) {}
           }}
         />
       )}
@@ -500,6 +520,20 @@ function SubjectCard({ subject, onChange, onRemove }) {
         ))}
       </div>
 
+      <div style={styles.durationRow}>
+        <input
+          type="number"
+          step={10}
+          min={10}
+          max={100}
+          value={subject.durationMinutes ?? 10}
+          onChange={(e) => set({ durationMinutes: Number(e.target.value) })}
+          onBlur={(e) => set({ durationMinutes: clampDuration(e.target.value) })}
+          style={styles.intervalInput}
+        />
+        <span style={{ fontSize: 13, color: "#4a6c85", fontWeight: 700 }}>分 とりくむ（10分きざみ・最大100分）</span>
+      </div>
+
       <div style={styles.freqRow}>
         {[
           { k: "daily", label: "毎日" },
@@ -578,6 +612,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting }) {
         freqType: "daily",
         intervalDays: 2,
         weekdays: [0, 1, 2, 3, 4],
+        durationMinutes: 10,
       },
     ]);
   }
@@ -830,6 +865,7 @@ function MainScreen({
                       </div>
                       <div style={styles.headLabel}>
                         {s.name}
+                        <span style={styles.durationBadge}>⏱{s.durationMinutes || 10}分</span>
                         {backlog > 0 && <div style={styles.backlogBadge}>🔁 のこり{backlog}</div>}
                       </div>
                     </td>
@@ -1152,6 +1188,7 @@ const styles = {
   freqRow: { display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" },
   freqBtn: { border: "2px solid #14588C", borderRadius: 999, padding: "6px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   intervalRow: { display: "flex", alignItems: "center", gap: 8 },
+  durationRow: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 },
   intervalInput: { width: 56, padding: "6px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 14, fontFamily: "inherit", textAlign: "center" },
   weekdayPicker: { display: "flex", gap: 5, flexWrap: "wrap" },
   weekdayToggle: { width: 32, height: 32, borderRadius: 10, border: "2px solid", cursor: "pointer", fontSize: 12.5, color: "#0B3D62", fontFamily: "inherit" },
@@ -1203,6 +1240,7 @@ const styles = {
   headBubble: { width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 3px 6px rgba(0,0,0,0.15)" },
   headLabel: { fontSize: 12, fontWeight: 800, color: "#0B3D62", lineHeight: 1.2 },
   backlogBadge: { fontSize: 9.5, color: "#B5651D", background: "#FFE9B3", borderRadius: 999, padding: "1px 6px", display: "inline-block", marginTop: 2, fontWeight: 800 },
+  durationBadge: { fontSize: 9.5, color: "#14588C", background: "#DCEEF7", borderRadius: 999, padding: "1px 6px", display: "inline-block", marginTop: 2, marginLeft: 4, fontWeight: 800 },
   rowHeadCell: { background: "#fff", borderRadius: 14, padding: "8px 10px", textAlign: "left", boxShadow: "inset 0 0 0 2px #EAF7FB", display: "flex", alignItems: "center", gap: 8, minWidth: 92, whiteSpace: "nowrap" },
 
   stampCell: { textAlign: "center", padding: 2 },
