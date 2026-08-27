@@ -32,3 +32,8 @@ export function upsertKnownSchedule(entry) {
   else list.push({ ...entry, updatedAt: Date.now() });
   writeAll(list);
 }
+
+export function removeKnownSchedule(id) {
+  const list = readAll().filter((x) => x.id !== id);
+  writeAll(list);
+}
