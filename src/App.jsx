@@ -939,7 +939,9 @@ function MainScreen({
                 }}
               >
                 <div style={styles.dayCellTopRow}>
-                  <span style={styles.dayNum}>{d.getDate()}</span>
+                  <span style={styles.dayNum}>
+                    {d.getDate() === 1 || i === 0 ? `${d.getMonth() + 1}/${d.getDate()}` : d.getDate()}
+                  </span>
                   {isToday && <span style={styles.dayHeadTodayTag}>きょう</span>}
                   {dayComplete && <span style={styles.dayHeadTrophy}>🏆</span>}
                 </div>
