@@ -148,6 +148,8 @@ function clampDuration(v) {
   return Math.max(10, Math.min(100, n));
 }
 
+const DURATION_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
+
 function defaultEndDate() {
   const d = new Date();
   d.setDate(d.getDate() + 27);
@@ -602,17 +604,18 @@ function SubjectCard({ subject, onChange, onRemove }) {
       </div>
 
       <div style={styles.durationRow}>
-        <input
-          type="number"
-          step={10}
-          min={10}
-          max={100}
+        <span style={{ fontSize: 13, color: "#4a6c85", fontWeight: 700 }}>とりくむ時間</span>
+        <select
           value={subject.durationMinutes ?? 10}
           onChange={(e) => set({ durationMinutes: Number(e.target.value) })}
-          onBlur={(e) => set({ durationMinutes: clampDuration(e.target.value) })}
-          style={styles.intervalInput}
-        />
-        <span style={{ fontSize: 13, color: "#4a6c85", fontWeight: 700 }}>分 とりくむ（10分きざみ・最大100分）</span>
+          style={styles.durationSelect}
+        >
+          {DURATION_OPTIONS.map((m) => (
+            <option key={m} value={m}>
+              {m}分
+            </option>
+          ))}
+        </select>
       </div>
 
       <div style={styles.freqRow}>
@@ -1331,7 +1334,8 @@ const styles = {
   freqRow: { display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" },
   freqBtn: { border: "2px solid #14588C", borderRadius: 999, padding: "6px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   intervalRow: { display: "flex", alignItems: "center", gap: 8 },
-  durationRow: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 },
+  durationRow: { display: "flex", alignItems: "center", gap: 10, marginBottom: 10 },
+  durationSelect: { flex: 1, maxWidth: 140, padding: "10px 12px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 15, fontFamily: "inherit", background: "#fff", color: "#0B3D62", fontWeight: 700 },
   intervalInput: { width: 56, padding: "6px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 14, fontFamily: "inherit", textAlign: "center" },
   weekdayPicker: { display: "flex", gap: 5, flexWrap: "wrap" },
   weekdayToggle: { width: 32, height: 32, borderRadius: 10, border: "2px solid", cursor: "pointer", fontSize: 12.5, color: "#0B3D62", fontFamily: "inherit" },
