@@ -167,6 +167,7 @@ function freshConfig() {
     endDate: defaultEndDate(),
     subjects: DEFAULT_SUBJECTS(),
     pin: "",
+    reward: "",
   };
 }
 
@@ -184,6 +185,7 @@ export default function KidsScheduleApp() {
   const [deleting, setDeleting] = useState(false);
   const [celebrateDay, setCelebrateDay] = useState(null);
   const [celebrateWeek, setCelebrateWeek] = useState(false);
+  const [celebrateSchedule, setCelebrateSchedule] = useState(false);
   const [toast, setToast] = useState("");
   const skipSave = useRef(true);
   const unlockTimer = useRef(null);
@@ -325,6 +327,18 @@ export default function KidsScheduleApp() {
           return req.every((id) => (rec[id] || 0) >= 1);
         });
         if (weekAllDone) setTimeout(() => setCelebrateWeek(true), 400);
+      }
+
+      if (dateKey(today) === dateKey(endDate)) {
+        const allDays = [];
+        for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) allDays.push(d);
+        const scheduleAllDone = allDays.every((d) => {
+          const req = daySubjectsFor(d).map((s) => s.id);
+          if (req.length === 0) return true;
+          const rec = updated[dateKey(d)] || {};
+          return req.every((id) => (rec[id] || 0) >= 1);
+        });
+        if (scheduleAllDone) setTimeout(() => setCelebrateSchedule(true), 700);
       }
       return updated;
     });
@@ -535,6 +549,13 @@ export default function KidsScheduleApp() {
 
       {celebrateDay && <DayCelebration onClose={() => setCelebrateDay(null)} />}
       {celebrateWeek && <WeekCelebration onClose={() => setCelebrateWeek(false)} title={config.title} />}
+      {celebrateSchedule && (
+        <ScheduleCompleteCelebration
+          onClose={() => setCelebrateSchedule(false)}
+          title={config.title}
+          reward={config.reward}
+        />
+      )}
       {toast && <div style={styles.toast}>{toast}</div>}
     </div>
   );
@@ -658,6 +679,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
   const [startDate, setStartDate] = useState(initial.startDate || todayStr());
   const [endDate, setEndDate] = useState(initial.endDate || defaultEndDate());
   const [pin, setPin] = useState(initial.pin || "");
+  const [reward, setReward] = useState(initial.reward || "");
   const [subjects, setSubjects] = useState(
     initial.subjects && initial.subjects.length ? initial.subjects : DEFAULT_SUBJECTS()
   );
@@ -692,7 +714,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
     let sd = startDate,
       ed = endDate;
     if (parseDate(ed) < parseDate(sd)) ed = sd;
-    onSave({ title: t, startDate: sd, endDate: ed, subjects: cleanSubjects, pin: pin.trim() });
+    onSave({ title: t, startDate: sd, endDate: ed, subjects: cleanSubjects, pin: pin.trim(), reward: reward.trim() });
   }
 
   return (
@@ -730,6 +752,15 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
           style={styles.input}
         />
         <p style={styles.tinyNote}>あんしょう番号を入れると、スタンプを押すときに保護者の確認が必要になります。</p>
+
+        <label style={{ ...styles.label, marginTop: 20 }}>🎁 ぜんぶ たっせいしたときの ごほうび（にんい）</label>
+        <input
+          value={reward}
+          onChange={(e) => setReward(e.target.value)}
+          placeholder="例）アイスをたべる！／こうえんに行く！"
+          style={styles.input}
+        />
+        <p style={styles.tinyNote}>期間の最後まで、すべてのやることを達成したときにお祝いのメッセージとして表示されます。</p>
 
         <label style={{ ...styles.label, marginTop: 20 }}>やること（教科・習い事）</label>
         <div style={styles.subjList}>
@@ -874,6 +905,12 @@ function MainScreen({
           ))}
           <span style={styles.pearlPct}>{pct}%（こんしゅう）</span>
         </div>
+
+        {config.reward && (
+          <div style={styles.rewardPreview}>
+            🎁 ぜんぶ たっせいすると… <strong>{config.reward}</strong>
+          </div>
+        )}
       </header>
 
       <div style={styles.weekNav}>
@@ -1145,6 +1182,30 @@ function WeekCelebration({ onClose, title }) {
   );
 }
 
+function ScheduleCompleteCelebration({ onClose, title, reward }) {
+  return (
+    <div style={styles.weekCelebrateOverlay}>
+      <Confetti />
+      <div style={styles.weekCelebrateCard}>
+        <div style={styles.chestEmoji}>🎉🏆🎉</div>
+        <h2 style={styles.weekCelebrateTitle}>ぜんぶ たっせい！！</h2>
+        <p style={styles.weekCelebrateSub}>{title} 最後まで、本当によくがんばったね！</p>
+        {reward ? (
+          <div style={styles.rewardCard}>
+            <div style={styles.rewardLabel}>🎁 ごほうび</div>
+            <div style={styles.rewardText}>{reward}</div>
+          </div>
+        ) : (
+          <div style={styles.bigStamp}>PERFECT!</div>
+        )}
+        <button style={styles.weekCelebrateBtn} onClick={onClose}>
+          とじる
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Confetti() {
   const pieces = Array.from({ length: 26 });
   return (
@@ -1301,6 +1362,7 @@ const styles = {
   necklaceRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "rgba(255,255,255,0.15)", padding: "10px 12px", borderRadius: 999, backdropFilter: "blur(4px)" },
   pearl: { width: 16, height: 16, borderRadius: "50%", flexShrink: 0, transition: "all 0.4s" },
   pearlPct: { marginLeft: "auto", color: "#fff", fontWeight: 900, fontSize: 13 },
+  rewardPreview: { marginTop: 8, background: "rgba(255,255,255,0.18)", borderRadius: 12, padding: "6px 12px", color: "#fff", fontSize: 12, fontWeight: 700, backdropFilter: "blur(4px)" },
 
   weekNav: { position: "relative", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 18px", marginTop: 4 },
   navBtn: { display: "inline-flex", alignItems: "center", gap: 2, background: "rgba(255,255,255,0.85)", border: "none", borderRadius: 999, padding: "8px 12px", fontWeight: 700, fontSize: 12.5, color: "#14588C", cursor: "pointer", fontFamily: "inherit" },
@@ -1356,5 +1418,8 @@ const styles = {
   weekCelebrateTitle: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 21, margin: "4px 0" },
   weekCelebrateSub: { fontSize: 13, color: "#5a7d94", marginBottom: 16, lineHeight: 1.6 },
   bigStamp: { display: "inline-block", border: "4px solid #FF8FA3", color: "#FF8FA3", fontWeight: 900, fontSize: 22, padding: "8px 22px", borderRadius: 14, transform: "rotate(-8deg)", marginBottom: 18, fontFamily: "'Kaisei Decol', serif" },
+  rewardCard: { background: "linear-gradient(135deg,#FFF3B0,#FFD6E0)", borderRadius: 16, padding: "14px 18px", marginBottom: 18, boxShadow: "0 6px 16px rgba(0,0,0,0.15)" },
+  rewardLabel: { fontSize: 11.5, fontWeight: 900, color: "#B5651D", marginBottom: 4 },
+  rewardText: { fontSize: 17, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif", lineHeight: 1.4 },
   weekCelebrateBtn: { display: "block", margin: "0 auto", padding: "10px 28px", borderRadius: 999, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
 };
