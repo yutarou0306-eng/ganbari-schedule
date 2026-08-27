@@ -183,6 +183,7 @@ export default function KidsScheduleApp() {
   const [config, setConfig] = useState(freshConfig());
   const [completions, setCompletions] = useState({});
   const [recoveries, setRecoveries] = useState({});
+  const [funStamps, setFunStamps] = useState({});
   const [locked, setLocked] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
@@ -205,6 +206,7 @@ export default function KidsScheduleApp() {
             setConfig(data.config);
             setCompletions(data.completions || {});
             setRecoveries(data.recoveries || {});
+            setFunStamps(data.funStamps || {});
             // A "?edit=1" URL flag (used by the top-page's edit button) jumps
             // straight into the setup/edit screen instead of the main view.
             let wantsEdit = false;
@@ -233,11 +235,11 @@ export default function KidsScheduleApp() {
     }
     const t = setTimeout(async () => {
       try {
-        await window.storage.set(STORAGE_KEY, JSON.stringify({ config, completions, recoveries }), false);
+        await window.storage.set(STORAGE_KEY, JSON.stringify({ config, completions, recoveries, funStamps }), false);
       } catch (e) {}
     }, 350);
     return () => clearTimeout(t);
-  }, [config, completions, recoveries, loaded]);
+  }, [config, completions, recoveries, funStamps, loaded]);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -261,6 +263,10 @@ export default function KidsScheduleApp() {
 
   function isStamped(dKey, subjId) {
     return countFor(dKey, subjId) >= 1;
+  }
+
+  function funStampFor(dKey, subjId) {
+    return !!(funStamps[dKey] && funStamps[dKey][subjId]);
   }
 
   // how many past required occurrences of this subject were never done, minus what's already been recovered
@@ -363,6 +369,21 @@ export default function KidsScheduleApp() {
     }
 
     showToast("スタンプを取り消したよ");
+  }
+
+  // Playful "practice" stamps for cells that aren't real yet (not today) — freely
+  // toggled on/off, always allowed regardless of lock state, and never counted
+  // toward backlog, streaks, or the completion percentage. Purely for fun so the
+  // app doesn't feel inert on every cell that isn't tappable "for real".
+  function handleToggleFunStamp(date, subjId) {
+    const dKey = dateKey(date);
+    if (dKey === todayKey) return; // today already has the real stamp
+    setFunStamps((prev) => {
+      const day = { ...(prev[dKey] || {}) };
+      if (day[subjId]) delete day[subjId];
+      else day[subjId] = true;
+      return { ...prev, [dKey]: day };
+    });
   }
 
   async function handleDeleteSchedule() {
@@ -486,9 +507,11 @@ export default function KidsScheduleApp() {
           }
           onTapStamp={handleTapStamp}
           onClearStamp={handleClearStamp}
+          onToggleFunStamp={handleToggleFunStamp}
           daySubjectsFor={daySubjectsFor}
           isStamped={isStamped}
           countFor={countFor}
+          funStampFor={funStampFor}
           missedBacklog={missedBacklog}
           onOpenSettings={() => setView("setup")}
           stats={totalStats()}
@@ -756,9 +779,11 @@ function MainScreen({
   onLockToggle,
   onTapStamp,
   onClearStamp,
+  onToggleFunStamp,
   daySubjectsFor,
   isStamped,
   countFor,
+  funStampFor,
   missedBacklog,
   onOpenSettings,
   stats,
@@ -779,16 +804,21 @@ function MainScreen({
       ? "いいちょうし！ あと すこし！"
       : "きょうも パーフェクト！すごいね！";
 
-  const allDays = [];
-  for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) allDays.push(d);
+  // Build a Monday-to-Sunday grid covering the whole schedule period, like a
+  // desk calendar: padded at both ends so every row is a full week.
+  const gridStart = getMonday(startDate);
+  const trailing = (6 - dayIndexMon0(endDate) + 7) % 7;
+  const gridEnd = addDays(endDate, trailing);
+  const allCells = [];
+  for (let d = new Date(gridStart); d.getTime() <= gridEnd.getTime(); d = addDays(d, 1)) allCells.push(d);
 
-  const columns = config.subjects;
+  const subjects = config.subjects;
 
-  const todayColRef = useRef(null);
+  const todayCellRef = useRef(null);
   useEffect(() => {
     const t = setTimeout(() => {
-      if (todayColRef.current) {
-        todayColRef.current.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+      if (todayCellRef.current) {
+        todayCellRef.current.scrollIntoView({ block: "center", behavior: "smooth" });
       }
     }, 250);
     return () => clearTimeout(t);
@@ -812,7 +842,7 @@ function MainScreen({
           </div>
         </div>
         <div style={styles.lockNote}>
-          {locked ? "🔒 スタンプは保護者の方がロックを開けてから押せます" : "🔓 スタンプが押せます（3分後に自動ロック）"}
+          {locked ? "🔒 本スタンプは保護者の方がロックを開けてから押せます" : "🔓 本スタンプが押せます（3分後に自動ロック）"}
         </div>
 
         <div style={styles.mascotRow}>
@@ -856,116 +886,145 @@ function MainScreen({
         )}
       </header>
 
-      <div style={styles.tablePanel}>
-        <p style={styles.tableHint}>💡 スタンプは「今日」だけ押せるよ。できなかった日は、今日2かいタップで取り戻せる！</p>
-        <div style={styles.tableScroll}>
-          <table style={styles.scheduleTable}>
-            <thead>
-              <tr>
-                <th style={styles.cornerHeadCell} rowSpan={2}>
-                  <span style={{ fontSize: 20 }}>🐚</span>
-                </th>
-                {allDays.map((d, i) => {
-                  const isToday = todayKey === dateKey(d);
-                  return (
-                    <th key={`dow-${i}`} style={{ ...styles.dayHeadCell, ...(isToday ? styles.dayHeadToday : {}) }}>
-                      <div style={styles.dayHeadDow}>{DAY_LABELS[dayIndexMon0(d)]}</div>
-                    </th>
-                  );
-                })}
-              </tr>
-              <tr>
-                {allDays.map((d, i) => {
-                  const dKey = dateKey(d);
-                  const isToday = todayKey === dKey;
-                  const dayReq = daySubjectsFor(d);
-                  const doneCount = dayReq.filter((s) => isStamped(dKey, s.id)).length;
-                  const dayComplete = dayReq.length > 0 && doneCount === dayReq.length;
-                  return (
-                    <th
-                      key={`date-${i}`}
-                      ref={isToday ? todayColRef : null}
-                      style={{
-                        ...styles.dayHeadCell,
-                        ...(isToday ? styles.dayHeadToday : {}),
-                        ...(dayComplete ? styles.dayHeadComplete : {}),
-                      }}
-                    >
-                      <div style={styles.dayHeadDate}>{`${d.getMonth() + 1}/${d.getDate()}`}</div>
-                      {isToday && <div style={styles.dayHeadTodayTag}>きょう</div>}
-                      {dayComplete && <div style={styles.dayHeadTrophy}>🏆</div>}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {columns.map((s, idx) => {
-                const backlog = missedBacklog(s);
-                return (
-                  <tr key={s.id}>
-                    <td style={styles.rowHeadCell}>
-                      <div style={{ ...styles.headBubble, background: s.color }}>
-                        <StampIcon index={idx} color="#ffffff" size={24} />
-                      </div>
-                      <div style={styles.headLabel}>
-                        {s.name}
-                        <span style={styles.durationBadge}>⏱{s.durationMinutes || 10}分</span>
-                        {backlog > 0 && <div style={styles.backlogBadge}>🔁 のこり{backlog}</div>}
-                      </div>
-                    </td>
-                    {allDays.map((d, i) => {
-                      const dKey = dateKey(d);
-                      const applies = daySubjectsFor(d).some((x) => x.id === s.id);
-                      if (!applies) {
-                        return (
-                          <td key={i} style={styles.dashCell}>
-                            <span style={styles.dashMark}>ー</span>
-                          </td>
-                        );
-                      }
-                      const count = countFor(dKey, s.id);
-                      const isToday = dKey === todayKey;
-                      const isPastMiss = !isToday && dKey < todayKey && count === 0;
+      <div style={styles.subjectSummaryRow}>
+        {subjects.map((s, idx) => {
+          const backlog = missedBacklog(s);
+          return (
+            <div key={s.id} style={styles.subjectSummaryChip}>
+              <div style={{ ...styles.headBubble, background: s.color, width: 30, height: 30 }}>
+                <StampIcon index={idx} color="#ffffff" size={16} />
+              </div>
+              <span style={styles.headLabel}>{s.name}</span>
+              <span style={styles.durationBadge}>⏱{s.durationMinutes || 10}分</span>
+              {backlog > 0 && <span style={styles.backlogBadge}>🔁 のこり{backlog}</span>}
+            </div>
+          );
+        })}
+      </div>
 
+      <div style={styles.calendarLegendRow}>
+        <span style={styles.calendarLegendItem}>
+          <span style={{ ...styles.legendDot, background: "#14588C" }} /> 本スタンプ（今日だけ）
+        </span>
+        <span style={styles.calendarLegendItem}>
+          <span style={{ ...styles.legendDot, background: "#BFE3F0" }} /> 仮スタンプ（れんしゅう用）
+        </span>
+      </div>
+
+      <div style={styles.calendarPanel}>
+        <p style={styles.tableHint}>💡 今日のマスは「本スタンプ」。ほかの日は自由に「仮スタンプ」で練習できるよ！</p>
+        <div style={styles.calendarGrid}>
+          {DAY_LABELS.map((label, i) => (
+            <div key={`dow-${i}`} style={styles.weekdayHeadCell}>
+              {label}
+            </div>
+          ))}
+          {allCells.map((d, i) => {
+            const dKey = dateKey(d);
+            const inRange = isBetween(d, startDate, endDate);
+            const isToday = todayKey === dKey;
+            const dayReq = inRange ? daySubjectsFor(d) : [];
+            const doneCount = dayReq.filter((s) => isStamped(dKey, s.id)).length;
+            const dayComplete = dayReq.length > 0 && doneCount === dayReq.length;
+
+            return (
+              <div
+                key={i}
+                ref={isToday ? todayCellRef : null}
+                style={{
+                  ...styles.dayCell,
+                  ...(!inRange ? styles.dayCellDim : {}),
+                  ...(isToday ? styles.dayCellToday : {}),
+                  ...(dayComplete ? styles.dayCellComplete : {}),
+                }}
+              >
+                <div style={styles.dayCellTopRow}>
+                  <span style={styles.dayNum}>{d.getDate()}</span>
+                  {isToday && <span style={styles.dayHeadTodayTag}>きょう</span>}
+                  {dayComplete && <span style={styles.dayHeadTrophy}>🏆</span>}
+                </div>
+
+                {!inRange ? (
+                  <span style={styles.dashMark}>ー</span>
+                ) : dayReq.length === 0 ? (
+                  <span style={styles.dashMark}>ー</span>
+                ) : (
+                  <div style={styles.dayStampsRow}>
+                    {dayReq.map((s, idx) => {
+                      const count = countFor(dKey, s.id);
                       if (isToday) {
                         return (
-                          <td key={i} style={styles.stampCell}>
-                            <StampCell count={count} color={s.color} iconIndex={idx} label={s.name} onTap={() => onTapStamp(d, s.id)} onClear={() => onClearStamp(d, s.id)} />
-                          </td>
+                          <div key={s.id} style={styles.stampSlot}>
+                            <StampCell
+                              count={count}
+                              color={s.color}
+                              iconIndex={idx}
+                              label={s.name}
+                              onTap={() => onTapStamp(d, s.id)}
+                              onClear={() => onClearStamp(d, s.id)}
+                            />
+                          </div>
                         );
                       }
+                      const isPastMiss = dKey < todayKey && count === 0;
                       return (
-                        <td key={i} style={styles.stampCell}>
-                          <ReadOnlyCell count={count} color={s.color} iconIndex={idx} missed={isPastMiss} />
-                        </td>
+                        <div key={s.id} style={styles.stampSlot}>
+                          <HistoryCell
+                            count={count}
+                            color={s.color}
+                            iconIndex={idx}
+                            label={s.name}
+                            missed={isPastMiss}
+                            fun={funStampFor(dKey, s.id)}
+                            onToggleFun={() => onToggleFunStamp(d, s.id)}
+                          />
+                        </div>
                       );
                     })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
   );
 }
 
-function ReadOnlyCell({ count, color, iconIndex, missed }) {
+function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun }) {
+  const real = count >= 1;
+  if (real) {
+    // A genuine past completion — shown vivid and solid, not editable here.
+    return (
+      <div
+        style={{
+          ...styles.stampCircle,
+          cursor: "default",
+          borderColor: color,
+          borderStyle: "solid",
+          background: color + "22",
+        }}
+      >
+        <StampIcon index={iconIndex} color={color} size="62%" />
+        {count === 2 && <span style={styles.x2Badge}>×2</span>}
+      </div>
+    );
+  }
+  // No real record here — a free, playful "practice" stamp the child can pop
+  // on and off. Always tappable, always pale, never affects real progress.
   return (
-    <div
+    <button
+      onClick={onToggleFun}
       style={{
         ...styles.stampCircle,
-        cursor: "default",
-        borderColor: count >= 1 ? color : missed ? "#F4C95D" : "#dbe8ee",
-        background: count >= 1 ? color + "22" : "#fff",
-        opacity: count >= 1 ? 1 : 0.75,
+        borderColor: fun ? color : missed ? "#F4C95D" : "#dbe8ee",
+        background: fun ? color + "18" : "#fff",
       }}
+      aria-label={`${label} れんしゅうスタンプ`}
     >
-      {count >= 1 && <StampIcon index={iconIndex} color={color} size={62} />}
-      {count === 2 && <span style={styles.x2Badge}>×2</span>}
-    </div>
+      {fun && <StampIcon index={iconIndex} color={color} size="60%" withFace={false} />}
+    </button>
   );
 }
 
@@ -1000,7 +1059,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear }) {
       >
         {count >= 1 && (
           <span key={popKey} style={styles.stampPopWrap}>
-            <StampIcon index={iconIndex} color={color} size={70} />
+            <StampIcon index={iconIndex} color={color} size="65%" />
           </span>
         )}
         {count === 2 && <span style={styles.x2Badge}>×2</span>}
@@ -1281,39 +1340,41 @@ const styles = {
   pearlPct: { marginLeft: "auto", color: "#fff", fontWeight: 900, fontSize: 17 },
   rewardPreview: { marginTop: 8, background: "rgba(255,255,255,0.18)", borderRadius: 12, padding: "8px 14px", color: "#fff", fontSize: 16, fontWeight: 700, backdropFilter: "blur(4px)" },
 
-  weekNav: { position: "relative", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 18px", marginTop: 4 },
-  navBtn: { display: "inline-flex", alignItems: "center", gap: 2, background: "rgba(255,255,255,0.85)", border: "none", borderRadius: 999, padding: "10px 15px", fontWeight: 700, fontSize: 16.5, color: "#14588C", cursor: "pointer", fontFamily: "inherit" },
-  weekLabel: { color: "#fff", fontWeight: 800, fontSize: 18 },
+  subjectSummaryRow: { position: "relative", zIndex: 2, display: "flex", flexWrap: "wrap", gap: 8, padding: "0 18px", marginTop: 4 },
+  subjectSummaryChip: { display: "flex", alignItems: "center", gap: 8, background: "#fff", borderRadius: 999, padding: "6px 12px 6px 6px", boxShadow: "0 4px 10px rgba(11,61,98,0.2)" },
 
-  tablePanel: { position: "relative", zIndex: 2, margin: "16px 18px 0", background: "linear-gradient(180deg,#FFFDF8,#FFF3E4)", borderRadius: 22, padding: 12, boxShadow: "0 16px 34px rgba(11,61,98,0.3)" },
+  calendarLegendRow: { position: "relative", zIndex: 2, display: "flex", gap: 14, padding: "10px 18px 0", flexWrap: "wrap" },
+  calendarLegendItem: { display: "inline-flex", alignItems: "center", gap: 6, color: "#EAF7FB", fontSize: 13, fontWeight: 700 },
+  legendDot: { width: 12, height: 12, borderRadius: "50%", display: "inline-block" },
+
+  calendarPanel: { position: "relative", zIndex: 2, margin: "12px 18px 0", background: "linear-gradient(180deg,#FFFDF8,#FFF3E4)", borderRadius: 22, padding: 12, boxShadow: "0 16px 34px rgba(11,61,98,0.3)" },
   tableHint: { fontSize: 15, color: "#5a7d94", fontWeight: 700, margin: "0 4px 10px" },
-  tableScroll: { overflowX: "auto" },
-  scheduleTable: { borderCollapse: "separate", borderSpacing: "9px", width: "100%" },
-  cornerHeadCell: { width: 120 },
+  calendarGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 },
+  weekdayHeadCell: { textAlign: "center", fontSize: 15, fontWeight: 900, color: "#0B3D62", background: "#fff", borderRadius: 10, padding: "6px 0", boxShadow: "inset 0 0 0 2px #EAF7FB" },
 
-  dayHeadCell: { background: "#fff", borderRadius: 14, padding: "8px 5px", textAlign: "center", boxShadow: "inset 0 0 0 2px #EAF7FB", minWidth: 90 },
-  dayHeadToday: { boxShadow: "inset 0 0 0 2px #14588C" },
-  dayHeadComplete: { boxShadow: "inset 0 0 0 2px #F4C95D", background: "#FFF7DA" },
-  dayHeadDow: { fontSize: 18, fontWeight: 900, color: "#0B3D62" },
-  dayHeadDate: { fontSize: 14, color: "#7c98aa" },
-  dayHeadTodayTag: { fontSize: 12.5, color: "#fff", background: "#14588C", borderRadius: 999, padding: "2px 8px", display: "inline-block", marginTop: 2, fontWeight: 900 },
-  dayHeadTrophy: { fontSize: 17, marginTop: 1 },
+  dayCell: { background: "#fff", borderRadius: 12, padding: "5px 4px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, boxShadow: "inset 0 0 0 2px #EAF7FB", minWidth: 0 },
+  dayCellDim: { opacity: 0.35 },
+  dayCellToday: { boxShadow: "inset 0 0 0 2px #14588C" },
+  dayCellComplete: { boxShadow: "inset 0 0 0 2px #F4C95D", background: "#FFF7DA" },
+  dayCellTopRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 3, width: "100%", flexWrap: "wrap" },
+  dayNum: { fontSize: 13, fontWeight: 800, color: "#7c98aa" },
+  dayHeadTodayTag: { fontSize: 9, color: "#fff", background: "#14588C", borderRadius: 999, padding: "1px 5px", fontWeight: 900 },
+  dayHeadTrophy: { fontSize: 12 },
 
   headBubble: { width: 44, height: 44, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 3px 6px rgba(0,0,0,0.15)" },
   headLabel: { fontSize: 17, fontWeight: 800, color: "#0B3D62", lineHeight: 1.3 },
-  backlogBadge: { fontSize: 13, color: "#B5651D", background: "#FFE9B3", borderRadius: 999, padding: "2px 8px", display: "inline-block", marginTop: 3, fontWeight: 800 },
-  durationBadge: { fontSize: 13, color: "#14588C", background: "#DCEEF7", borderRadius: 999, padding: "2px 8px", display: "inline-block", marginTop: 3, marginLeft: 4, fontWeight: 800 },
-  rowHeadCell: { background: "#fff", borderRadius: 14, padding: "10px 14px", textAlign: "left", boxShadow: "inset 0 0 0 2px #EAF7FB", display: "flex", alignItems: "center", gap: 10, minWidth: 130, whiteSpace: "nowrap" },
+  backlogBadge: { fontSize: 13, color: "#B5651D", background: "#FFE9B3", borderRadius: 999, padding: "2px 8px", display: "inline-block", fontWeight: 800 },
+  durationBadge: { fontSize: 13, color: "#14588C", background: "#DCEEF7", borderRadius: 999, padding: "2px 8px", display: "inline-block", fontWeight: 800 },
 
-  stampCell: { textAlign: "center", padding: 4 },
-  stampCellWrap: { position: "relative", display: "inline-block" },
-  stampCircle: { width: 112, height: 112, borderRadius: "50%", border: "5px dashed", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", overflow: "visible" },
+  dayStampsRow: { display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center", width: "100%" },
+  stampSlot: { flex: "1 1 0", minWidth: 26, maxWidth: 90 },
+  stampCellWrap: { position: "relative", width: "100%" },
+  stampCircle: { width: "100%", aspectRatio: "1", borderRadius: "50%", border: "3px dashed", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", overflow: "visible", boxSizing: "border-box" },
   stampPopWrap: { display: "flex", alignItems: "center", justifyContent: "center", animation: "stampPop 0.45s cubic-bezier(.34,1.56,.64,1)" },
-  x2Badge: { position: "absolute", top: -10, right: -10, background: "#FF6B8A", color: "#fff", fontSize: 15, fontWeight: 900, borderRadius: 999, padding: "3px 9px", boxShadow: "0 2px 5px rgba(0,0,0,0.3)" },
-  undoBadge: { position: "absolute", top: -10, left: -10, width: 34, height: 34, borderRadius: "50%", background: "#8aa4b4", color: "#fff", fontSize: 19, fontWeight: 900, border: "3px solid #fff", boxShadow: "0 2px 5px rgba(0,0,0,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 },
-  commentBubble: { position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap", background: "#fff", color: "#FF6B8A", fontSize: 15, fontWeight: 900, padding: "5px 11px", borderRadius: 999, boxShadow: "0 4px 10px rgba(0,0,0,0.2)", animation: "floatComment 1.3s ease-out forwards", pointerEvents: "none" },
-  dashCell: { textAlign: "center" },
-  dashMark: { color: "#c9d8e0", fontSize: 19, fontWeight: 700 },
+  x2Badge: { position: "absolute", top: -8, right: -8, background: "#FF6B8A", color: "#fff", fontSize: 11, fontWeight: 900, borderRadius: 999, padding: "2px 6px", boxShadow: "0 2px 5px rgba(0,0,0,0.3)" },
+  undoBadge: { position: "absolute", top: -8, left: -8, width: 22, height: 22, borderRadius: "50%", background: "#8aa4b4", color: "#fff", fontSize: 14, fontWeight: 900, border: "2px solid #fff", boxShadow: "0 2px 5px rgba(0,0,0,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 },
+  commentBubble: { position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap", background: "#fff", color: "#FF6B8A", fontSize: 12, fontWeight: 900, padding: "3px 8px", borderRadius: 999, boxShadow: "0 4px 10px rgba(0,0,0,0.2)", animation: "floatComment 1.3s ease-out forwards", pointerEvents: "none", zIndex: 5 },
+  dashMark: { color: "#c9d8e0", fontSize: 15, fontWeight: 700 },
 
   toast: { position: "fixed", left: "50%", bottom: 20, transform: "translateX(-50%)", background: "#0B3D62", color: "#fff", padding: "12px 22px", borderRadius: 999, fontSize: 17, fontWeight: 700, boxShadow: "0 10px 24px rgba(0,0,0,0.3)", zIndex: 50, maxWidth: "90%", textAlign: "center" },
 
