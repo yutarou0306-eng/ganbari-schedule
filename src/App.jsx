@@ -292,7 +292,7 @@ export default function KidsScheduleApp() {
     } else if (cur === 1) {
       const backlog = missedBacklog(subject);
       if (backlog <= 0) {
-        showToast("いまは取り戻す分がないよ。1かいでOK！");
+        showToast("すでに1かい押してあるよ。取り消すときは×ボタンをおしてね");
         return;
       }
       next = 2;
@@ -332,6 +332,34 @@ export default function KidsScheduleApp() {
     }
 
     if (next === 2) showToast("すごい！2日ぶん取り戻したね！");
+  }
+
+  function handleClearStamp(date, subjId) {
+    if (dateKey(date) !== todayKey) {
+      showToast("スタンプは今日の分だけ操作できるよ");
+      return;
+    }
+    if (locked) {
+      if (config.pin && config.pin.length > 0) setShowPinModal(true);
+      else setShowConfirmModal(true);
+      return;
+    }
+    const dKey = dateKey(date);
+    const cur = countFor(dKey, subjId);
+    if (cur === 0) return;
+    const recoveryDelta = cur === 2 ? -1 : 0;
+
+    setCompletions((prev) => {
+      const day = { ...(prev[dKey] || {}) };
+      delete day[subjId];
+      return { ...prev, [dKey]: day };
+    });
+
+    if (recoveryDelta !== 0) {
+      setRecoveries((prev) => ({ ...prev, [subjId]: Math.max(0, (prev[subjId] || 0) + recoveryDelta) }));
+    }
+
+    showToast("スタンプを取り消したよ");
   }
 
   function doUnlock() {
@@ -442,6 +470,7 @@ export default function KidsScheduleApp() {
               : handleRelock()
           }
           onTapStamp={handleTapStamp}
+          onClearStamp={handleClearStamp}
           daySubjectsFor={daySubjectsFor}
           isStamped={isStamped}
           countFor={countFor}
@@ -707,6 +736,7 @@ function MainScreen({
   locked,
   onLockToggle,
   onTapStamp,
+  onClearStamp,
   daySubjectsFor,
   isStamped,
   countFor,
@@ -895,7 +925,7 @@ function MainScreen({
                       if (isToday) {
                         return (
                           <td key={i} style={styles.stampCell}>
-                            <StampCell count={count} color={s.color} iconIndex={idx} label={s.name} onTap={() => onTapStamp(d, s.id)} />
+                            <StampCell count={count} color={s.color} iconIndex={idx} label={s.name} onTap={() => onTapStamp(d, s.id)} onClear={() => onClearStamp(d, s.id)} />
                           </td>
                         );
                       }
@@ -933,7 +963,7 @@ function ReadOnlyCell({ count, color, iconIndex, missed }) {
   );
 }
 
-function StampCell({ count, color, iconIndex, label, onTap }) {
+function StampCell({ count, color, iconIndex, label, onTap, onClear }) {
   const [popKey, setPopKey] = useState(0);
   const [comment, setComment] = useState(null);
   const prevCount = useRef(count);
@@ -952,23 +982,38 @@ function StampCell({ count, color, iconIndex, label, onTap }) {
   useEffect(() => () => clearTimeout(timerRef.current), []);
 
   return (
-    <button
-      onClick={onTap}
-      style={{
-        ...styles.stampCircle,
-        borderColor: color,
-        background: count >= 1 ? color + "22" : "#ffffff",
-      }}
-      aria-label={`${label} スタンプ`}
-    >
+    <div style={styles.stampCellWrap}>
+      <button
+        onClick={onTap}
+        style={{
+          ...styles.stampCircle,
+          borderColor: color,
+          background: count >= 1 ? color + "22" : "#ffffff",
+        }}
+        aria-label={`${label} スタンプ`}
+      >
+        {count >= 1 && (
+          <span key={popKey} style={styles.stampPopWrap}>
+            <StampIcon index={iconIndex} color={color} size={26} />
+          </span>
+        )}
+        {count === 2 && <span style={styles.x2Badge}>×2</span>}
+        {comment && <span style={styles.commentBubble}>{comment}</span>}
+      </button>
       {count >= 1 && (
-        <span key={popKey} style={styles.stampPopWrap}>
-          <StampIcon index={iconIndex} color={color} size={26} />
-        </span>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onClear();
+          }}
+          style={styles.undoBadge}
+          aria-label={`${label} スタンプを取り消す`}
+          title="取り消す"
+        >
+          ×
+        </button>
       )}
-      {count === 2 && <span style={styles.x2Badge}>×2</span>}
-      {comment && <span style={styles.commentBubble}>{comment}</span>}
-    </button>
+    </div>
   );
 }
 
@@ -1244,9 +1289,11 @@ const styles = {
   rowHeadCell: { background: "#fff", borderRadius: 14, padding: "8px 10px", textAlign: "left", boxShadow: "inset 0 0 0 2px #EAF7FB", display: "flex", alignItems: "center", gap: 8, minWidth: 92, whiteSpace: "nowrap" },
 
   stampCell: { textAlign: "center", padding: 2 },
+  stampCellWrap: { position: "relative", display: "inline-block" },
   stampCircle: { width: 42, height: 42, borderRadius: "50%", border: "2px dashed", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", overflow: "visible" },
   stampPopWrap: { display: "flex", alignItems: "center", justifyContent: "center", animation: "stampPop 0.45s cubic-bezier(.34,1.56,.64,1)" },
   x2Badge: { position: "absolute", top: -6, right: -6, background: "#FF6B8A", color: "#fff", fontSize: 9.5, fontWeight: 900, borderRadius: 999, padding: "1px 5px", boxShadow: "0 2px 5px rgba(0,0,0,0.3)" },
+  undoBadge: { position: "absolute", top: -6, left: -6, width: 18, height: 18, borderRadius: "50%", background: "#8aa4b4", color: "#fff", fontSize: 12, fontWeight: 900, border: "2px solid #fff", boxShadow: "0 2px 5px rgba(0,0,0,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 },
   commentBubble: { position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap", background: "#fff", color: "#FF6B8A", fontSize: 10.5, fontWeight: 900, padding: "3px 8px", borderRadius: 999, boxShadow: "0 4px 10px rgba(0,0,0,0.2)", animation: "floatComment 1.3s ease-out forwards", pointerEvents: "none" },
   dashCell: { textAlign: "center" },
   dashMark: { color: "#c9d8e0", fontSize: 14, fontWeight: 700 },
