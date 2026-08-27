@@ -725,7 +725,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
       <div style={styles.setupCard}>
         {onCancel && (
           <button onClick={onCancel} style={styles.backBtn}>
-            <ArrowLeft size={18} /> もどる
+            <ArrowLeft size={20} /> もどる
           </button>
         )}
         <h1 style={styles.setupHeading}>{hasExisting ? "スケジュールを編集する" : "スケジュールをつくろう"}</h1>
@@ -777,7 +777,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
           ))}
         </div>
         <button style={styles.addBtn} onClick={addSubject}>
-          <Plus size={18} /> やることを追加
+          <Plus size={20} /> やることを追加
         </button>
 
         <button style={styles.saveBtn} onClick={handleSave}>
@@ -864,10 +864,10 @@ function MainScreen({
           </div>
           <div style={styles.headerBtns}>
             <button style={styles.iconBtn} onClick={onLockToggle} title={locked ? "保護者用に開ける" : "ロックする"}>
-              {locked ? <Lock size={20} /> : <Unlock size={20} />}
+              {locked ? <Lock size={22} /> : <Unlock size={22} />}
             </button>
             <button style={styles.iconBtn} onClick={onOpenSettings} title="設定">
-              <Settings size={20} />
+              <Settings size={22} />
             </button>
           </div>
         </div>
@@ -877,7 +877,7 @@ function MainScreen({
 
         <div style={styles.mascotRow}>
           <div style={styles.mascotFace}>
-            <StampIcon index={0} color="#FFD6E0" size={50} />
+            <StampIcon index={0} color="#FFD6E0" size={58} />
           </div>
           <div style={styles.mascotBubbleWrap}>
             <div style={styles.mascotBubble}>{mascotMsg}</div>
@@ -918,11 +918,11 @@ function MainScreen({
 
       <div style={styles.weekNav}>
         <button style={{ ...styles.navBtn, opacity: canPrev ? 1 : 0.4 }} disabled={!canPrev} onClick={() => setWeekStart(addDays(weekStart, -7))}>
-          <ChevronLeft size={20} /> 前の週
+          <ChevronLeft size={22} /> 前の週
         </button>
         <div style={styles.weekLabel}>{rangeLabel}</div>
         <button style={{ ...styles.navBtn, opacity: canNext ? 1 : 0.4 }} disabled={!canNext} onClick={() => setWeekStart(addDays(weekStart, 7))}>
-          次の週 <ChevronRight size={20} />
+          次の週 <ChevronRight size={22} />
         </button>
       </div>
 
@@ -968,7 +968,7 @@ function MainScreen({
                   <tr key={s.id}>
                     <td style={styles.rowHeadCell}>
                       <div style={{ ...styles.headBubble, background: s.color }}>
-                        <StampIcon index={idx} color="#ffffff" size={20} />
+                        <StampIcon index={idx} color="#ffffff" size={24} />
                       </div>
                       <div style={styles.headLabel}>
                         {s.name}
@@ -1034,7 +1034,7 @@ function ReadOnlyCell({ count, color, iconIndex, missed }) {
         opacity: count >= 1 ? 1 : 0.75,
       }}
     >
-      {count >= 1 && <StampIcon index={iconIndex} color={color} size={30} />}
+      {count >= 1 && <StampIcon index={iconIndex} color={color} size={62} />}
       {count === 2 && <span style={styles.x2Badge}>×2</span>}
     </div>
   );
@@ -1071,7 +1071,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear }) {
       >
         {count >= 1 && (
           <span key={popKey} style={styles.stampPopWrap}>
-            <StampIcon index={iconIndex} color={color} size={34} />
+            <StampIcon index={iconIndex} color={color} size={70} />
           </span>
         )}
         {count === 2 && <span style={styles.x2Badge}>×2</span>}
@@ -1309,122 +1309,122 @@ const styles = {
     width: "100%",
     color: "#0B3D62",
     background: "#EAF7FB",
-    fontSize: 16,
+    fontSize: 19,
   },
   loadingWrap: { minHeight: 400, display: "flex", alignItems: "center", justifyContent: "center", background: oceanBg },
   loadingBubble: { width: 40, height: 40, borderRadius: "50%", background: "radial-gradient(circle at 35% 30%, #fff, #6FCFEB 70%)", animation: "bob 1.2s ease-in-out infinite" },
 
   setupWrap: { background: oceanBg, minHeight: 560, padding: "28px 16px", display: "flex", justifyContent: "center" },
   setupCard: { background: "linear-gradient(180deg, #FFFBF3, #FFF7EC)", borderRadius: 24, padding: 24, maxWidth: 680, width: "100%", boxShadow: "0 20px 50px rgba(11,61,98,0.35)", position: "relative" },
-  backBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#14588C", fontWeight: 700, cursor: "pointer", marginBottom: 8, fontFamily: "inherit", fontSize: 16 },
-  setupHeading: { fontFamily: "'Kaisei Decol', serif", fontSize: 30, margin: "4px 0 2px", color: "#0B3D62" },
-  setupSub: { fontSize: 15, color: "#4a6c85", marginBottom: 18 },
-  label: { display: "block", fontWeight: 700, fontSize: 16, marginBottom: 8, color: "#14588C" },
-  tinyNote: { fontSize: 13, color: "#7c98aa", marginTop: 6 },
-  input: { width: "100%", padding: "13px 14px", borderRadius: 14, border: "2px solid #BFE3F0", fontSize: 17, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" },
+  backBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#14588C", fontWeight: 700, cursor: "pointer", marginBottom: 8, fontFamily: "inherit", fontSize: 18 },
+  setupHeading: { fontFamily: "'Kaisei Decol', serif", fontSize: 34, margin: "4px 0 2px", color: "#0B3D62" },
+  setupSub: { fontSize: 17, color: "#4a6c85", marginBottom: 18 },
+  label: { display: "block", fontWeight: 700, fontSize: 18, marginBottom: 8, color: "#14588C" },
+  tinyNote: { fontSize: 15, color: "#7c98aa", marginTop: 6 },
+  input: { width: "100%", padding: "14px 16px", borderRadius: 14, border: "2px solid #BFE3F0", fontSize: 19, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" },
   dateRow: { display: "flex", alignItems: "center", gap: 10 },
-  dateInput: { flex: 1, padding: "10px 12px", borderRadius: 14, border: "2px solid #BFE3F0", fontSize: 16, fontFamily: "inherit", background: "#fff" },
+  dateInput: { flex: 1, padding: "11px 12px", borderRadius: 14, border: "2px solid #BFE3F0", fontSize: 18, fontFamily: "inherit", background: "#fff" },
 
   subjList: { display: "flex", flexDirection: "column", gap: 12, marginBottom: 12 },
-  subjCard: { background: "#fff", border: "2px solid #EAF7FB", borderRadius: 16, padding: 12 },
+  subjCard: { background: "#fff", border: "2px solid #EAF7FB", borderRadius: 16, padding: 14 },
   subjCardTop: { display: "flex", alignItems: "center", gap: 8, marginBottom: 10 },
-  subjNameInput: { flex: 1, border: "none", borderBottom: "2px solid #EAF7FB", padding: "4px 2px", fontSize: 17, fontWeight: 700, fontFamily: "inherit", outline: "none", color: "#0B3D62" },
-  chipX: { border: "none", background: "rgba(11,61,98,0.12)", borderRadius: "50%", width: 24, height: 24, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#0B3D62", flexShrink: 0 },
-  swatchRow: { display: "flex", gap: 8, marginBottom: 10, flexWrap: "wrap" },
-  swatch: { width: 30, height: 30, borderRadius: "50%", border: "none", cursor: "pointer" },
-  freqRow: { display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" },
-  freqBtn: { border: "2px solid #14588C", borderRadius: 999, padding: "7px 14px", fontSize: 14.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  subjNameInput: { flex: 1, border: "none", borderBottom: "2px solid #EAF7FB", padding: "5px 2px", fontSize: 19, fontWeight: 700, fontFamily: "inherit", outline: "none", color: "#0B3D62" },
+  chipX: { border: "none", background: "rgba(11,61,98,0.12)", borderRadius: "50%", width: 28, height: 28, display: "inline-flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#0B3D62", flexShrink: 0 },
+  swatchRow: { display: "flex", gap: 9, marginBottom: 10, flexWrap: "wrap" },
+  swatch: { width: 34, height: 34, borderRadius: "50%", border: "none", cursor: "pointer" },
+  freqRow: { display: "flex", gap: 7, marginBottom: 9, flexWrap: "wrap" },
+  freqBtn: { border: "2px solid #14588C", borderRadius: 999, padding: "8px 16px", fontSize: 16.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   intervalRow: { display: "flex", alignItems: "center", gap: 8 },
   durationRow: { display: "flex", alignItems: "center", gap: 10, marginBottom: 10 },
-  durationSelect: { flex: 1, maxWidth: 160, padding: "11px 12px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 17, fontFamily: "inherit", background: "#fff", color: "#0B3D62", fontWeight: 700 },
-  intervalInput: { width: 62, padding: "7px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 16, fontFamily: "inherit", textAlign: "center" },
-  weekdayPicker: { display: "flex", gap: 5, flexWrap: "wrap" },
-  weekdayToggle: { width: 36, height: 36, borderRadius: 10, border: "2px solid", cursor: "pointer", fontSize: 14, color: "#0B3D62", fontFamily: "inherit" },
+  durationSelect: { flex: 1, maxWidth: 180, padding: "12px 12px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 19, fontFamily: "inherit", background: "#fff", color: "#0B3D62", fontWeight: 700 },
+  intervalInput: { width: 68, padding: "8px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 18, fontFamily: "inherit", textAlign: "center" },
+  weekdayPicker: { display: "flex", gap: 6, flexWrap: "wrap" },
+  weekdayToggle: { width: 42, height: 42, borderRadius: 10, border: "2px solid", cursor: "pointer", fontSize: 16, color: "#0B3D62", fontFamily: "inherit" },
 
-  addBtn: { display: "inline-flex", alignItems: "center", gap: 4, background: "#14588C", color: "#fff", border: "none", borderRadius: 14, padding: "11px 18px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 16, marginBottom: 20 },
-  saveBtn: { width: "100%", padding: "15px 0", borderRadius: 16, border: "none", background: "linear-gradient(135deg, #FFB6C9, #F4C95D)", color: "#fff", fontWeight: 900, fontSize: 18, cursor: "pointer", boxShadow: "0 10px 20px rgba(255,143,163,0.4)", fontFamily: "inherit" },
-  deleteScheduleBtn: { width: "100%", padding: "13px 0", borderRadius: 16, border: "2px solid #FBD4DB", background: "#fff", color: "#E0526B", fontWeight: 700, fontSize: 15.5, cursor: "pointer", fontFamily: "inherit", marginTop: 14 },
+  addBtn: { display: "inline-flex", alignItems: "center", gap: 4, background: "#14588C", color: "#fff", border: "none", borderRadius: 14, padding: "12px 20px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 18, marginBottom: 20 },
+  saveBtn: { width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "linear-gradient(135deg, #FFB6C9, #F4C95D)", color: "#fff", fontWeight: 900, fontSize: 20, cursor: "pointer", boxShadow: "0 10px 20px rgba(255,143,163,0.4)", fontFamily: "inherit" },
+  deleteScheduleBtn: { width: "100%", padding: "14px 0", borderRadius: 16, border: "2px solid #FBD4DB", background: "#fff", color: "#E0526B", fontWeight: 700, fontSize: 17, cursor: "pointer", fontFamily: "inherit", marginTop: 14 },
 
   mainWrap: { position: "relative", background: oceanBg, minHeight: 560, overflow: "hidden", paddingBottom: 30 },
   header: { position: "relative", padding: "24px 18px 16px", zIndex: 2 },
   headerTop: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 },
-  titleBanner: { background: "#fff", borderRadius: 999, padding: "9px 20px", boxShadow: "0 8px 18px rgba(11,61,98,0.3)", maxWidth: "78%" },
-  titleText: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 21, fontWeight: 700 },
+  titleBanner: { background: "#fff", borderRadius: 999, padding: "10px 22px", boxShadow: "0 8px 18px rgba(11,61,98,0.3)", maxWidth: "78%" },
+  titleText: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 24, fontWeight: 700 },
   headerBtns: { display: "flex", gap: 8, flexShrink: 0 },
-  iconBtn: { width: 42, height: 42, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.3)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)" },
-  lockNote: { color: "#EAF7FB", fontSize: 14, marginTop: 10, fontWeight: 700 },
+  iconBtn: { width: 46, height: 46, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.3)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)" },
+  lockNote: { color: "#EAF7FB", fontSize: 16, marginTop: 10, fontWeight: 700 },
 
   mascotRow: { display: "flex", alignItems: "flex-start", gap: 10, marginTop: 14 },
-  mascotFace: { width: 60, height: 60, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 6px 14px rgba(11,61,98,0.3)", animation: "bob 2.4s ease-in-out infinite" },
+  mascotFace: { width: 68, height: 68, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 6px 14px rgba(11,61,98,0.3)", animation: "bob 2.4s ease-in-out infinite" },
   mascotBubbleWrap: { flex: 1, minWidth: 0 },
-  mascotBubble: { background: "#fff", borderRadius: 14, padding: "9px 14px", fontSize: 15, fontWeight: 800, color: "#0B3D62", display: "inline-block", boxShadow: "0 6px 14px rgba(11,61,98,0.25)" },
-  todayProgressLine: { display: "flex", alignItems: "center", gap: 8, marginTop: 6, flexWrap: "wrap" },
-  todayProgressNum: { color: "#fff", fontWeight: 900, fontSize: 16, textShadow: "0 2px 6px rgba(11,61,98,0.5)" },
-  streakBadge: { background: "linear-gradient(135deg,#FFB347,#FF8FA3)", color: "#fff", fontWeight: 900, fontSize: 13, padding: "3px 10px", borderRadius: 999, boxShadow: "0 3px 8px rgba(0,0,0,0.25)" },
-  todayBarTrack: { marginTop: 6, height: 12, borderRadius: 999, background: "rgba(255,255,255,0.3)", overflow: "hidden", maxWidth: 280 },
+  mascotBubble: { background: "#fff", borderRadius: 14, padding: "10px 15px", fontSize: 17, fontWeight: 800, color: "#0B3D62", display: "inline-block", boxShadow: "0 6px 14px rgba(11,61,98,0.25)" },
+  todayProgressLine: { display: "flex", alignItems: "center", gap: 8, marginTop: 7, flexWrap: "wrap" },
+  todayProgressNum: { color: "#fff", fontWeight: 900, fontSize: 18, textShadow: "0 2px 6px rgba(11,61,98,0.5)" },
+  streakBadge: { background: "linear-gradient(135deg,#FFB347,#FF8FA3)", color: "#fff", fontWeight: 900, fontSize: 14.5, padding: "4px 11px", borderRadius: 999, boxShadow: "0 3px 8px rgba(0,0,0,0.25)" },
+  todayBarTrack: { marginTop: 6, height: 13, borderRadius: 999, background: "rgba(255,255,255,0.3)", overflow: "hidden", maxWidth: 300 },
   todayBarFill: { height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#FFD6E0,#F4C95D)", transition: "width 0.5s ease" },
 
-  necklaceRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "rgba(255,255,255,0.15)", padding: "11px 12px", borderRadius: 999, backdropFilter: "blur(4px)" },
-  pearl: { width: 18, height: 18, borderRadius: "50%", flexShrink: 0, transition: "all 0.4s" },
-  pearlPct: { marginLeft: "auto", color: "#fff", fontWeight: 900, fontSize: 15 },
-  rewardPreview: { marginTop: 8, background: "rgba(255,255,255,0.18)", borderRadius: 12, padding: "7px 12px", color: "#fff", fontSize: 14, fontWeight: 700, backdropFilter: "blur(4px)" },
+  necklaceRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "rgba(255,255,255,0.15)", padding: "12px 14px", borderRadius: 999, backdropFilter: "blur(4px)" },
+  pearl: { width: 20, height: 20, borderRadius: "50%", flexShrink: 0, transition: "all 0.4s" },
+  pearlPct: { marginLeft: "auto", color: "#fff", fontWeight: 900, fontSize: 17 },
+  rewardPreview: { marginTop: 8, background: "rgba(255,255,255,0.18)", borderRadius: 12, padding: "8px 14px", color: "#fff", fontSize: 16, fontWeight: 700, backdropFilter: "blur(4px)" },
 
   weekNav: { position: "relative", zIndex: 2, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 18px", marginTop: 4 },
-  navBtn: { display: "inline-flex", alignItems: "center", gap: 2, background: "rgba(255,255,255,0.85)", border: "none", borderRadius: 999, padding: "9px 13px", fontWeight: 700, fontSize: 14.5, color: "#14588C", cursor: "pointer", fontFamily: "inherit" },
-  weekLabel: { color: "#fff", fontWeight: 800, fontSize: 16 },
+  navBtn: { display: "inline-flex", alignItems: "center", gap: 2, background: "rgba(255,255,255,0.85)", border: "none", borderRadius: 999, padding: "10px 15px", fontWeight: 700, fontSize: 16.5, color: "#14588C", cursor: "pointer", fontFamily: "inherit" },
+  weekLabel: { color: "#fff", fontWeight: 800, fontSize: 18 },
 
   tablePanel: { position: "relative", zIndex: 2, margin: "16px 18px 0", background: "linear-gradient(180deg,#FFFDF8,#FFF3E4)", borderRadius: 22, padding: 12, boxShadow: "0 16px 34px rgba(11,61,98,0.3)" },
-  tableHint: { fontSize: 13, color: "#5a7d94", fontWeight: 700, margin: "0 4px 8px" },
+  tableHint: { fontSize: 15, color: "#5a7d94", fontWeight: 700, margin: "0 4px 10px" },
   tableScroll: { overflowX: "auto" },
-  scheduleTable: { borderCollapse: "separate", borderSpacing: "7px", width: "100%" },
-  cornerHeadCell: { width: 100 },
+  scheduleTable: { borderCollapse: "separate", borderSpacing: "9px", width: "100%" },
+  cornerHeadCell: { width: 120 },
 
-  dayHeadCell: { background: "#fff", borderRadius: 14, padding: "7px 4px", textAlign: "center", boxShadow: "inset 0 0 0 2px #EAF7FB", minWidth: 60 },
+  dayHeadCell: { background: "#fff", borderRadius: 14, padding: "8px 5px", textAlign: "center", boxShadow: "inset 0 0 0 2px #EAF7FB", minWidth: 90 },
   dayHeadToday: { boxShadow: "inset 0 0 0 2px #14588C" },
   dayHeadComplete: { boxShadow: "inset 0 0 0 2px #F4C95D", background: "#FFF7DA" },
-  dayHeadDow: { fontSize: 15, fontWeight: 900, color: "#0B3D62" },
-  dayHeadDate: { fontSize: 12, color: "#7c98aa" },
-  dayHeadTodayTag: { fontSize: 10.5, color: "#fff", background: "#14588C", borderRadius: 999, padding: "1px 7px", display: "inline-block", marginTop: 2, fontWeight: 900 },
-  dayHeadTrophy: { fontSize: 14, marginTop: 1 },
+  dayHeadDow: { fontSize: 18, fontWeight: 900, color: "#0B3D62" },
+  dayHeadDate: { fontSize: 14, color: "#7c98aa" },
+  dayHeadTodayTag: { fontSize: 12.5, color: "#fff", background: "#14588C", borderRadius: 999, padding: "2px 8px", display: "inline-block", marginTop: 2, fontWeight: 900 },
+  dayHeadTrophy: { fontSize: 17, marginTop: 1 },
 
-  headBubble: { width: 38, height: 38, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 3px 6px rgba(0,0,0,0.15)" },
-  headLabel: { fontSize: 14, fontWeight: 800, color: "#0B3D62", lineHeight: 1.25 },
-  backlogBadge: { fontSize: 11, color: "#B5651D", background: "#FFE9B3", borderRadius: 999, padding: "1px 7px", display: "inline-block", marginTop: 2, fontWeight: 800 },
-  durationBadge: { fontSize: 11, color: "#14588C", background: "#DCEEF7", borderRadius: 999, padding: "1px 7px", display: "inline-block", marginTop: 2, marginLeft: 4, fontWeight: 800 },
-  rowHeadCell: { background: "#fff", borderRadius: 14, padding: "9px 12px", textAlign: "left", boxShadow: "inset 0 0 0 2px #EAF7FB", display: "flex", alignItems: "center", gap: 9, minWidth: 108, whiteSpace: "nowrap" },
+  headBubble: { width: 44, height: 44, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 3px 6px rgba(0,0,0,0.15)" },
+  headLabel: { fontSize: 17, fontWeight: 800, color: "#0B3D62", lineHeight: 1.3 },
+  backlogBadge: { fontSize: 13, color: "#B5651D", background: "#FFE9B3", borderRadius: 999, padding: "2px 8px", display: "inline-block", marginTop: 3, fontWeight: 800 },
+  durationBadge: { fontSize: 13, color: "#14588C", background: "#DCEEF7", borderRadius: 999, padding: "2px 8px", display: "inline-block", marginTop: 3, marginLeft: 4, fontWeight: 800 },
+  rowHeadCell: { background: "#fff", borderRadius: 14, padding: "10px 14px", textAlign: "left", boxShadow: "inset 0 0 0 2px #EAF7FB", display: "flex", alignItems: "center", gap: 10, minWidth: 130, whiteSpace: "nowrap" },
 
-  stampCell: { textAlign: "center", padding: 3 },
+  stampCell: { textAlign: "center", padding: 4 },
   stampCellWrap: { position: "relative", display: "inline-block" },
-  stampCircle: { width: 56, height: 56, borderRadius: "50%", border: "3px dashed", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", overflow: "visible" },
+  stampCircle: { width: 112, height: 112, borderRadius: "50%", border: "5px dashed", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", overflow: "visible" },
   stampPopWrap: { display: "flex", alignItems: "center", justifyContent: "center", animation: "stampPop 0.45s cubic-bezier(.34,1.56,.64,1)" },
-  x2Badge: { position: "absolute", top: -8, right: -8, background: "#FF6B8A", color: "#fff", fontSize: 11, fontWeight: 900, borderRadius: 999, padding: "2px 6px", boxShadow: "0 2px 5px rgba(0,0,0,0.3)" },
-  undoBadge: { position: "absolute", top: -8, left: -8, width: 24, height: 24, borderRadius: "50%", background: "#8aa4b4", color: "#fff", fontSize: 15, fontWeight: 900, border: "2px solid #fff", boxShadow: "0 2px 5px rgba(0,0,0,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 },
-  commentBubble: { position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap", background: "#fff", color: "#FF6B8A", fontSize: 12, fontWeight: 900, padding: "4px 9px", borderRadius: 999, boxShadow: "0 4px 10px rgba(0,0,0,0.2)", animation: "floatComment 1.3s ease-out forwards", pointerEvents: "none" },
+  x2Badge: { position: "absolute", top: -10, right: -10, background: "#FF6B8A", color: "#fff", fontSize: 15, fontWeight: 900, borderRadius: 999, padding: "3px 9px", boxShadow: "0 2px 5px rgba(0,0,0,0.3)" },
+  undoBadge: { position: "absolute", top: -10, left: -10, width: 34, height: 34, borderRadius: "50%", background: "#8aa4b4", color: "#fff", fontSize: 19, fontWeight: 900, border: "3px solid #fff", boxShadow: "0 2px 5px rgba(0,0,0,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 },
+  commentBubble: { position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap", background: "#fff", color: "#FF6B8A", fontSize: 15, fontWeight: 900, padding: "5px 11px", borderRadius: 999, boxShadow: "0 4px 10px rgba(0,0,0,0.2)", animation: "floatComment 1.3s ease-out forwards", pointerEvents: "none" },
   dashCell: { textAlign: "center" },
-  dashMark: { color: "#c9d8e0", fontSize: 16, fontWeight: 700 },
+  dashMark: { color: "#c9d8e0", fontSize: 19, fontWeight: 700 },
 
-  toast: { position: "fixed", left: "50%", bottom: 20, transform: "translateX(-50%)", background: "#0B3D62", color: "#fff", padding: "11px 20px", borderRadius: 999, fontSize: 15, fontWeight: 700, boxShadow: "0 10px 24px rgba(0,0,0,0.3)", zIndex: 50, maxWidth: "90%", textAlign: "center" },
+  toast: { position: "fixed", left: "50%", bottom: 20, transform: "translateX(-50%)", background: "#0B3D62", color: "#fff", padding: "12px 22px", borderRadius: 999, fontSize: 17, fontWeight: 700, boxShadow: "0 10px 24px rgba(0,0,0,0.3)", zIndex: 50, maxWidth: "90%", textAlign: "center" },
 
   modalOverlay: { position: "absolute", inset: 0, background: "rgba(11,61,98,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 40, padding: 20 },
-  modalCard: { background: "#fff", borderRadius: 20, padding: 24, maxWidth: 340, width: "100%", textAlign: "center", animation: "popIn 0.25s ease-out" },
-  modalTitle: { margin: "0 0 8px", fontSize: 19, color: "#0B3D62" },
-  modalMsg: { fontSize: 15, color: "#4a6c85", lineHeight: 1.6, marginBottom: 18 },
+  modalCard: { background: "#fff", borderRadius: 20, padding: 26, maxWidth: 360, width: "100%", textAlign: "center", animation: "popIn 0.25s ease-out" },
+  modalTitle: { margin: "0 0 8px", fontSize: 22, color: "#0B3D62" },
+  modalMsg: { fontSize: 17, color: "#4a6c85", lineHeight: 1.6, marginBottom: 18 },
   modalBtns: { display: "flex", gap: 10 },
-  modalCancel: { flex: 1, padding: "11px 0", borderRadius: 12, border: "2px solid #d7ecf3", background: "#fff", color: "#5a7d94", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 15.5 },
-  modalConfirm: { flex: 1, padding: "11px 0", borderRadius: 12, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 15.5 },
-  modalDanger: { flex: 1, padding: "11px 0", borderRadius: 12, border: "none", background: "#E0526B", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 15.5 },
+  modalCancel: { flex: 1, padding: "12px 0", borderRadius: 12, border: "2px solid #d7ecf3", background: "#fff", color: "#5a7d94", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
+  modalConfirm: { flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
+  modalDanger: { flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#E0526B", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
 
   dayCelebrateOverlay: { position: "absolute", inset: 0, background: "rgba(11,61,98,0.25)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 45 },
-  dayCelebrateBadge: { background: "#fff", borderRadius: 20, padding: "22px 32px", textAlign: "center", animation: "popIn 0.3s ease-out", boxShadow: "0 20px 40px rgba(0,0,0,0.25)" },
+  dayCelebrateBadge: { background: "#fff", borderRadius: 20, padding: "24px 34px", textAlign: "center", animation: "popIn 0.3s ease-out", boxShadow: "0 20px 40px rgba(0,0,0,0.25)" },
 
   weekCelebrateOverlay: { position: "absolute", inset: 0, background: "rgba(11,61,98,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 46 },
-  weekCelebrateCard: { position: "relative", background: "linear-gradient(180deg, #FFFBF3, #FFF3D6)", borderRadius: 24, padding: "32px 28px", textAlign: "center", maxWidth: 340, animation: "popIn 0.35s ease-out", boxShadow: "0 30px 60px rgba(0,0,0,0.4)" },
-  chestEmoji: { fontSize: 52, marginBottom: 6 },
-  weekCelebrateTitle: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 24, margin: "4px 0" },
-  weekCelebrateSub: { fontSize: 15, color: "#5a7d94", marginBottom: 16, lineHeight: 1.6 },
-  bigStamp: { display: "inline-block", border: "4px solid #FF8FA3", color: "#FF8FA3", fontWeight: 900, fontSize: 24, padding: "9px 24px", borderRadius: 14, transform: "rotate(-8deg)", marginBottom: 18, fontFamily: "'Kaisei Decol', serif" },
-  rewardCard: { background: "linear-gradient(135deg,#FFF3B0,#FFD6E0)", borderRadius: 16, padding: "15px 20px", marginBottom: 18, boxShadow: "0 6px 16px rgba(0,0,0,0.15)" },
-  rewardLabel: { fontSize: 13, fontWeight: 900, color: "#B5651D", marginBottom: 4 },
-  rewardText: { fontSize: 19, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif", lineHeight: 1.4 },
-  weekCelebrateBtn: { display: "block", margin: "0 auto", padding: "11px 30px", borderRadius: 999, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 16 },
+  weekCelebrateCard: { position: "relative", background: "linear-gradient(180deg, #FFFBF3, #FFF3D6)", borderRadius: 24, padding: "34px 30px", textAlign: "center", maxWidth: 360, animation: "popIn 0.35s ease-out", boxShadow: "0 30px 60px rgba(0,0,0,0.4)" },
+  chestEmoji: { fontSize: 56, marginBottom: 6 },
+  weekCelebrateTitle: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 27, margin: "4px 0" },
+  weekCelebrateSub: { fontSize: 17, color: "#5a7d94", marginBottom: 16, lineHeight: 1.6 },
+  bigStamp: { display: "inline-block", border: "4px solid #FF8FA3", color: "#FF8FA3", fontWeight: 900, fontSize: 26, padding: "10px 26px", borderRadius: 14, transform: "rotate(-8deg)", marginBottom: 18, fontFamily: "'Kaisei Decol', serif" },
+  rewardCard: { background: "linear-gradient(135deg,#FFF3B0,#FFD6E0)", borderRadius: 16, padding: "16px 22px", marginBottom: 18, boxShadow: "0 6px 16px rgba(0,0,0,0.15)" },
+  rewardLabel: { fontSize: 15, fontWeight: 900, color: "#B5651D", marginBottom: 4 },
+  rewardText: { fontSize: 21, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif", lineHeight: 1.4 },
+  weekCelebrateBtn: { display: "block", margin: "0 auto", padding: "12px 32px", borderRadius: 999, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 18 },
 };

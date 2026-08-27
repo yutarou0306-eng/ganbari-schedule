@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { getKnownSchedules, upsertKnownSchedule } from "./registry.js";
+import { getKnownSchedules, upsertKnownSchedule, removeKnownSchedule } from "./registry.js";
 import { generateScheduleId } from "./scheduleId.js";
 import { supabase } from "./db.js";
 import { computeOverallStats } from "./progress.js";
@@ -24,6 +24,8 @@ export default function TopPage() {
   const [tab, setTab] = useState("create"); // create | active | done
   const [schedules, setSchedules] = useState(getKnownSchedules());
   const [refreshing, setRefreshing] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, title } | null
+  const [deleting, setDeleting] = useState(false);
 
   // Refresh cached progress numbers from Supabase in one batched query.
   useEffect(() => {
@@ -64,6 +66,24 @@ export default function TopPage() {
     window.location.href = `${window.location.pathname}?id=${id}`;
   }
 
+  function handleEdit(id) {
+    window.location.href = `${window.location.pathname}?id=${id}&edit=1`;
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await supabase.from("schedules").delete().eq("id", deleteTarget.id);
+    } catch (e) {
+      // even if the network call fails, still drop it from this device's local list
+    }
+    removeKnownSchedule(deleteTarget.id);
+    setSchedules(getKnownSchedules());
+    setDeleting(false);
+    setDeleteTarget(null);
+  }
+
   const today = todayStr();
   const active = schedules
     .filter((s) => !s.endDate || s.endDate >= today)
@@ -89,18 +109,18 @@ export default function TopPage() {
             fontFamily: "'Kaisei Decol', serif",
             color: "#fff",
             textAlign: "center",
-            fontSize: 26,
+            fontSize: 32,
             textShadow: "0 2px 10px rgba(11,61,98,0.5)",
-            margin: "0 0 4px",
+            margin: "0 0 6px",
           }}
         >
           🐚 がんばりスケジュール
         </h1>
-        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 12.5, marginBottom: 20 }}>
+        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 15, marginBottom: 22 }}>
           作る・見る・ふりかえる、ぜんぶここから
         </p>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
           {[
             ["create", "① 作る"],
             ["active", "② 見る"],
@@ -111,11 +131,11 @@ export default function TopPage() {
               onClick={() => setTab(key)}
               style={{
                 flex: 1,
-                padding: "10px 0",
+                padding: "12px 0",
                 borderRadius: 999,
                 border: "none",
                 fontWeight: 900,
-                fontSize: 13,
+                fontSize: 16,
                 cursor: "pointer",
                 fontFamily: "inherit",
                 background: tab === key ? "#fff" : "rgba(255,255,255,0.25)",
@@ -132,25 +152,25 @@ export default function TopPage() {
             style={{
               background: "linear-gradient(180deg,#FFFBF3,#FFF7EC)",
               borderRadius: 22,
-              padding: 24,
+              padding: 26,
               textAlign: "center",
               boxShadow: "0 16px 34px rgba(11,61,98,0.3)",
             }}
           >
-            <p style={{ color: "#4a6c85", fontSize: 13, marginBottom: 16, lineHeight: 1.7 }}>
+            <p style={{ color: "#4a6c85", fontSize: 15.5, marginBottom: 18, lineHeight: 1.7 }}>
               新しいスケジュールを作ります。作ったあとに出てくる「共有リンク」を、いっしょに使うご家族に送ってください。
             </p>
             <button
               onClick={handleCreate}
               style={{
                 width: "100%",
-                padding: "14px 0",
+                padding: "16px 0",
                 borderRadius: 16,
                 border: "none",
                 background: "linear-gradient(135deg,#FFB6C9,#F4C95D)",
                 color: "#fff",
                 fontWeight: 900,
-                fontSize: 16,
+                fontSize: 19,
                 cursor: "pointer",
                 boxShadow: "0 10px 20px rgba(255,143,163,0.4)",
                 fontFamily: "inherit",
@@ -166,6 +186,8 @@ export default function TopPage() {
             items={active}
             emptyText='まだ進行中のスケジュールはありません。「① 作る」から作ってみましょう。'
             onOpen={handleOpen}
+            onEdit={handleEdit}
+            onDelete={(s) => setDeleteTarget(s)}
             refreshing={refreshing}
           />
         )}
@@ -175,31 +197,104 @@ export default function TopPage() {
             items={done}
             emptyText="完了したスケジュールはまだありません。"
             onOpen={handleOpen}
+            onEdit={handleEdit}
+            onDelete={(s) => setDeleteTarget(s)}
             refreshing={refreshing}
           />
         )}
 
-        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 11, marginTop: 20, lineHeight: 1.7 }}>
+        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 13, marginTop: 22, lineHeight: 1.7 }}>
           ※「見る」「完了」の一覧は、この端末で開いたことのあるスケジュールだけが表示されます。
           <br />
           共有リンクを開いたことがあるスケジュールは、ここにも自動で並びます。
         </p>
       </div>
+
+      {deleteTarget && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(11,61,98,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              padding: 26,
+              maxWidth: 340,
+              width: "100%",
+              textAlign: "center",
+            }}
+          >
+            <h3 style={{ margin: "0 0 8px", fontSize: 20, color: "#0B3D62", fontFamily: "inherit" }}>
+              このスケジュールを削除しますか？
+            </h3>
+            <p style={{ fontSize: 15.5, color: "#4a6c85", lineHeight: 1.6, marginBottom: 20 }}>
+              「{deleteTarget.title || "無題のスケジュール"}」を削除します。これまでの記録もすべて消え、元に戻せません。
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                style={{
+                  flex: 1,
+                  padding: "12px 0",
+                  borderRadius: 12,
+                  border: "2px solid #d7ecf3",
+                  background: "#fff",
+                  color: "#5a7d94",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontSize: 16,
+                }}
+              >
+                やめる
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                style={{
+                  flex: 1,
+                  padding: "12px 0",
+                  borderRadius: 12,
+                  border: "none",
+                  background: "#E0526B",
+                  color: "#fff",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontSize: 16,
+                }}
+              >
+                {deleting ? "削除中…" : "削除する"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function ScheduleList({ items, emptyText, onOpen, refreshing }) {
+function ScheduleList({ items, emptyText, onOpen, onEdit, onDelete, refreshing }) {
   if (items.length === 0) {
     return (
       <div
         style={{
           background: "rgba(255,255,255,0.92)",
           borderRadius: 18,
-          padding: 22,
+          padding: 24,
           textAlign: "center",
           color: "#5a7d94",
-          fontSize: 13,
+          fontSize: 15,
           lineHeight: 1.7,
         }}
       >
@@ -208,41 +303,104 @@ function ScheduleList({ items, emptyText, onOpen, refreshing }) {
     );
   }
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       {refreshing && (
-        <div style={{ color: "#EAF7FB", fontSize: 11.5, textAlign: "center" }}>さいしんの状態を確認中…</div>
+        <div style={{ color: "#EAF7FB", fontSize: 13, textAlign: "center" }}>さいしんの状態を確認中…</div>
       )}
       {items.map((s) => (
-        <button
+        <div
           key={s.id}
-          onClick={() => onOpen(s.id)}
           style={{
-            textAlign: "left",
+            position: "relative",
             background: "#fff",
             borderRadius: 16,
-            padding: "14px 16px",
-            border: "none",
-            cursor: "pointer",
+            padding: "16px 18px",
             boxShadow: "0 8px 18px rgba(11,61,98,0.25)",
-            fontFamily: "inherit",
           }}
         >
-          <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 15 }}>{s.title || "無題のスケジュール"}</div>
-          <div style={{ fontSize: 12, color: "#7c98aa", marginTop: 2 }}>{formatRange(s.startDate, s.endDate)}</div>
-          <div style={{ marginTop: 8, height: 8, borderRadius: 999, background: "#EAF7FB", overflow: "hidden" }}>
-            <div
-              style={{
-                height: "100%",
-                width: `${s.pct || 0}%`,
-                borderRadius: 999,
-                background: "linear-gradient(90deg,#FFD6E0,#F4C95D)",
+          {/* edit / delete — top-right corner */}
+          <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 6, zIndex: 2 }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(s.id);
               }}
-            />
+              aria-label="修正する"
+              title="修正する"
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                border: "2px solid #BFE3F0",
+                background: "#fff",
+                color: "#14588C",
+                fontSize: 18,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              ✏️
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(s);
+              }}
+              aria-label="削除する"
+              title="削除する"
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                border: "2px solid #FBD4DB",
+                background: "#fff",
+                color: "#E0526B",
+                fontSize: 18,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              🗑
+            </button>
           </div>
-          <div style={{ fontSize: 11, color: "#14588C", fontWeight: 700, marginTop: 4, textAlign: "right" }}>
-            達成度 {s.pct || 0}%
-          </div>
-        </button>
+
+          <button
+            onClick={() => onOpen(s.id)}
+            style={{
+              display: "block",
+              width: "100%",
+              textAlign: "left",
+              background: "none",
+              border: "none",
+              padding: 0,
+              paddingRight: 96,
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 19, lineHeight: 1.3 }}>
+              {s.title || "無題のスケジュール"}
+            </div>
+            <div style={{ fontSize: 14, color: "#7c98aa", marginTop: 4 }}>{formatRange(s.startDate, s.endDate)}</div>
+            <div style={{ marginTop: 10, height: 10, borderRadius: 999, background: "#EAF7FB", overflow: "hidden" }}>
+              <div
+                style={{
+                  height: "100%",
+                  width: `${s.pct || 0}%`,
+                  borderRadius: 999,
+                  background: "linear-gradient(90deg,#FFD6E0,#F4C95D)",
+                }}
+              />
+            </div>
+            <div style={{ fontSize: 13, color: "#14588C", fontWeight: 700, marginTop: 6, textAlign: "right" }}>
+              達成度 {s.pct || 0}%
+            </div>
+          </button>
+        </div>
       ))}
     </div>
   );
