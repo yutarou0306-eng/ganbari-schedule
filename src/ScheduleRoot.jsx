@@ -1,32 +1,20 @@
 import "./storageShim.js";
-import React, { useEffect, useState } from "react";
+import React from "react";
 import App from "./App.jsx";
 import ShareBar from "./ShareBar.jsx";
 
+// Note: this used to remount <App> whenever the tab regained focus/visibility,
+// to pull fresh data after another device made changes. That turned out to
+// fire too eagerly on some devices (e.g. when the on-screen keyboard shows or
+// hides), which reset the whole app back to its last-saved state and wiped
+// out whatever the person was in the middle of typing on the setup screen.
+// Removed for reliability — reopening the schedule (e.g. from the top page,
+// or by revisiting the link) is still enough to pick up the latest data.
 export default function ScheduleRoot() {
-  // Re-mounting <App> re-runs its initial load, which pulls the latest data
-  // from Supabase. We only do this when the tab becomes visible/focused
-  // again (e.g. switching back from another app) rather than on a timer,
-  // to avoid the flicker/interrupted-connection issue from constant polling.
-  const [syncKey, setSyncKey] = useState(0);
-
-  useEffect(() => {
-    const refresh = () => setSyncKey((k) => k + 1);
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") refresh();
-    };
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("focus", refresh);
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("focus", refresh);
-    };
-  }, []);
-
   return (
     <>
       <ShareBar />
-      <App key={syncKey} />
+      <App />
     </>
   );
 }
