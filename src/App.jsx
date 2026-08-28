@@ -74,17 +74,19 @@ const HUNTER_SHAPES = [
   // baby dragon (used as the mascot / signature icon) — friendly, not fierce
   (c) => (
     <>
-      <path d="M8.3 4.6l-1.4-3 3 1.4zM15.7 4.6l1.4-3-3 1.4z" fill={c} />
-      <path d="M4 9.5l-2.4-1 2 2.1zM20 9.5l2.4-1-2 2.1z" fill={c} />
-      <circle cx="12" cy="12.3" r="8" fill={c} />
-      <ellipse cx="12" cy="17" rx="3.4" ry="2.2" fill={c} />
-      <circle cx="9.1" cy="11.3" r="1.25" fill="#1c1c1c" />
-      <circle cx="14.9" cy="11.3" r="1.25" fill="#1c1c1c" />
-      <circle cx="9.5" cy="10.9" r="0.4" fill="#fff" />
-      <circle cx="15.3" cy="10.9" r="0.4" fill="#fff" />
-      <circle cx="10.6" cy="17" r="0.35" fill="#1c1c1c" />
-      <circle cx="13.4" cy="17" r="0.35" fill="#1c1c1c" />
-      <path d="M10 18.7c1 .8 3 .8 4 0" stroke="#1c1c1c" strokeWidth="1" fill="none" strokeLinecap="round" />
+      <path d="M8.3 4l-1.6-3.4 3.2 1.6zM15.7 4l1.6-3.4-3.2 1.6z" fill={c} />
+      <path d="M9.6 2.3l-.8-1.8 1.6.7zM12 1.8V0l1.1 1.4zM14.4 2.3l.8-1.8-1.6.7z" fill={c} />
+      <path d="M4 9l-2.4-1 2 2.1zM20 9l2.4-1-2 2.1z" fill={c} />
+      <path
+        d="M12 4.2c3.9 0 7 3 7 7 0 2-.7 3.7-2 5 .3.3.5.8.5 1.3 0 1-.8 1.8-1.8 1.8-.5 0-1-.2-1.3-.6-.6.8-1.5 1.3-2.4 1.3s-1.8-.5-2.4-1.3c-.3.4-.8.6-1.3.6-1 0-1.8-.8-1.8-1.8 0-.5.2-1 .5-1.3-1.3-1.3-2-3-2-5 0-4 3.1-7 7-7z"
+        fill={c}
+      />
+      <circle cx="9" cy="10.5" r="1.2" fill="#1c1c1c" />
+      <circle cx="15" cy="10.5" r="1.2" fill="#1c1c1c" />
+      <circle cx="9.4" cy="10.1" r="0.38" fill="#fff" />
+      <circle cx="15.4" cy="10.1" r="0.38" fill="#fff" />
+      <path d="M10.3 15.6l.6-1 .6 1zM12.5 15.6l.6-1 .6 1z" fill="#1c1c1c" opacity="0.75" />
+      <path d="M10 17.3c1 .8 3 .8 4 0" stroke="#1c1c1c" strokeWidth="1" fill="none" strokeLinecap="round" />
     </>
   ),
   // sword
@@ -1381,15 +1383,36 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
 }
 
 function TreasureChestMini({ filled }) {
-  const body = filled ? "#C89B3C" : "rgba(62,42,22,0.28)";
-  const lid = filled ? "#8B5E34" : "rgba(62,42,22,0.22)";
-  const lock = filled ? "#5C3A21" : "rgba(62,42,22,0.35)";
+  const wood = filled ? "#8B5A2B" : "rgba(62,42,22,0.25)";
+  const woodDark = filled ? "#5C3A1A" : "rgba(62,42,22,0.22)";
+  const metal = filled ? "#E5C878" : "rgba(62,42,22,0.3)";
+  const metalDark = filled ? "#B8934A" : "rgba(62,42,22,0.28)";
   return (
-    <svg width="20" height="18" viewBox="0 0 20 18" style={{ flexShrink: 0 }}>
-      <path d="M1 8c0-3.9 4-6.8 9-6.8s9 2.9 9 6.8z" fill={lid} />
-      <rect x="1" y="8" width="18" height="8.5" rx="1.6" fill={body} />
-      <rect x="8" y="7" width="4" height="4.5" rx="0.9" fill={lock} />
-      {filled && <circle cx="10" cy="9" r="1" fill="#F4E9CE" />}
+    <svg width="22" height="20" viewBox="0 0 22 20" style={{ flexShrink: 0 }}>
+      {/* domed lid */}
+      <path d="M2 9c0-4.4 4-7.5 9-7.5s9 3.1 9 7.5z" fill={wood} />
+      <path d="M6.8 3.3c-1.4 1.5-2.2 3.4-2.4 5.7M15.2 3.3c1.4 1.5 2.2 3.4 2.4 5.7" stroke={woodDark} strokeWidth="0.5" fill="none" opacity="0.6" />
+      <path d="M11 2v7" stroke={woodDark} strokeWidth="0.5" opacity="0.4" />
+      <rect x="2" y="7.3" width="18" height="1.8" fill={metal} />
+      {/* body */}
+      <rect x="1.3" y="9" width="19.4" height="9.7" rx="1.8" fill={wood} />
+      <path d="M6.2 9.3v9.2M11 9.3v9.2M15.8 9.3v9.2" stroke={woodDark} strokeWidth="0.5" opacity="0.45" />
+      <rect x="1.3" y="9" width="19.4" height="1.7" fill={metal} />
+      <rect x="1.3" y="16.2" width="19.4" height="1.7" fill={metal} />
+      {/* rivets */}
+      <circle cx="2.8" cy="9.85" r="0.55" fill={metalDark} />
+      <circle cx="19.2" cy="9.85" r="0.55" fill={metalDark} />
+      <circle cx="2.8" cy="17.05" r="0.55" fill={metalDark} />
+      <circle cx="19.2" cy="17.05" r="0.55" fill={metalDark} />
+      {/* lock plate */}
+      <rect x="9" y="7.8" width="4" height="5.2" rx="1" fill={metal} stroke={metalDark} strokeWidth="0.4" />
+      <circle cx="11" cy="10.2" r="0.85" fill={metalDark} />
+      {filled && (
+        <>
+          <circle cx="11" cy="3.5" r="1.1" fill="#FFF3C4" opacity="0.95" />
+          <path d="M3.5 20l1-2.2M18.5 20l-1-2.2" stroke="#F4C95D" strokeWidth="1" strokeLinecap="round" opacity="0.65" />
+        </>
+      )}
     </svg>
   );
 }
@@ -1851,9 +1874,9 @@ const styles = {
   tableHint: { fontSize: 15, color: "#5a7d94", fontWeight: 700, margin: "0 4px 10px", textAlign: "center" },
   calendarGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 },
   weekdayHeadCell: { textAlign: "center", fontSize: 15, fontWeight: 900, color: "#0B3D62", background: "#fff", borderRadius: 10, padding: "6px 0", boxShadow: "inset 0 0 0 2px #EAF7FB" },
-  weekdayShieldWrap: { position: "relative", width: "100%", minHeight: 60, display: "flex", alignItems: "center", justifyContent: "center" },
-  weekdayShieldFrame: { position: "absolute", top: "8%", left: "18%", width: "64%", height: "84%" },
-  weekdayShieldContent: { position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 },
+  weekdayShieldWrap: { position: "relative", width: "100%", minHeight: 78, display: "flex", alignItems: "center", justifyContent: "center" },
+  weekdayShieldFrame: { position: "absolute", top: "2%", left: "10%", width: "80%", height: "96%" },
+  weekdayShieldContent: { position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, paddingBottom: "10%" },
   weekdayShieldLabel: { color: "#fff", fontWeight: 900, fontSize: 19, textShadow: "0 1px 3px rgba(0,0,0,0.6)" },
 
   dayCell: { background: "#fff", borderRadius: 12, padding: "5px 4px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, boxShadow: "inset 0 0 0 2px #EAF7FB", minWidth: 0 },
