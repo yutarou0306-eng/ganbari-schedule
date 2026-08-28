@@ -16,44 +16,15 @@ const PASTELS = [
 ];
 
 const BOY_PALETTE = [
-  { name: "そら", hex: "#60A5FA" },
-  { name: "みどり", hex: "#4ADE80" },
-  { name: "オレンジ", hex: "#FB923C" },
-  { name: "あか", hex: "#F87171" },
-  { name: "パープル", hex: "#A78BFA" },
-  { name: "イエロー", hex: "#FACC15" },
-  { name: "ティール", hex: "#2DD4BF" },
-  { name: "グレー", hex: "#94A3B8" },
+  { name: "フレイム", hex: "#E5533D" },
+  { name: "ブロンズ", hex: "#C89B3C" },
+  { name: "フォレスト", hex: "#4B7A3C" },
+  { name: "アイアン", hex: "#6B7280" },
+  { name: "ポイズン", hex: "#7C5CBF" },
+  { name: "アイス", hex: "#38BDF8" },
+  { name: "アンバー", hex: "#D97706" },
+  { name: "ブラッド", hex: "#B91C1C" },
 ];
-
-const THEMES = {
-  girl: {
-    key: "girl",
-    label: "女の子むけ",
-    emoji: "🎀",
-    bg: "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)",
-    accentGradient: "linear-gradient(90deg,#FFD6E0,#F4C95D)",
-    palette: PASTELS,
-    headingFont: "'Kaisei Decol', serif",
-    mascotBg: "#FFD6E0",
-    mascotIconIndex: 0,
-  },
-  boy: {
-    key: "boy",
-    label: "男の子むけ",
-    emoji: "🚀",
-    bg: "linear-gradient(180deg, #04061A 0%, #0B1E4D 42%, #1B3F8C 78%, #3E7BD6 100%)",
-    accentGradient: "linear-gradient(90deg,#60A5FA,#22C55E)",
-    palette: BOY_PALETTE,
-    headingFont: "'Dela Gothic One', sans-serif",
-    mascotBg: "#60A5FA",
-    mascotIconIndex: 1,
-  },
-};
-
-function getTheme(key) {
-  return THEMES[key] || THEMES.girl;
-}
 
 const SHAPES = [
   // seal
@@ -99,6 +70,46 @@ const SHAPES = [
   ),
 ];
 
+const HUNTER_SHAPES = [
+  // sword
+  (c) => (
+    <>
+      <path d="M12 2l1.6 1.6-7 7-2-2z" fill={c} />
+      <rect x="5.2" y="9.6" width="2.4" height="2.4" transform="rotate(45 6.4 10.8)" fill={c} />
+      <path d="M4 12.5l-2.3 2.3 1.4 1.4L5.4 14zM6.7 15.2l-2 4.6 1.7 1.7 4.6-2z" fill={c} />
+      <circle cx="4.7" cy="13.7" r="1.15" fill={c} />
+    </>
+  ),
+  // shield
+  (c) => <path d="M12 2.5l8 3v5.2c0 6-3.5 9.5-8 10.8-4.5-1.3-8-4.8-8-10.8V5.5z" fill={c} />,
+  // ember / flame
+  (c) => (
+    <path
+      d="M12 2c1 3-2.5 4-2.5 7.2A2.5 2.5 0 0012 11.7 2.5 2.5 0 0014.5 9.2c0-.9-.4-1.5-.9-2.1 2 1.2 4 3.7 4 7A5.6 5.6 0 0112 19.7 5.6 5.6 0 016.4 14.1c0-4.4 3.6-6.6 3.6-9.4 0-1 .6-2 2-2.7z"
+      fill={c}
+    />
+  ),
+  // crystal / gem
+  (c) => <path d="M12 2l6 5-2.5 12.5h-7L6 7z" fill={c} />,
+  // claw mark
+  (c) => (
+    <path
+      d="M4 4c3 3 3 8 1 12M10 3c3 3 3 9 1 13M16 4c3 3 3 8 1 12"
+      stroke={c}
+      strokeWidth="2.6"
+      fill="none"
+      strokeLinecap="round"
+    />
+  ),
+  // potion
+  (c) => (
+    <>
+      <rect x="10" y="2.5" width="4" height="3.5" fill={c} />
+      <path d="M9 6.5h6l2 4.5c1.5 3-1 9-5 9s-6.5-6-5-9z" fill={c} />
+    </>
+  ),
+];
+
 function Face() {
   return (
     <>
@@ -111,14 +122,48 @@ function Face() {
   );
 }
 
-function StampIcon({ index, color, size = 30, withFace = true }) {
-  const draw = SHAPES[index % SHAPES.length];
+function StampIcon({ index, color, size = 30, withFace = true, shapes }) {
+  const set = shapes || SHAPES;
+  const draw = set[index % set.length];
   return (
     <svg width={size} height={size} viewBox="0 0 24 24">
       {draw(color)}
       {withFace && <Face />}
     </svg>
   );
+}
+
+const THEMES = {
+  girl: {
+    key: "girl",
+    label: "女の子むけ",
+    emoji: "🎀",
+    bg: "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)",
+    accentGradient: "linear-gradient(90deg,#FFD6E0,#F4C95D)",
+    palette: PASTELS,
+    headingFont: "'Kaisei Decol', serif",
+    mascotBg: "#FFD6E0",
+    mascotIconIndex: 0,
+    shapes: SHAPES,
+    withFace: true,
+  },
+  boy: {
+    key: "boy",
+    label: "男の子むけ",
+    emoji: "⚔️",
+    bg: "linear-gradient(180deg, #170D08 0%, #3B1F0F 42%, #7A3B12 78%, #C76B1F 100%)",
+    accentGradient: "linear-gradient(90deg,#E5533D,#C89B3C)",
+    palette: BOY_PALETTE,
+    headingFont: "'Dela Gothic One', sans-serif",
+    mascotBg: "#C89B3C",
+    mascotIconIndex: 1,
+    shapes: HUNTER_SHAPES,
+    withFace: false,
+  },
+};
+
+function getTheme(key) {
+  return THEMES[key] || THEMES.girl;
 }
 
 const CHEERS = ["やったね！", "すごいね！", "よくできました！", "ピカピカ★", "偉いね！", "ナイス！", "完璧！"];
@@ -271,16 +316,28 @@ export default function KidsScheduleApp() {
             } catch (e) {}
             setView(wantsEdit ? "setup" : "main");
           } else {
+            applyThemeFromUrl();
             setView("setup");
           }
         } else {
+          applyThemeFromUrl();
           setView("setup");
         }
       } catch (e) {
+        applyThemeFromUrl();
         setView("setup");
       }
       setLoaded(true);
     })();
+
+    function applyThemeFromUrl() {
+      try {
+        const t = new URLSearchParams(window.location.search).get("theme");
+        if (t === "girl" || t === "boy") {
+          setConfig((prev) => ({ ...prev, theme: t }));
+        }
+      } catch (e) {}
+    }
   }, []);
 
   useEffect(() => {
@@ -1041,7 +1098,7 @@ function MainScreen({
 
         <div style={styles.mascotRow}>
           <div style={styles.mascotFace}>
-            <StampIcon index={theme.mascotIconIndex} color={theme.mascotBg} size={58} />
+            <StampIcon index={theme.mascotIconIndex} color={theme.mascotBg} size={58} shapes={theme.shapes} withFace={theme.withFace} />
           </div>
           <div style={styles.mascotBubbleWrap}>
             <div style={styles.mascotBubble}>{mascotMsg}</div>
@@ -1086,7 +1143,7 @@ function MainScreen({
           return (
             <div key={s.id} style={{ ...styles.subjectSpotlight, background: `linear-gradient(135deg, ${s.color}, #ffffff)` }}>
               <div style={{ ...styles.subjectSpotlightIcon, background: s.color }}>
-                <StampIcon index={idx} color="#ffffff" size="60%" />
+                <StampIcon index={idx} color="#ffffff" size="60%" shapes={theme.shapes} withFace={theme.withFace} />
               </div>
               <div style={styles.subjectSpotlightTextWrap}>
                 <div style={styles.subjectSpotlightName}>{s.name}</div>
@@ -1166,6 +1223,8 @@ function MainScreen({
                               color={s.color}
                               iconIndex={idx}
                               label={s.name}
+                              shapes={theme.shapes}
+                              withFace={theme.withFace}
                               onTap={() => onTapStamp(d, s.id)}
                               onClear={() => onClearStamp(d, s.id)}
                             />
@@ -1182,6 +1241,8 @@ function MainScreen({
                             label={s.name}
                             missed={isPastMiss}
                             fun={funStampFor(dKey, s.id)}
+                            shapes={theme.shapes}
+                            withFace={theme.withFace}
                             onToggleFun={() => onToggleFunStamp(d, s.id)}
                           />
                         </div>
@@ -1198,7 +1259,7 @@ function MainScreen({
   );
 }
 
-function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun }) {
+function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun, shapes, withFace }) {
   const real = count >= 1;
   if (real) {
     // A genuine past completion — shown vivid and solid, not editable here.
@@ -1212,7 +1273,7 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun 
           background: color + "22",
         }}
       >
-        <StampIcon index={iconIndex} color={color} size="62%" />
+        <StampIcon index={iconIndex} color={color} size="62%" shapes={shapes} withFace={withFace} />
         {count === 2 && <span style={styles.x2Badge}>×2</span>}
       </div>
     );
@@ -1229,12 +1290,12 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun 
       }}
       aria-label={`${label} れんしゅうスタンプ`}
     >
-      {fun && <StampIcon index={iconIndex} color={color} size="60%" withFace={false} />}
+      {fun && <StampIcon index={iconIndex} color={color} size="60%" shapes={shapes} withFace={false} />}
     </button>
   );
 }
 
-function StampCell({ count, color, iconIndex, label, onTap, onClear }) {
+function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, withFace }) {
   const [popKey, setPopKey] = useState(0);
   const [comment, setComment] = useState(null);
   const prevCount = useRef(count);
@@ -1265,7 +1326,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear }) {
       >
         {count >= 1 && (
           <span key={popKey} style={styles.stampPopWrap}>
-            <StampIcon index={iconIndex} color={color} size="65%" />
+            <StampIcon index={iconIndex} color={color} size="65%" shapes={shapes} withFace={withFace} />
           </span>
         )}
         {count === 2 && <span style={styles.x2Badge}>×2</span>}
@@ -1446,7 +1507,7 @@ function Confetti() {
 }
 
 function CornerArt({ theme }) {
-  if (theme === "boy") return <SpaceCornerArt />;
+  if (theme === "boy") return <HunterCornerArt />;
   return (
     <>
       <svg style={{ position: "absolute", top: 6, right: -10, opacity: 0.5 }} width="150" height="90" viewBox="0 0 150 90">
@@ -1468,33 +1529,45 @@ function CornerArt({ theme }) {
   );
 }
 
-function SpaceCornerArt() {
+function HunterCornerArt() {
   return (
     <>
-      {/* rocket, top right */}
-      <svg style={{ position: "absolute", top: 10, right: 4, opacity: 0.85 }} width="70" height="100" viewBox="0 0 70 100">
-        <path d="M35 4c12 14 16 32 12 52H23c-4-20 0-38 12-52z" fill="#E2E8F0" />
-        <circle cx="35" cy="34" r="7" fill="#60A5FA" />
-        <path d="M23 46l-14 20 16-6zM47 46l14 20-16-6z" fill="#F87171" />
-        <path d="M28 56h14l-4 20-3 8-3-8z" fill="#FB923C" opacity="0.9" />
+      {/* crossed sword & shield, top right */}
+      <svg style={{ position: "absolute", top: 6, right: 2, opacity: 0.85 }} width="100" height="100" viewBox="0 0 100 100">
+        <g transform="rotate(18 50 50)">
+          <rect x="47" y="6" width="6" height="46" rx="1.5" fill="#E2E8F0" />
+          <rect x="40" y="46" width="20" height="7" rx="1.5" fill="#8B5E34" />
+          <rect x="45" y="53" width="10" height="16" rx="2" fill="#8B5E34" />
+        </g>
+        <path d="M68 30l16 6v10c0 12-7 19-16 22-9-3-16-10-16-22V36z" fill="#C89B3C" opacity="0.9" />
+        <path d="M68 34l0 30M60 44h16" stroke="#7A3B12" strokeWidth="2" opacity="0.6" />
       </svg>
-      {/* ringed planet, bottom right */}
-      <svg style={{ position: "absolute", bottom: 10, right: -8, opacity: 0.6 }} width="120" height="100" viewBox="0 0 120 100">
-        <circle cx="60" cy="52" r="26" fill="#A78BFA" />
-        <ellipse cx="60" cy="52" rx="46" ry="12" fill="none" stroke="#FACC15" strokeWidth="4" opacity="0.85" />
+      {/* rising embers, bottom right */}
+      <svg style={{ position: "absolute", bottom: 6, right: -4, opacity: 0.75 }} width="110" height="110" viewBox="0 0 110 110">
+        <path d="M55 30c5 10-8 12-8 22a8 8 0 0016 0c0-3-1-5-3-7 6 4 12 12 12 22a17 17 0 01-34 0c0-14 11-20 11-30 0-3 2-5 6-7z" fill="#E5533D" />
       </svg>
-      {/* comet trail, left */}
-      <svg style={{ position: "absolute", top: "34%", left: -16, opacity: 0.5 }} width="100" height="60" viewBox="0 0 100 60">
-        <path d="M4 4c30 8 55 24 90 50" stroke="#5EEAD4" strokeWidth="3" fill="none" strokeLinecap="round" strokeDasharray="1 9" />
-        <circle cx="90" cy="52" r="5" fill="#5EEAD4" />
+      {/* claw marks, left */}
+      <svg style={{ position: "absolute", top: "40%", left: -10, opacity: 0.4 }} width="90" height="90" viewBox="0 0 90 90">
+        <path d="M10 8c14 12 14 40 4 56M24 4c14 12 14 44 4 60M38 8c14 12 14 40 4 56" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" />
       </svg>
-      {/* scattered stars */}
+      {/* embers scattered */}
       {[
-        [20, 60], [55, 20], [80, 70], [12, 20], [65, 88], [90, 30],
+        [18, 55], [50, 15], [78, 62], [10, 18], [60, 85], [88, 25],
       ].map(([x, y], i) => (
-        <svg key={i} style={{ position: "absolute", top: `${y}%`, left: i % 2 === 0 ? `${x}%` : "auto", right: i % 2 === 1 ? `${100 - x}%` : "auto", opacity: 0.7 }} width="14" height="14" viewBox="0 0 14 14">
-          <path d="M7 0l1.6 4.8L14 7l-5.4 2.2L7 14l-1.6-4.8L0 7l5.4-2.2z" fill="#FACC15" />
-        </svg>
+        <span
+          key={i}
+          style={{
+            position: "absolute",
+            top: `${y}%`,
+            left: i % 2 === 0 ? `${x}%` : "auto",
+            right: i % 2 === 1 ? `${100 - x}%` : "auto",
+            width: 5,
+            height: 5,
+            borderRadius: "50%",
+            background: "#FACC15",
+            opacity: 0.6,
+          }}
+        />
       ))}
     </>
   );
