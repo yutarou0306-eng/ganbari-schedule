@@ -921,24 +921,6 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
         </h1>
         <p style={styles.setupSub}>誰の、何を頑張るスケジュールか、名前をつけてね</p>
 
-        <label style={styles.label}>デザイン</label>
-        <div style={styles.themePickRow}>
-          {Object.values(THEMES).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTheme(t.key)}
-              style={{
-                ...styles.themePickCard,
-                background: t.bg,
-                boxShadow: theme === t.key ? "0 0 0 4px #14588C, 0 8px 18px rgba(0,0,0,0.25)" : "0 8px 18px rgba(0,0,0,0.2)",
-              }}
-            >
-              <span style={styles.themePickEmoji}>{t.emoji}</span>
-              <span style={styles.themePickLabel}>{t.label}</span>
-            </button>
-          ))}
-        </div>
-
         <label style={styles.label}>タイトル</label>
         <input
           value={title}
@@ -1632,10 +1614,6 @@ const styles = {
   setupHeading: { fontFamily: "'Kaisei Decol', serif", fontSize: 34, margin: "4px 0 2px", color: "#0B3D62" },
   setupSub: { fontSize: 17, color: "#4a6c85", marginBottom: 18 },
   label: { display: "block", fontWeight: 700, fontSize: 18, marginBottom: 8, color: "#14588C" },
-  themePickRow: { display: "flex", gap: 12, marginBottom: 20 },
-  themePickCard: { flex: 1, border: "none", borderRadius: 18, padding: "18px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer" },
-  themePickEmoji: { fontSize: 30 },
-  themePickLabel: { fontSize: 14, fontWeight: 900, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,0.5)" },
   tinyNote: { fontSize: 15, color: "#7c98aa", marginTop: 6 },
   input: { width: "100%", padding: "14px 16px", borderRadius: 14, border: "2px solid #BFE3F0", fontSize: 19, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" },
   dateRow: { display: "flex", alignItems: "center", gap: 10 },
