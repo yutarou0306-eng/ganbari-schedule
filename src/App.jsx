@@ -771,6 +771,7 @@ export default function KidsScheduleApp() {
           onClose={() => setCelebrateSchedule(false)}
           title={config.title}
           reward={config.reward}
+          theme={config.theme}
         />
       )}
       {toast && <div style={styles.toast}>{toast}</div>}
@@ -1317,6 +1318,7 @@ function MainScreen({
                               label={s.name}
                               shapes={theme.shapes}
                               withFace={theme.withFace}
+                              useDragonStamp={theme.isMapTheme}
                               onTap={() => onTapStamp(d, s.id)}
                               onClear={() => onClearStamp(d, s.id)}
                             />
@@ -1335,6 +1337,7 @@ function MainScreen({
                             fun={funStampFor(dKey, s.id)}
                             shapes={theme.shapes}
                             withFace={theme.withFace}
+                            useDragonStamp={theme.isMapTheme}
                             onToggleFun={() => onToggleFunStamp(d, s.id)}
                           />
                         </div>
@@ -1351,7 +1354,7 @@ function MainScreen({
   );
 }
 
-function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun, shapes, withFace }) {
+function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun, shapes, withFace, useDragonStamp }) {
   const real = count >= 1;
   if (real) {
     // A genuine past completion — shown vivid and solid, not editable here.
@@ -1365,7 +1368,11 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
           background: color + "22",
         }}
       >
-        <StampIcon index={iconIndex} color={color} size="62%" shapes={shapes} withFace={withFace} />
+        {useDragonStamp ? (
+          <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
+        ) : (
+          <StampIcon index={iconIndex} color={color} size="62%" shapes={shapes} withFace={withFace} />
+        )}
         {count === 2 && <span style={styles.x2Badge}>×2</span>}
       </div>
     );
@@ -1382,7 +1389,12 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
       }}
       aria-label={`${label} れんしゅうスタンプ`}
     >
-      {fun && <StampIcon index={iconIndex} color={color} size="60%" shapes={shapes} withFace={false} />}
+      {fun &&
+        (useDragonStamp ? (
+          <img src="/dragon-stamp.png" alt="" style={{ ...styles.dragonStampImg, opacity: 0.55 }} />
+        ) : (
+          <StampIcon index={iconIndex} color={color} size="60%" shapes={shapes} withFace={false} />
+        ))}
     </button>
   );
 }
@@ -1438,7 +1450,7 @@ function WeekdayShield({ label, color, iconIndex, shapes }) {
   );
 }
 
-function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, withFace }) {
+function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, withFace, useDragonStamp }) {
   const [popKey, setPopKey] = useState(0);
   const [comment, setComment] = useState(null);
   const prevCount = useRef(count);
@@ -1469,7 +1481,11 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, wit
       >
         {count >= 1 && (
           <span key={popKey} style={styles.stampPopWrap}>
-            <StampIcon index={iconIndex} color={color} size="65%" shapes={shapes} withFace={withFace} />
+            {useDragonStamp ? (
+              <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
+            ) : (
+              <StampIcon index={iconIndex} color={color} size="65%" shapes={shapes} withFace={withFace} />
+            )}
           </span>
         )}
         {count === 2 && <span style={styles.x2Badge}>×2</span>}
@@ -1595,12 +1611,16 @@ function DayCelebration({ onClose, theme }) {
   );
 }
 
-function ScheduleCompleteCelebration({ onClose, title, reward }) {
+function ScheduleCompleteCelebration({ onClose, title, reward, theme }) {
   return (
     <div style={styles.weekCelebrateOverlay}>
       <Confetti />
       <div style={styles.weekCelebrateCard}>
-        <div style={styles.chestEmoji}>🎉🏆🎉</div>
+        {theme === "boy" ? (
+          <img src="/dragon-face.png" alt="ドラゴン" style={styles.celebrateDragonImg} />
+        ) : (
+          <div style={styles.chestEmoji}>🎉🏆🎉</div>
+        )}
         <h2 style={styles.weekCelebrateTitle}>全部達成！！</h2>
         <p style={styles.weekCelebrateSub}>{title} 最後まで、本当によく頑張ったね！</p>
         {reward ? (
@@ -1933,6 +1953,8 @@ const styles = {
   weekCelebrateOverlay: { position: "fixed", inset: 0, background: "rgba(11,61,98,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1220 },
   weekCelebrateCard: { position: "relative", background: "linear-gradient(180deg, #FFFBF3, #FFF3D6)", borderRadius: 24, padding: "34px 30px", textAlign: "center", maxWidth: 360, animation: "popIn 0.35s ease-out", boxShadow: "0 30px 60px rgba(0,0,0,0.4)" },
   chestEmoji: { fontSize: 56, marginBottom: 6 },
+  celebrateDragonImg: { width: 120, height: 120, borderRadius: "50%", marginBottom: 10, boxShadow: "0 8px 20px rgba(0,0,0,0.35)" },
+  dragonStampImg: { width: "82%", height: "82%", borderRadius: "50%", objectFit: "cover" },
   weekCelebrateTitle: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 27, margin: "4px 0" },
   weekCelebrateSub: { fontSize: 17, color: "#5a7d94", marginBottom: 16, lineHeight: 1.6 },
   bigStamp: { display: "inline-block", border: "4px solid #FF8FA3", color: "#FF8FA3", fontWeight: 900, fontSize: 26, padding: "10px 26px", borderRadius: 14, transform: "rotate(-8deg)", marginBottom: 18, fontFamily: "'Kaisei Decol', serif" },
