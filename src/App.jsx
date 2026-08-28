@@ -890,13 +890,15 @@ function MainScreen({
         {subjects.map((s, idx) => {
           const backlog = missedBacklog(s);
           return (
-            <div key={s.id} style={styles.subjectSummaryChip}>
-              <div style={{ ...styles.headBubble, background: s.color, width: 30, height: 30 }}>
-                <StampIcon index={idx} color="#ffffff" size={16} />
+            <div key={s.id} style={{ ...styles.subjectSpotlight, background: `linear-gradient(135deg, ${s.color}, #ffffff)` }}>
+              <div style={{ ...styles.subjectSpotlightIcon, background: s.color }}>
+                <StampIcon index={idx} color="#ffffff" size="60%" />
               </div>
-              <span style={styles.headLabel}>{s.name}</span>
-              <span style={styles.durationBadge}>⏱{s.durationMinutes || 10}分</span>
-              {backlog > 0 && <span style={styles.backlogBadge}>🔁 のこり{backlog}</span>}
+              <div style={styles.subjectSpotlightTextWrap}>
+                <div style={styles.subjectSpotlightName}>{s.name}</div>
+                <div style={styles.subjectSpotlightDuration}>⏱ {s.durationMinutes || 10}分</div>
+              </div>
+              {backlog > 0 && <span style={styles.backlogBadgeBig}>🔁 のこり{backlog}</span>}
             </div>
           );
         })}
@@ -939,9 +941,7 @@ function MainScreen({
                 }}
               >
                 <div style={styles.dayCellTopRow}>
-                  <span style={styles.dayNum}>
-                    {d.getDate() === 1 || i === 0 ? `${d.getMonth() + 1}/${d.getDate()}` : d.getDate()}
-                  </span>
+                  <span style={styles.dayNum}>{`${d.getMonth() + 1}/${d.getDate()}`}</span>
                   {isToday && <span style={styles.dayHeadTodayTag}>きょう</span>}
                   {dayComplete && <span style={styles.dayHeadTrophy}>🏆</span>}
                 </div>
@@ -1325,7 +1325,7 @@ const styles = {
   titleText: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 24, fontWeight: 700 },
   headerBtns: { display: "flex", gap: 8, flexShrink: 0 },
   iconBtn: { width: 46, height: 46, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.3)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)" },
-  lockNote: { color: "#EAF7FB", fontSize: 16, marginTop: 10, fontWeight: 700 },
+  lockNote: { color: "#EAF7FB", fontSize: 16, marginTop: 10, fontWeight: 700, textAlign: "center" },
 
   mascotRow: { display: "flex", alignItems: "flex-start", gap: 10, marginTop: 14 },
   mascotFace: { width: 68, height: 68, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 6px 14px rgba(11,61,98,0.3)", animation: "bob 2.4s ease-in-out infinite" },
@@ -1340,17 +1340,22 @@ const styles = {
   necklaceRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "rgba(255,255,255,0.15)", padding: "12px 14px", borderRadius: 999, backdropFilter: "blur(4px)" },
   pearl: { width: 20, height: 20, borderRadius: "50%", flexShrink: 0, transition: "all 0.4s" },
   pearlPct: { marginLeft: "auto", color: "#fff", fontWeight: 900, fontSize: 17 },
-  rewardPreview: { marginTop: 8, background: "rgba(255,255,255,0.18)", borderRadius: 12, padding: "8px 14px", color: "#fff", fontSize: 16, fontWeight: 700, backdropFilter: "blur(4px)" },
+  rewardPreview: { marginTop: 8, background: "rgba(255,255,255,0.18)", borderRadius: 12, padding: "8px 14px", color: "#fff", fontSize: 16, fontWeight: 700, backdropFilter: "blur(4px)", textAlign: "center" },
 
-  subjectSummaryRow: { position: "relative", zIndex: 2, display: "flex", flexWrap: "wrap", gap: 8, padding: "0 18px", marginTop: 4 },
-  subjectSummaryChip: { display: "flex", alignItems: "center", gap: 8, background: "#fff", borderRadius: 999, padding: "6px 12px 6px 6px", boxShadow: "0 4px 10px rgba(11,61,98,0.2)" },
+  subjectSummaryRow: { position: "relative", zIndex: 2, display: "flex", flexWrap: "wrap", gap: 10, padding: "0 18px", marginTop: 8, justifyContent: "center" },
+  subjectSpotlight: { display: "flex", alignItems: "center", gap: 14, borderRadius: 20, padding: "14px 22px", boxShadow: "0 10px 22px rgba(11,61,98,0.3)", justifyContent: "center", flexWrap: "wrap" },
+  subjectSpotlightIcon: { width: 56, height: 56, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 10px rgba(0,0,0,0.2)" },
+  subjectSpotlightTextWrap: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" },
+  subjectSpotlightName: { fontFamily: "'Kaisei Decol', serif", fontSize: 26, fontWeight: 700, color: "#0B3D62", lineHeight: 1.2 },
+  subjectSpotlightDuration: { fontSize: 16, fontWeight: 900, color: "#0B3D62", marginTop: 2 },
+  backlogBadgeBig: { fontSize: 13.5, color: "#B5651D", background: "#FFE9B3", borderRadius: 999, padding: "5px 12px", fontWeight: 800, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" },
 
-  calendarLegendRow: { position: "relative", zIndex: 2, display: "flex", gap: 14, padding: "10px 18px 0", flexWrap: "wrap" },
+  calendarLegendRow: { position: "relative", zIndex: 2, display: "flex", gap: 14, padding: "10px 18px 0", flexWrap: "wrap", justifyContent: "center" },
   calendarLegendItem: { display: "inline-flex", alignItems: "center", gap: 6, color: "#EAF7FB", fontSize: 13, fontWeight: 700 },
   legendDot: { width: 12, height: 12, borderRadius: "50%", display: "inline-block" },
 
   calendarPanel: { position: "relative", zIndex: 2, margin: "12px 18px 0", background: "linear-gradient(180deg,#FFFDF8,#FFF3E4)", borderRadius: 22, padding: 12, boxShadow: "0 16px 34px rgba(11,61,98,0.3)" },
-  tableHint: { fontSize: 15, color: "#5a7d94", fontWeight: 700, margin: "0 4px 10px" },
+  tableHint: { fontSize: 15, color: "#5a7d94", fontWeight: 700, margin: "0 4px 10px", textAlign: "center" },
   calendarGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 },
   weekdayHeadCell: { textAlign: "center", fontSize: 15, fontWeight: 900, color: "#0B3D62", background: "#fff", borderRadius: 10, padding: "6px 0", boxShadow: "inset 0 0 0 2px #EAF7FB" },
 
