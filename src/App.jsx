@@ -1033,17 +1033,19 @@ function MainScreen({
                 }}
               >
                 <div style={styles.dayCellTopRow}>
-                  <button
-                    onClick={() => onOpenNote(d)}
-                    style={styles.dayNumBtn}
-                    aria-label={`${d.getMonth() + 1}月${d.getDate()}日 の きろく`}
-                  >
-                    <span style={styles.dayNum}>{`${d.getMonth() + 1}/${d.getDate()}`}</span>
-                    {notes[dKey] && <span style={styles.noteDot}>📝</span>}
-                  </button>
+                  <span style={styles.dayNum}>{`${d.getMonth() + 1}/${d.getDate()}`}</span>
                   {isToday && <span style={styles.dayHeadTodayTag}>きょう</span>}
                   {dayComplete && <span style={styles.dayHeadTrophy}>🏆</span>}
                 </div>
+                {inRange && (
+                  <button
+                    onClick={() => onOpenNote(d)}
+                    style={{ ...styles.memoBtn, ...(notes[dKey] ? styles.memoBtnFilled : {}) }}
+                    aria-label={`${d.getMonth() + 1}月${d.getDate()}日 の メモ`}
+                  >
+                    📝 メモ
+                  </button>
+                )}
 
                 {!inRange ? (
                   <span style={styles.dashMark}>ー</span>
@@ -1497,8 +1499,8 @@ const styles = {
   dayCellComplete: { boxShadow: "inset 0 0 0 2px #F4C95D", background: "#FFF7DA" },
   dayCellTopRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 3, width: "100%", flexWrap: "wrap" },
   dayNum: { fontSize: 13, fontWeight: 800, color: "#7c98aa" },
-  dayNumBtn: { display: "inline-flex", alignItems: "center", gap: 2, background: "none", border: "none", padding: "1px 3px", cursor: "pointer", borderRadius: 6 },
-  noteDot: { fontSize: 11 },
+  memoBtn: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3, background: "#EAF7FB", border: "1px dashed #BFE3F0", color: "#7c98aa", borderRadius: 999, padding: "2px 8px", fontSize: 10.5, fontWeight: 700, cursor: "pointer", marginTop: 2 },
+  memoBtnFilled: { background: "#FFF3B0", border: "1px solid #E0C24A", color: "#8a6d00" },
   dayHeadTodayTag: { fontSize: 9, color: "#fff", background: "#14588C", borderRadius: 999, padding: "1px 5px", fontWeight: 900 },
   dayHeadTrophy: { fontSize: 12 },
 
