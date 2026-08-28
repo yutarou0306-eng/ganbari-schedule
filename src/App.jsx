@@ -1164,9 +1164,14 @@ function MainScreen({
               ...styles.mascotFace,
               background: theme.isMapTheme ? "linear-gradient(160deg,#3E2A16,#1E1409)" : "#fff",
               boxShadow: theme.isMapTheme ? "0 0 0 3px #C89B3C, 0 6px 14px rgba(0,0,0,0.5)" : styles.mascotFace.boxShadow,
+              overflow: "hidden",
             }}
           >
-            <StampIcon index={theme.mascotIconIndex} color={theme.isMapTheme ? "#E5C878" : theme.mascotBg} size={40} shapes={theme.shapes} withFace={theme.withFace} />
+            {theme.isMapTheme ? (
+              <img src="/dragon-icon.png" alt="ドラゴン" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            ) : (
+              <StampIcon index={theme.mascotIconIndex} color={theme.mascotBg} size={40} shapes={theme.shapes} withFace={theme.withFace} />
+            )}
           </div>
           <div style={styles.mascotBubbleWrap}>
             <div style={styles.mascotBubble}>{mascotMsg}</div>
@@ -1700,15 +1705,20 @@ function MapDoodles() {
 function DragonCornerArt() {
   return (
     <>
-      {/* dragon silhouette, top left */}
-      <svg style={{ position: "absolute", top: 2, left: -6, opacity: 0.85 }} width="120" height="110" viewBox="0 0 120 110">
-        <path
-          d="M18 70c-4-10 0-24 12-30-6-10-4-22 4-28 2 8 6 12 12 14 8-6 18-6 24 2-6 0-10 2-13 6 10 2 18 10 20 22-4-4-9-6-14-6 4 8 3 18-4 26-1-8-5-13-11-15 2 8-1 16-9 20 2-7 0-13-5-16-6 5-14 6-16 5z"
-          fill="#3F6B35"
-        />
-        <path d="M34 12c2 6 5 10 10 12-3-6-3-10 0-14-4 0-7 1-10 2z" fill="#4B7A3C" opacity="0.9" />
-        <circle cx="20" cy="52" r="1.6" fill="#F4C95D" />
-      </svg>
+      {/* dragon illustration, top left */}
+      <img
+        src="/dragon-full.png"
+        alt=""
+        style={{
+          position: "absolute",
+          top: -6,
+          left: -14,
+          width: 150,
+          opacity: 0.92,
+          filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.35))",
+          pointerEvents: "none",
+        }}
+      />
       {/* compass rose, top right */}
       <svg style={{ position: "absolute", top: 10, right: 8, opacity: 0.55 }} width="70" height="70" viewBox="0 0 70 70">
         <circle cx="35" cy="35" r="26" fill="none" stroke="#C89B3C" strokeWidth="2" />
