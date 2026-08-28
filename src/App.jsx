@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Lock, Unlock, Settings, ArrowLeft } from "lucide-react";
+import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 
 const STORAGE_KEY = "pearl-sea-schedule-v2";
 const DAY_LABELS = ["月", "火", "水", "木", "金", "土", "日"]; // index 0=Mon ... 6=Sun
@@ -184,6 +184,8 @@ export default function KidsScheduleApp() {
   const [completions, setCompletions] = useState({});
   const [recoveries, setRecoveries] = useState({});
   const [funStamps, setFunStamps] = useState({});
+  const [notes, setNotes] = useState({});
+  const [noteModalDate, setNoteModalDate] = useState(null);
   const [locked, setLocked] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
@@ -207,6 +209,7 @@ export default function KidsScheduleApp() {
             setCompletions(data.completions || {});
             setRecoveries(data.recoveries || {});
             setFunStamps(data.funStamps || {});
+            setNotes(data.notes || {});
             // A "?edit=1" URL flag (used by the top-page's edit button) jumps
             // straight into the setup/edit screen instead of the main view.
             let wantsEdit = false;
@@ -235,11 +238,11 @@ export default function KidsScheduleApp() {
     }
     const t = setTimeout(async () => {
       try {
-        await window.storage.set(STORAGE_KEY, JSON.stringify({ config, completions, recoveries, funStamps }), false);
+        await window.storage.set(STORAGE_KEY, JSON.stringify({ config, completions, recoveries, funStamps, notes }), false);
       } catch (e) {}
     }, 350);
     return () => clearTimeout(t);
-  }, [config, completions, recoveries, funStamps, loaded]);
+  }, [config, completions, recoveries, funStamps, notes, loaded]);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -386,6 +389,26 @@ export default function KidsScheduleApp() {
     });
   }
 
+  function handleOpenNote(date) {
+    setNoteModalDate(date);
+  }
+
+  function handleCloseNote() {
+    setNoteModalDate(null);
+  }
+
+  function handleSaveNote(text) {
+    if (!noteModalDate) return;
+    const dKey = dateKey(noteModalDate);
+    setNotes((prev) => {
+      const next = { ...prev };
+      if (text.trim()) next[dKey] = text;
+      else delete next[dKey];
+      return next;
+    });
+    setNoteModalDate(null);
+  }
+
   async function handleDeleteSchedule() {
     setDeleting(true);
     try {
@@ -508,6 +531,8 @@ export default function KidsScheduleApp() {
           onTapStamp={handleTapStamp}
           onClearStamp={handleClearStamp}
           onToggleFunStamp={handleToggleFunStamp}
+          notes={notes}
+          onOpenNote={handleOpenNote}
           daySubjectsFor={daySubjectsFor}
           isStamped={isStamped}
           countFor={countFor}
@@ -552,6 +577,15 @@ export default function KidsScheduleApp() {
         />
       )}
 
+      {noteModalDate && (
+        <NoteModal
+          date={noteModalDate}
+          initialText={notes[dateKey(noteModalDate)] || ""}
+          onSave={handleSaveNote}
+          onClose={handleCloseNote}
+        />
+      )}
+
       {celebrateDay && <DayCelebration onClose={() => setCelebrateDay(null)} />}
       {celebrateSchedule && (
         <ScheduleCompleteCelebration
@@ -567,7 +601,7 @@ export default function KidsScheduleApp() {
 
 /* ---------------- Setup Screen ---------------- */
 
-function SubjectCard({ subject, onChange }) {
+function SubjectCard({ subject, onChange, onRemove, canRemove }) {
   function set(patch) {
     onChange({ ...subject, ...patch });
   }
@@ -585,6 +619,11 @@ function SubjectCard({ subject, onChange }) {
           placeholder="なにをがんばる？（例：ピアノ）"
           style={styles.subjNameInput}
         />
+        {canRemove && (
+          <button style={styles.chipX} onClick={onRemove} aria-label="削除">
+            <X size={16} />
+          </button>
+        )}
       </div>
 
       <div style={styles.swatchRow}>
@@ -682,14 +721,29 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
   const [endDate, setEndDate] = useState(initial.endDate || defaultEndDate());
   const [pin, setPin] = useState(initial.pin || "");
   const [reward, setReward] = useState(initial.reward || "");
-  const [subject, setSubject] = useState(
-    initial.subjects && initial.subjects[0] ? initial.subjects[0] : DEFAULT_SUBJECT()
+  const [subjects, setSubjects] = useState(
+    initial.subjects && initial.subjects.length ? initial.subjects : [DEFAULT_SUBJECT()]
   );
+
+  function addSubject() {
+    setSubjects((prev) => [
+      ...prev,
+      { ...DEFAULT_SUBJECT(), color: PASTELS[prev.length % PASTELS.length].hex },
+    ]);
+  }
+
+  function updateSubject(id, next) {
+    setSubjects((prev) => prev.map((s) => (s.id === id ? next : s)));
+  }
+
+  function removeSubject(id) {
+    setSubjects((prev) => (prev.length > 1 ? prev.filter((s) => s.id !== id) : prev));
+  }
 
   function handleSave() {
     const t = title.trim() || "がんばりスケジュール";
-    const subjName = subject.name.trim();
-    if (!subjName) return;
+    const cleanSubjects = subjects.filter((s) => s.name.trim().length > 0).map((s) => ({ ...s, name: s.name.trim() }));
+    if (cleanSubjects.length === 0) return;
     let sd = startDate,
       ed = endDate;
     if (parseDate(ed) < parseDate(sd)) ed = sd;
@@ -697,7 +751,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
       title: t,
       startDate: sd,
       endDate: ed,
-      subjects: [{ ...subject, name: subjName }],
+      subjects: cleanSubjects,
       pin: pin.trim(),
       reward: reward.trim(),
     });
@@ -712,13 +766,13 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
           </button>
         )}
         <h1 style={styles.setupHeading}>{hasExisting ? "スケジュールを編集する" : "スケジュールをつくろう"}</h1>
-        <p style={styles.setupSub}>1つのスケジュールにつき、がんばることは1つです。だれの、なにをがんばるスケジュールか、名前をつけてね</p>
+        <p style={styles.setupSub}>だれの、なにをがんばるスケジュールか、名前をつけてね</p>
 
         <label style={styles.label}>タイトル</label>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="例）ゆうたろうのピアノチャレンジ"
+          placeholder="例）ゆうたろうの夏休みチャレンジ"
           style={styles.input}
         />
 
@@ -746,12 +800,23 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
           placeholder="例）アイスをたべる！／こうえんに行く！"
           style={styles.input}
         />
-        <p style={styles.tinyNote}>期間の最後まで、すべての日を達成したときにお祝いのメッセージとして表示されます。</p>
+        <p style={styles.tinyNote}>期間の最後まで、すべてのやることを達成したときにお祝いのメッセージとして表示されます。</p>
 
-        <label style={{ ...styles.label, marginTop: 20 }}>なにを がんばる？</label>
+        <label style={{ ...styles.label, marginTop: 20 }}>やること（教科・習い事）</label>
         <div style={styles.subjList}>
-          <SubjectCard subject={subject} onChange={setSubject} />
+          {subjects.map((s) => (
+            <SubjectCard
+              key={s.id}
+              subject={s}
+              onChange={(next) => updateSubject(s.id, next)}
+              onRemove={() => removeSubject(s.id)}
+              canRemove={subjects.length > 1}
+            />
+          ))}
         </div>
+        <button style={styles.addBtn} onClick={addSubject}>
+          <Plus size={20} /> やることを追加
+        </button>
 
         <button style={styles.saveBtn} onClick={handleSave}>
           このスケジュールではじめる
@@ -789,6 +854,8 @@ function MainScreen({
   stats,
   todayStats,
   streak,
+  notes,
+  onOpenNote,
 }) {
   const pct = stats.need > 0 ? Math.round((stats.done / stats.need) * 100) : 0;
   const pearlCount = 10;
@@ -941,7 +1008,14 @@ function MainScreen({
                 }}
               >
                 <div style={styles.dayCellTopRow}>
-                  <span style={styles.dayNum}>{`${d.getMonth() + 1}/${d.getDate()}`}</span>
+                  <button
+                    onClick={() => onOpenNote(d)}
+                    style={styles.dayNumBtn}
+                    aria-label={`${d.getMonth() + 1}月${d.getDate()}日 の きろく`}
+                  >
+                    <span style={styles.dayNum}>{`${d.getMonth() + 1}/${d.getDate()}`}</span>
+                    {notes[dKey] && <span style={styles.noteDot}>📝</span>}
+                  </button>
                   {isToday && <span style={styles.dayHeadTodayTag}>きょう</span>}
                   {dayComplete && <span style={styles.dayHeadTrophy}>🏆</span>}
                 </div>
@@ -1136,6 +1210,35 @@ function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
           </button>
           <button style={styles.modalConfirm} onClick={submit}>
             開ける
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NoteModal({ date, initialText, onSave, onClose }) {
+  const [text, setText] = useState(initialText || "");
+  const dLabel = `${date.getMonth() + 1}月${date.getDate()}日`;
+  return (
+    <div style={styles.modalOverlay}>
+      <div style={styles.modalCard}>
+        <h3 style={styles.modalTitle}>📝 {dLabel} の きろく</h3>
+        <p style={styles.modalMsg}>やったこと・かんそうを書いておこう</p>
+        <textarea
+          autoFocus
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="れい）今日はスラスラ弾けた！たのしかった。"
+          style={styles.noteTextarea}
+          rows={5}
+        />
+        <div style={styles.modalBtns}>
+          <button style={styles.modalCancel} onClick={onClose}>
+            とじる
+          </button>
+          <button style={styles.modalConfirm} onClick={() => onSave(text)}>
+            ほぞんする
           </button>
         </div>
       </div>
@@ -1365,6 +1468,8 @@ const styles = {
   dayCellComplete: { boxShadow: "inset 0 0 0 2px #F4C95D", background: "#FFF7DA" },
   dayCellTopRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 3, width: "100%", flexWrap: "wrap" },
   dayNum: { fontSize: 13, fontWeight: 800, color: "#7c98aa" },
+  dayNumBtn: { display: "inline-flex", alignItems: "center", gap: 2, background: "none", border: "none", padding: "1px 3px", cursor: "pointer", borderRadius: 6 },
+  noteDot: { fontSize: 11 },
   dayHeadTodayTag: { fontSize: 9, color: "#fff", background: "#14588C", borderRadius: 999, padding: "1px 5px", fontWeight: 900 },
   dayHeadTrophy: { fontSize: 12 },
 
@@ -1389,6 +1494,7 @@ const styles = {
   modalCard: { background: "#fff", borderRadius: 20, padding: 26, maxWidth: 360, width: "100%", textAlign: "center", animation: "popIn 0.25s ease-out" },
   modalTitle: { margin: "0 0 8px", fontSize: 22, color: "#0B3D62" },
   modalMsg: { fontSize: 17, color: "#4a6c85", lineHeight: 1.6, marginBottom: 18 },
+  noteTextarea: { width: "100%", padding: "12px 14px", borderRadius: 14, border: "2px solid #BFE3F0", fontSize: 16, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff", resize: "vertical", marginBottom: 18, color: "#0B3D62" },
   modalBtns: { display: "flex", gap: 10 },
   modalCancel: { flex: 1, padding: "12px 0", borderRadius: 12, border: "2px solid #d7ecf3", background: "#fff", color: "#5a7d94", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
   modalConfirm: { flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
