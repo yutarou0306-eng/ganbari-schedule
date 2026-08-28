@@ -15,6 +15,46 @@ const PASTELS = [
   { name: "らいらっく", hex: "#F3C9EA" },
 ];
 
+const BOY_PALETTE = [
+  { name: "そら", hex: "#60A5FA" },
+  { name: "みどり", hex: "#4ADE80" },
+  { name: "オレンジ", hex: "#FB923C" },
+  { name: "あか", hex: "#F87171" },
+  { name: "パープル", hex: "#A78BFA" },
+  { name: "イエロー", hex: "#FACC15" },
+  { name: "ティール", hex: "#2DD4BF" },
+  { name: "グレー", hex: "#94A3B8" },
+];
+
+const THEMES = {
+  girl: {
+    key: "girl",
+    label: "女の子むけ",
+    emoji: "🎀",
+    bg: "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)",
+    accentGradient: "linear-gradient(90deg,#FFD6E0,#F4C95D)",
+    palette: PASTELS,
+    headingFont: "'Kaisei Decol', serif",
+    mascotBg: "#FFD6E0",
+    mascotIconIndex: 0,
+  },
+  boy: {
+    key: "boy",
+    label: "男の子むけ",
+    emoji: "🚀",
+    bg: "linear-gradient(180deg, #04061A 0%, #0B1E4D 42%, #1B3F8C 78%, #3E7BD6 100%)",
+    accentGradient: "linear-gradient(90deg,#60A5FA,#22C55E)",
+    palette: BOY_PALETTE,
+    headingFont: "'Dela Gothic One', sans-serif",
+    mascotBg: "#60A5FA",
+    mascotIconIndex: 1,
+  },
+};
+
+function getTheme(key) {
+  return THEMES[key] || THEMES.girl;
+}
+
 const SHAPES = [
   // seal
   (c) => (
@@ -168,10 +208,10 @@ function defaultEndDate() {
   return dateKey(d);
 }
 
-const DEFAULT_SUBJECT = () => ({
+const DEFAULT_SUBJECT = (palette) => ({
   id: uid(),
   name: "",
-  color: PASTELS[0].hex,
+  color: (palette || PASTELS)[0].hex,
   freqType: "daily",
   intervalDays: 2,
   weekdays: [0, 1, 2, 3, 4],
@@ -181,6 +221,7 @@ const DEFAULT_SUBJECT = () => ({
 function freshConfig() {
   return {
     title: "",
+    theme: "girl",
     startDate: todayStr(),
     endDate: defaultEndDate(),
     subjects: [DEFAULT_SUBJECT()],
@@ -650,7 +691,7 @@ export default function KidsScheduleApp() {
 
 /* ---------------- Setup Screen ---------------- */
 
-function SubjectCard({ subject, onChange, onRemove, canRemove }) {
+function SubjectCard({ subject, onChange, onRemove, canRemove, palette }) {
   function set(patch) {
     onChange({ ...subject, ...patch });
   }
@@ -676,7 +717,7 @@ function SubjectCard({ subject, onChange, onRemove, canRemove }) {
       </div>
 
       <div style={styles.swatchRow}>
-        {PASTELS.map((p) => (
+        {(palette || PASTELS).map((p) => (
           <button
             key={p.hex}
             title={p.name}
@@ -766,6 +807,7 @@ function SubjectCard({ subject, onChange, onRemove, canRemove }) {
 
 function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }) {
   const [title, setTitle] = useState(initial.title || "");
+  const [theme, setTheme] = useState(initial.theme || "girl");
   const [startDate, setStartDate] = useState(initial.startDate || todayStr());
   const [endDate, setEndDate] = useState(initial.endDate || defaultEndDate());
   const [pin, setPin] = useState(initial.pin || "");
@@ -774,10 +816,12 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
     initial.subjects && initial.subjects.length ? initial.subjects : [DEFAULT_SUBJECT()]
   );
 
+  const palette = getTheme(theme).palette;
+
   function addSubject() {
     setSubjects((prev) => [
       ...prev,
-      { ...DEFAULT_SUBJECT(), color: PASTELS[prev.length % PASTELS.length].hex },
+      { ...DEFAULT_SUBJECT(), color: palette[prev.length % palette.length].hex },
     ]);
   }
 
@@ -798,6 +842,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
     if (parseDate(ed) < parseDate(sd)) ed = sd;
     onSave({
       title: t,
+      theme,
       startDate: sd,
       endDate: ed,
       subjects: cleanSubjects,
@@ -814,8 +859,28 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
             <ArrowLeft size={20} /> もどる
           </button>
         )}
-        <h1 style={styles.setupHeading}>{hasExisting ? "スケジュールを編集する" : "スケジュールを作ろう"}</h1>
+        <h1 style={{ ...styles.setupHeading, fontFamily: getTheme(theme).headingFont }}>
+          {hasExisting ? "スケジュールを編集する" : "スケジュールを作ろう"}
+        </h1>
         <p style={styles.setupSub}>誰の、何を頑張るスケジュールか、名前をつけてね</p>
+
+        <label style={styles.label}>デザイン</label>
+        <div style={styles.themePickRow}>
+          {Object.values(THEMES).map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTheme(t.key)}
+              style={{
+                ...styles.themePickCard,
+                background: t.bg,
+                boxShadow: theme === t.key ? "0 0 0 4px #14588C, 0 8px 18px rgba(0,0,0,0.25)" : "0 8px 18px rgba(0,0,0,0.2)",
+              }}
+            >
+              <span style={styles.themePickEmoji}>{t.emoji}</span>
+              <span style={styles.themePickLabel}>{t.label}</span>
+            </button>
+          ))}
+        </div>
 
         <label style={styles.label}>タイトル</label>
         <input
@@ -862,6 +927,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
               onChange={(next) => updateSubject(s.id, next)}
               onRemove={() => removeSubject(s.id)}
               canRemove={subjects.length > 1}
+              palette={palette}
             />
           ))}
         </div>
@@ -932,6 +998,7 @@ function MainScreen({
   for (let d = new Date(gridStart); d.getTime() <= gridEnd.getTime(); d = addDays(d, 1)) allCells.push(d);
 
   const subjects = config.subjects;
+  const theme = getTheme(config.theme);
 
   const todayCellRef = useRef(null);
   useEffect(() => {
@@ -944,12 +1011,12 @@ function MainScreen({
   }, []);
 
   return (
-    <div style={styles.mainWrap}>
-      <CornerArt />
+    <div style={{ ...styles.mainWrap, background: theme.bg }}>
+      <CornerArt theme={theme.key} />
       <header style={styles.header}>
         <div style={styles.headerTop}>
           <div style={styles.titleBanner}>
-            <span style={styles.titleText}>{config.title}</span>
+            <span style={{ ...styles.titleText, fontFamily: theme.headingFont }}>{config.title}</span>
           </div>
           <div style={styles.headerBtns}>
             <button style={styles.iconBtn} onClick={onLockToggle} title={locked ? "保護者用に開ける" : "ロックする"}>
@@ -974,7 +1041,7 @@ function MainScreen({
 
         <div style={styles.mascotRow}>
           <div style={styles.mascotFace}>
-            <StampIcon index={0} color="#FFD6E0" size={58} />
+            <StampIcon index={theme.mascotIconIndex} color={theme.mascotBg} size={58} />
           </div>
           <div style={styles.mascotBubbleWrap}>
             <div style={styles.mascotBubble}>{mascotMsg}</div>
@@ -986,7 +1053,7 @@ function MainScreen({
             </div>
             {todayStats.need > 0 && (
               <div style={styles.todayBarTrack}>
-                <div style={{ ...styles.todayBarFill, width: `${todayPct}%` }} />
+                <div style={{ ...styles.todayBarFill, width: `${todayPct}%`, background: theme.accentGradient }} />
               </div>
             )}
           </div>
@@ -1378,7 +1445,8 @@ function Confetti() {
   );
 }
 
-function CornerArt() {
+function CornerArt({ theme }) {
+  if (theme === "boy") return <SpaceCornerArt />;
   return (
     <>
       <svg style={{ position: "absolute", top: 6, right: -10, opacity: 0.5 }} width="150" height="90" viewBox="0 0 150 90">
@@ -1400,10 +1468,42 @@ function CornerArt() {
   );
 }
 
+function SpaceCornerArt() {
+  return (
+    <>
+      {/* rocket, top right */}
+      <svg style={{ position: "absolute", top: 10, right: 4, opacity: 0.85 }} width="70" height="100" viewBox="0 0 70 100">
+        <path d="M35 4c12 14 16 32 12 52H23c-4-20 0-38 12-52z" fill="#E2E8F0" />
+        <circle cx="35" cy="34" r="7" fill="#60A5FA" />
+        <path d="M23 46l-14 20 16-6zM47 46l14 20-16-6z" fill="#F87171" />
+        <path d="M28 56h14l-4 20-3 8-3-8z" fill="#FB923C" opacity="0.9" />
+      </svg>
+      {/* ringed planet, bottom right */}
+      <svg style={{ position: "absolute", bottom: 10, right: -8, opacity: 0.6 }} width="120" height="100" viewBox="0 0 120 100">
+        <circle cx="60" cy="52" r="26" fill="#A78BFA" />
+        <ellipse cx="60" cy="52" rx="46" ry="12" fill="none" stroke="#FACC15" strokeWidth="4" opacity="0.85" />
+      </svg>
+      {/* comet trail, left */}
+      <svg style={{ position: "absolute", top: "34%", left: -16, opacity: 0.5 }} width="100" height="60" viewBox="0 0 100 60">
+        <path d="M4 4c30 8 55 24 90 50" stroke="#5EEAD4" strokeWidth="3" fill="none" strokeLinecap="round" strokeDasharray="1 9" />
+        <circle cx="90" cy="52" r="5" fill="#5EEAD4" />
+      </svg>
+      {/* scattered stars */}
+      {[
+        [20, 60], [55, 20], [80, 70], [12, 20], [65, 88], [90, 30],
+      ].map(([x, y], i) => (
+        <svg key={i} style={{ position: "absolute", top: `${y}%`, left: i % 2 === 0 ? `${x}%` : "auto", right: i % 2 === 1 ? `${100 - x}%` : "auto", opacity: 0.7 }} width="14" height="14" viewBox="0 0 14 14">
+          <path d="M7 0l1.6 4.8L14 7l-5.4 2.2L7 14l-1.6-4.8L0 7l5.4-2.2z" fill="#FACC15" />
+        </svg>
+      ))}
+    </>
+  );
+}
+
 function GlobalStyle() {
   return (
     <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Kaisei+Decol:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap');
       @keyframes confettiFall {
         0% { transform: translateY(0) rotate(0deg); opacity: 1; }
         100% { transform: translateY(520px) rotate(340deg); opacity: 0; }
@@ -1459,6 +1559,10 @@ const styles = {
   setupHeading: { fontFamily: "'Kaisei Decol', serif", fontSize: 34, margin: "4px 0 2px", color: "#0B3D62" },
   setupSub: { fontSize: 17, color: "#4a6c85", marginBottom: 18 },
   label: { display: "block", fontWeight: 700, fontSize: 18, marginBottom: 8, color: "#14588C" },
+  themePickRow: { display: "flex", gap: 12, marginBottom: 20 },
+  themePickCard: { flex: 1, border: "none", borderRadius: 18, padding: "18px 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 6, cursor: "pointer" },
+  themePickEmoji: { fontSize: 30 },
+  themePickLabel: { fontSize: 14, fontWeight: 900, color: "#fff", textShadow: "0 2px 6px rgba(0,0,0,0.5)" },
   tinyNote: { fontSize: 15, color: "#7c98aa", marginTop: 6 },
   input: { width: "100%", padding: "14px 16px", borderRadius: 14, border: "2px solid #BFE3F0", fontSize: 19, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" },
   dateRow: { display: "flex", alignItems: "center", gap: 10 },
