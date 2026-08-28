@@ -71,14 +71,17 @@ const SHAPES = [
 ];
 
 const HUNTER_SHAPES = [
-  // dragon face (used as the mascot / signature icon)
+  // dragon head (used as the mascot / signature icon) — angular and fierce
   (c) => (
     <>
-      <path d="M6 9c0-4 2.7-6.5 6-6.5S18 5 18 9c0 2-.6 3-1.2 4.2.6.3 1 .9 1 1.6 0 1-.8 1.8-1.8 1.8-.4 0-.8-.1-1.1-.4-.5 1.6-1.9 2.8-3.9 2.8s-3.4-1.2-3.9-2.8c-.3.3-.7.4-1.1.4-1 0-1.8-.8-1.8-1.8 0-.7.4-1.3 1-1.6C6.6 12 6 11 6 9z" fill={c} />
-      <path d="M6.5 5.5l-2-2.8 3.2 1M17.5 5.5l2-2.8-3.2 1" stroke={c} strokeWidth="1.6" fill="none" strokeLinecap="round" />
-      <circle cx="9.3" cy="9.6" r="1.1" fill="#2b2b2b" />
-      <circle cx="14.7" cy="9.6" r="1.1" fill="#2b2b2b" />
-      <path d="M9 13.2c1 1 5 1 6 0" stroke="#2b2b2b" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+      <path d="M12 1.5L8.5 6h7z" fill={c} />
+      <path d="M4 5l3.5 4.5-4.3-1zM20 5l-3.5 4.5 4.3-1z" fill={c} />
+      <path
+        d="M4.2 12c0-4.3 3.5-7.3 7.8-7.3s7.8 3 7.8 7.3c0 3-1.6 5.6-4 7.2l1 3-2.3-1.6-1 2-1.5-2-1.5 2-1-2-2.3 1.6 1-3c-2.4-1.6-4-4.2-4-7.2z"
+        fill={c}
+      />
+      <path d="M8.2 10.8l3-1.1-3-1.1zM15.8 10.8l-3-1.1 3-1.1z" fill="#1c1c1c" />
+      <path d="M9 16.2l1-2 1 1.6 1-1.6 1 1.6 1-1.6 1 2" stroke="#1c1c1c" strokeWidth="1.1" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </>
   ),
   // sword
@@ -893,8 +896,9 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
   const [endDate, setEndDate] = useState(initial.endDate || defaultEndDate());
   const [pin, setPin] = useState(initial.pin || "");
   const [reward, setReward] = useState(initial.reward || "");
+  const initialPalette = getTheme(initial.theme || "girl").palette;
   const [subjects, setSubjects] = useState(
-    initial.subjects && initial.subjects.length ? initial.subjects : [DEFAULT_SUBJECT()]
+    initial.subjects && initial.subjects.length ? initial.subjects : [DEFAULT_SUBJECT(initialPalette)]
   );
 
   const palette = getTheme(theme).palette;
@@ -1083,7 +1087,19 @@ function MainScreen({
   }, []);
 
   return (
-    <div style={{ ...styles.mainWrap, background: theme.bg }}>
+    <div
+      style={{
+        ...styles.mainWrap,
+        background: theme.bg,
+        ...(theme.isMapTheme
+          ? {
+              border: "10px solid #3E2A16",
+              boxShadow: "inset 0 0 0 4px #C89B3C, inset 0 0 0 6px #3E2A16",
+              borderRadius: 18,
+            }
+          : {}),
+      }}
+    >
       {theme.isMapTheme && <MapDoodles />}
       <CornerArt theme={theme.key} />
       <header style={styles.header}>
@@ -1138,8 +1154,14 @@ function MainScreen({
         </div>
 
         <div style={styles.mascotRow}>
-          <div style={styles.mascotFace}>
-            <StampIcon index={theme.mascotIconIndex} color={theme.mascotBg} size={58} shapes={theme.shapes} withFace={theme.withFace} />
+          <div
+            style={{
+              ...styles.mascotFace,
+              background: theme.isMapTheme ? "linear-gradient(160deg,#3E2A16,#1E1409)" : "#fff",
+              boxShadow: theme.isMapTheme ? "0 0 0 3px #C89B3C, 0 6px 14px rgba(0,0,0,0.5)" : styles.mascotFace.boxShadow,
+            }}
+          >
+            <StampIcon index={theme.mascotIconIndex} color={theme.isMapTheme ? "#E5C878" : theme.mascotBg} size={40} shapes={theme.shapes} withFace={theme.withFace} />
           </div>
           <div style={styles.mascotBubbleWrap}>
             <div style={styles.mascotBubble}>{mascotMsg}</div>
@@ -1163,7 +1185,14 @@ function MainScreen({
               key={i}
               style={{
                 ...styles.pearl,
-                background: i < filledPearls ? "radial-gradient(circle at 35% 30%, #fff, #F4C95D 70%)" : "#ffffff55",
+                borderRadius: theme.isMapTheme ? 3 : styles.pearl.borderRadius,
+                transform: theme.isMapTheme ? "rotate(45deg)" : "none",
+                background:
+                  i < filledPearls
+                    ? "radial-gradient(circle at 35% 30%, #fff, #F4C95D 70%)"
+                    : theme.isMapTheme
+                    ? "rgba(62,42,22,0.3)"
+                    : "#ffffff55",
                 boxShadow: i < filledPearls ? "0 0 8px #F4C95Daa" : "none",
               }}
             />
@@ -1209,11 +1238,15 @@ function MainScreen({
       <div style={styles.calendarPanel}>
         <p style={styles.tableHint}>💡 今日のマスは「本スタンプ」。他の日は自由に「仮スタンプ」で練習できるよ！</p>
         <div style={styles.calendarGrid}>
-          {DAY_LABELS.map((label, i) => (
-            <div key={`dow-${i}`} style={styles.weekdayHeadCell}>
-              {label}
-            </div>
-          ))}
+          {DAY_LABELS.map((label, i) =>
+            theme.isMapTheme ? (
+              <WeekdayShield key={`dow-${i}`} label={label} color={BOY_PALETTE[i % BOY_PALETTE.length].hex} iconIndex={(i % 7) + 1} shapes={theme.shapes} />
+            ) : (
+              <div key={`dow-${i}`} style={styles.weekdayHeadCell}>
+                {label}
+              </div>
+            )
+          )}
           {allCells.map((d, i) => {
             const dKey = dateKey(d);
             const inRange = isBetween(d, startDate, endDate);
@@ -1333,6 +1366,20 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
     >
       {fun && <StampIcon index={iconIndex} color={color} size="60%" shapes={shapes} withFace={false} />}
     </button>
+  );
+}
+
+function WeekdayShield({ label, color, iconIndex, shapes }) {
+  return (
+    <div style={styles.weekdayShieldWrap}>
+      <svg width="100%" height="100%" viewBox="0 0 40 46" preserveAspectRatio="xMidYMid meet" style={{ position: "absolute", inset: 0 }}>
+        <path d="M20 2l17 6v9c0 12-7 19.5-17 24C10 37.5 3 30 3 17V8z" fill={color} stroke="#2A1A0D" strokeWidth="1.5" />
+      </svg>
+      <div style={styles.weekdayShieldContent}>
+        <span style={styles.weekdayShieldLabel}>{label}</span>
+        <StampIcon index={iconIndex} color="#fff" size={13} shapes={shapes} withFace={false} />
+      </div>
+    </div>
   );
 }
 
@@ -1777,6 +1824,9 @@ const styles = {
   tableHint: { fontSize: 15, color: "#5a7d94", fontWeight: 700, margin: "0 4px 10px", textAlign: "center" },
   calendarGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 },
   weekdayHeadCell: { textAlign: "center", fontSize: 15, fontWeight: 900, color: "#0B3D62", background: "#fff", borderRadius: 10, padding: "6px 0", boxShadow: "inset 0 0 0 2px #EAF7FB" },
+  weekdayShieldWrap: { position: "relative", width: "100%", aspectRatio: "40/46", minWidth: 34 },
+  weekdayShieldContent: { position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, paddingBottom: "18%" },
+  weekdayShieldLabel: { color: "#fff", fontWeight: 900, fontSize: 13, textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
 
   dayCell: { background: "#fff", borderRadius: 12, padding: "5px 4px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, boxShadow: "inset 0 0 0 2px #EAF7FB", minWidth: 0 },
   dayCellDim: { opacity: 0.35 },
