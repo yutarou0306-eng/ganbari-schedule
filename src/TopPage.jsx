@@ -117,7 +117,7 @@ export default function TopPage() {
           🐚 がんばりスケジュール
         </h1>
         <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 15, marginBottom: 22 }}>
-          作る・見る・ふりかえる、ぜんぶここから
+          作る・見る・振り返る、全部ここから
         </p>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
@@ -158,7 +158,7 @@ export default function TopPage() {
             }}
           >
             <p style={{ color: "#4a6c85", fontSize: 15.5, marginBottom: 18, lineHeight: 1.7 }}>
-              新しいスケジュールを作ります。作ったあとに出てくる「共有リンク」を、いっしょに使うご家族に送ってください。
+              新しいスケジュールを作ります。作ったあとに出てくる「共有リンク」を、一緒に使うご家族に送ってください。
             </p>
             <button
               onClick={handleCreate}
