@@ -71,17 +71,20 @@ const SHAPES = [
 ];
 
 const HUNTER_SHAPES = [
-  // dragon head (used as the mascot / signature icon) — angular and fierce
+  // baby dragon (used as the mascot / signature icon) — friendly, not fierce
   (c) => (
     <>
-      <path d="M12 1.5L8.5 6h7z" fill={c} />
-      <path d="M4 5l3.5 4.5-4.3-1zM20 5l-3.5 4.5 4.3-1z" fill={c} />
-      <path
-        d="M4.2 12c0-4.3 3.5-7.3 7.8-7.3s7.8 3 7.8 7.3c0 3-1.6 5.6-4 7.2l1 3-2.3-1.6-1 2-1.5-2-1.5 2-1-2-2.3 1.6 1-3c-2.4-1.6-4-4.2-4-7.2z"
-        fill={c}
-      />
-      <path d="M8.2 10.8l3-1.1-3-1.1zM15.8 10.8l-3-1.1 3-1.1z" fill="#1c1c1c" />
-      <path d="M9 16.2l1-2 1 1.6 1-1.6 1 1.6 1-1.6 1 2" stroke="#1c1c1c" strokeWidth="1.1" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8.3 4.6l-1.4-3 3 1.4zM15.7 4.6l1.4-3-3 1.4z" fill={c} />
+      <path d="M4 9.5l-2.4-1 2 2.1zM20 9.5l2.4-1-2 2.1z" fill={c} />
+      <circle cx="12" cy="12.3" r="8" fill={c} />
+      <ellipse cx="12" cy="17" rx="3.4" ry="2.2" fill={c} />
+      <circle cx="9.1" cy="11.3" r="1.25" fill="#1c1c1c" />
+      <circle cx="14.9" cy="11.3" r="1.25" fill="#1c1c1c" />
+      <circle cx="9.5" cy="10.9" r="0.4" fill="#fff" />
+      <circle cx="15.3" cy="10.9" r="0.4" fill="#fff" />
+      <circle cx="10.6" cy="17" r="0.35" fill="#1c1c1c" />
+      <circle cx="13.4" cy="17" r="0.35" fill="#1c1c1c" />
+      <path d="M10 18.7c1 .8 3 .8 4 0" stroke="#1c1c1c" strokeWidth="1" fill="none" strokeLinecap="round" />
     </>
   ),
   // sword
@@ -760,7 +763,7 @@ export default function KidsScheduleApp() {
         />
       )}
 
-      {celebrateDay && <DayCelebration onClose={() => setCelebrateDay(null)} />}
+      {celebrateDay && <DayCelebration onClose={() => setCelebrateDay(null)} theme={config.theme} />}
       {celebrateSchedule && (
         <ScheduleCompleteCelebration
           onClose={() => setCelebrateSchedule(false)}
@@ -1180,23 +1183,20 @@ function MainScreen({
         </div>
 
         <div style={{ ...styles.necklaceRow, background: theme.overlayBg }}>
-          {Array.from({ length: pearlCount }).map((_, i) => (
-            <span
-              key={i}
-              style={{
-                ...styles.pearl,
-                borderRadius: theme.isMapTheme ? 3 : styles.pearl.borderRadius,
-                transform: theme.isMapTheme ? "rotate(45deg)" : "none",
-                background:
-                  i < filledPearls
-                    ? "radial-gradient(circle at 35% 30%, #fff, #F4C95D 70%)"
-                    : theme.isMapTheme
-                    ? "rgba(62,42,22,0.3)"
-                    : "#ffffff55",
-                boxShadow: i < filledPearls ? "0 0 8px #F4C95Daa" : "none",
-              }}
-            />
-          ))}
+          {Array.from({ length: pearlCount }).map((_, i) =>
+            theme.isMapTheme ? (
+              <TreasureChestMini key={i} filled={i < filledPearls} />
+            ) : (
+              <span
+                key={i}
+                style={{
+                  ...styles.pearl,
+                  background: i < filledPearls ? "radial-gradient(circle at 35% 30%, #fff, #F4C95D 70%)" : "#ffffff55",
+                  boxShadow: i < filledPearls ? "0 0 8px #F4C95Daa" : "none",
+                }}
+              />
+            )
+          )}
           <span style={{ ...styles.pearlPct, color: theme.headerTextColor }}>{pct}%（期間全体）</span>
         </div>
 
@@ -1274,7 +1274,18 @@ function MainScreen({
                 {inRange && (
                   <button
                     onClick={() => onOpenNote(d)}
-                    style={{ ...styles.memoBtn, ...(notes[dKey] ? styles.memoBtnFilled : {}) }}
+                    style={{
+                      ...styles.memoBtn,
+                      ...(theme.isMapTheme
+                        ? {
+                            background: notes[dKey] ? "#F4C95D" : "rgba(139,94,52,0.12)",
+                            border: notes[dKey] ? "1px solid #8B5E34" : "1px dashed #C4A876",
+                            color: notes[dKey] ? "#5C3A21" : "#8B6B47",
+                          }
+                        : notes[dKey]
+                        ? styles.memoBtnFilled
+                        : {}),
+                    }}
                     aria-label={`${d.getMonth() + 1}月${d.getDate()}日 の メモ`}
                   >
                     📝 メモ
@@ -1369,15 +1380,31 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
   );
 }
 
+function TreasureChestMini({ filled }) {
+  const body = filled ? "#C89B3C" : "rgba(62,42,22,0.28)";
+  const lid = filled ? "#8B5E34" : "rgba(62,42,22,0.22)";
+  const lock = filled ? "#5C3A21" : "rgba(62,42,22,0.35)";
+  return (
+    <svg width="20" height="18" viewBox="0 0 20 18" style={{ flexShrink: 0 }}>
+      <path d="M1 8c0-3.9 4-6.8 9-6.8s9 2.9 9 6.8z" fill={lid} />
+      <rect x="1" y="8" width="18" height="8.5" rx="1.6" fill={body} />
+      <rect x="8" y="7" width="4" height="4.5" rx="0.9" fill={lock} />
+      {filled && <circle cx="10" cy="9" r="1" fill="#F4E9CE" />}
+    </svg>
+  );
+}
+
 function WeekdayShield({ label, color, iconIndex, shapes }) {
   return (
     <div style={styles.weekdayShieldWrap}>
-      <svg width="100%" height="100%" viewBox="0 0 40 46" preserveAspectRatio="xMidYMid meet" style={{ position: "absolute", inset: 0 }}>
-        <path d="M20 2l17 6v9c0 12-7 19.5-17 24C10 37.5 3 30 3 17V8z" fill={color} stroke="#2A1A0D" strokeWidth="1.5" />
-      </svg>
+      <div style={styles.weekdayShieldFrame}>
+        <svg width="100%" height="100%" viewBox="0 0 40 46" preserveAspectRatio="xMidYMid meet">
+          <path d="M20 2l17 6v9c0 12-7 19.5-17 24C10 37.5 3 30 3 17V8z" fill={color} stroke="#2A1A0D" strokeWidth="1.5" />
+        </svg>
+      </div>
       <div style={styles.weekdayShieldContent}>
         <span style={styles.weekdayShieldLabel}>{label}</span>
-        <StampIcon index={iconIndex} color="#fff" size={13} shapes={shapes} withFace={false} />
+        <StampIcon index={iconIndex} color="#fff" size={22} shapes={shapes} withFace={false} />
       </div>
     </div>
   );
@@ -1525,7 +1552,7 @@ function NoteModal({ date, initialText, onSave, onClose }) {
   );
 }
 
-function DayCelebration({ onClose }) {
+function DayCelebration({ onClose, theme }) {
   useEffect(() => {
     const t = setTimeout(onClose, 1800);
     return () => clearTimeout(t);
@@ -1533,7 +1560,7 @@ function DayCelebration({ onClose }) {
   return (
     <div style={styles.dayCelebrateOverlay} onClick={onClose}>
       <div style={styles.dayCelebrateBadge}>
-        <span style={{ fontSize: 46 }}>🐚</span>
+        <span style={{ fontSize: 46 }}>{theme === "boy" ? "⚔️" : "🐚"}</span>
         <div style={{ fontSize: 18, fontWeight: 700, color: "#0B3D62", marginTop: 4 }}>今日は全部できたね！</div>
       </div>
     </div>
@@ -1824,9 +1851,10 @@ const styles = {
   tableHint: { fontSize: 15, color: "#5a7d94", fontWeight: 700, margin: "0 4px 10px", textAlign: "center" },
   calendarGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 },
   weekdayHeadCell: { textAlign: "center", fontSize: 15, fontWeight: 900, color: "#0B3D62", background: "#fff", borderRadius: 10, padding: "6px 0", boxShadow: "inset 0 0 0 2px #EAF7FB" },
-  weekdayShieldWrap: { position: "relative", width: "100%", aspectRatio: "40/46", minWidth: 34 },
-  weekdayShieldContent: { position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1, paddingBottom: "18%" },
-  weekdayShieldLabel: { color: "#fff", fontWeight: 900, fontSize: 13, textShadow: "0 1px 2px rgba(0,0,0,0.5)" },
+  weekdayShieldWrap: { position: "relative", width: "100%", minHeight: 60, display: "flex", alignItems: "center", justifyContent: "center" },
+  weekdayShieldFrame: { position: "absolute", top: "8%", left: "18%", width: "64%", height: "84%" },
+  weekdayShieldContent: { position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 },
+  weekdayShieldLabel: { color: "#fff", fontWeight: 900, fontSize: 19, textShadow: "0 1px 3px rgba(0,0,0,0.6)" },
 
   dayCell: { background: "#fff", borderRadius: 12, padding: "5px 4px 6px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, boxShadow: "inset 0 0 0 2px #EAF7FB", minWidth: 0 },
   dayCellDim: { opacity: 0.35 },
