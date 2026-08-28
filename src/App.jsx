@@ -156,23 +156,33 @@ const THEMES = {
     accentGradient: "linear-gradient(90deg,#FFD6E0,#F4C95D)",
     palette: PASTELS,
     headingFont: "'Kaisei Decol', serif",
+    headingColor: "#0B3D62",
+    headingShadow: "none",
     mascotBg: "#FFD6E0",
     mascotIconIndex: 0,
     shapes: SHAPES,
     withFace: true,
+    headerTextColor: "#EAF7FB",
+    overlayBg: "rgba(255,255,255,0.15)",
+    isMapTheme: false,
   },
   boy: {
     key: "boy",
     label: "男の子むけ",
     emoji: "🐉",
-    bg: "linear-gradient(180deg, #2A1A0D 0%, #4A2E18 38%, #8B5E34 72%, #C89B3C 100%)",
+    bg: "linear-gradient(180deg, #3E2A16 0%, #6B4E2A 25%, #A9885A 58%, #D9C48C 100%)",
     accentGradient: "linear-gradient(90deg,#C89B3C,#8B5E34)",
     palette: BOY_PALETTE,
-    headingFont: "'Yuji Syuku', serif",
+    headingFont: "'Dela Gothic One', sans-serif",
+    headingColor: "#5C3A21",
+    headingShadow: "2px 2px 0 #C89B3C, -1px -1px 0 #F4E9CE, 0 3px 6px rgba(0,0,0,0.35)",
     mascotBg: "#3F6B35",
     mascotIconIndex: 0,
     shapes: HUNTER_SHAPES,
     withFace: false,
+    headerTextColor: "#3E2415",
+    overlayBg: "rgba(255,251,240,0.55)",
+    isMapTheme: true,
   },
 };
 
@@ -888,6 +898,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
   );
 
   const palette = getTheme(theme).palette;
+  const themeObj = getTheme(theme);
 
   function addSubject() {
     setSubjects((prev) => [
@@ -923,14 +934,22 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
   }
 
   return (
-    <div style={styles.setupWrap}>
-      <div style={styles.setupCard}>
+    <div style={{ ...styles.setupWrap, background: themeObj.bg, position: "relative", overflow: "hidden" }}>
+      {themeObj.isMapTheme && <MapDoodles />}
+      <div style={{ ...styles.setupCard, position: "relative", zIndex: 1 }}>
         {onCancel && (
           <button onClick={onCancel} style={styles.backBtn}>
             <ArrowLeft size={20} /> もどる
           </button>
         )}
-        <h1 style={{ ...styles.setupHeading, fontFamily: getTheme(theme).headingFont }}>
+        <h1
+          style={{
+            ...styles.setupHeading,
+            fontFamily: themeObj.headingFont,
+            color: themeObj.headingColor,
+            textShadow: themeObj.headingShadow,
+          }}
+        >
           {hasExisting ? "スケジュールを編集する" : "スケジュールを作ろう"}
         </h1>
         <p style={styles.setupSub}>誰の、何を頑張るスケジュールか、名前をつけてね</p>
@@ -1065,11 +1084,21 @@ function MainScreen({
 
   return (
     <div style={{ ...styles.mainWrap, background: theme.bg }}>
+      {theme.isMapTheme && <MapDoodles />}
       <CornerArt theme={theme.key} />
       <header style={styles.header}>
         <div style={styles.headerTop}>
           <div style={styles.titleBanner}>
-            <span style={{ ...styles.titleText, fontFamily: theme.headingFont }}>{config.title}</span>
+            <span
+              style={{
+                ...styles.titleText,
+                fontFamily: theme.headingFont,
+                color: theme.headingColor,
+                textShadow: theme.headingShadow,
+              }}
+            >
+              {config.title}
+            </span>
           </div>
           <div style={styles.headerBtns}>
             <button style={styles.iconBtn} onClick={onLockToggle} title={locked ? "保護者用に開ける" : "ロックする"}>
@@ -1081,14 +1110,30 @@ function MainScreen({
           </div>
         </div>
         <div style={styles.editDeleteRow}>
-          <button style={styles.editBtnSmall} onClick={onOpenSettings}>
+          <button
+            style={{
+              ...styles.editBtnSmall,
+              background: theme.overlayBg,
+              borderColor: theme.headerTextColor,
+              color: theme.headerTextColor,
+            }}
+            onClick={onOpenSettings}
+          >
             ✏️ 修正する
           </button>
-          <button style={styles.deleteBtnSmall} onClick={onRequestDelete}>
+          <button
+            style={{
+              ...styles.deleteBtnSmall,
+              background: theme.overlayBg,
+              borderColor: theme.isMapTheme ? "#B4432F" : "#FBAEBE",
+              color: theme.isMapTheme ? "#B4432F" : theme.headerTextColor,
+            }}
+            onClick={onRequestDelete}
+          >
             🗑 削除する
           </button>
         </div>
-        <div style={styles.lockNote}>
+        <div style={{ ...styles.lockNote, color: theme.headerTextColor }}>
           {locked ? "🔒 本スタンプは保護者の方がロックを開けてから押せます" : "🔓 本スタンプが押せます（3分後に自動ロック）"}
         </div>
 
@@ -1099,7 +1144,7 @@ function MainScreen({
           <div style={styles.mascotBubbleWrap}>
             <div style={styles.mascotBubble}>{mascotMsg}</div>
             <div style={styles.todayProgressLine}>
-              <span style={styles.todayProgressNum}>
+              <span style={{ ...styles.todayProgressNum, color: theme.headerTextColor, textShadow: theme.isMapTheme ? "none" : styles.todayProgressNum.textShadow }}>
                 今日 {todayStats.done}／{todayStats.need}
               </span>
               {streak > 0 && <span style={styles.streakBadge}>🔥 連続{streak}日</span>}
@@ -1112,7 +1157,7 @@ function MainScreen({
           </div>
         </div>
 
-        <div style={styles.necklaceRow}>
+        <div style={{ ...styles.necklaceRow, background: theme.overlayBg }}>
           {Array.from({ length: pearlCount }).map((_, i) => (
             <span
               key={i}
@@ -1123,11 +1168,11 @@ function MainScreen({
               }}
             />
           ))}
-          <span style={styles.pearlPct}>{pct}%（期間全体）</span>
+          <span style={{ ...styles.pearlPct, color: theme.headerTextColor }}>{pct}%（期間全体）</span>
         </div>
 
         {config.reward && (
-          <div style={styles.rewardPreview}>
+          <div style={{ ...styles.rewardPreview, background: theme.overlayBg, color: theme.headerTextColor }}>
             🎁 全部達成すると… <strong>{config.reward}</strong>
           </div>
         )}
@@ -1522,6 +1567,36 @@ function CornerArt({ theme }) {
         <path d="M35 0c15 20 15 40 0 60s-15 40 0 60" stroke="#fff" strokeWidth="3" fill="none" />
       </svg>
     </>
+  );
+}
+
+function MapDoodles() {
+  return (
+    <svg
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0.16, pointerEvents: "none" }}
+      viewBox="0 0 400 400"
+      preserveAspectRatio="xMidYMid slice"
+    >
+      {/* dotted trail */}
+      <path
+        d="M20 320c40-20 60-60 100-70s70 20 110 0 90-70 150-60"
+        stroke="#3E2415"
+        strokeWidth="3"
+        strokeDasharray="1 12"
+        strokeLinecap="round"
+        fill="none"
+      />
+      {/* mountains */}
+      <path d="M60 260l30-40 22 26 26-34 30 48z" fill="#3E2415" />
+      {/* big compass watermark */}
+      <circle cx="300" cy="120" r="60" fill="none" stroke="#3E2415" strokeWidth="2" />
+      <path d="M300 68l7 45-7 7-7-7zM300 172l7-45-7-7-7 7z" fill="#3E2415" />
+      <path d="M248 120l45-7 7 7-7 7zM352 120l-45-7-7 7 7 7z" fill="#3E2415" opacity="0.7" />
+      {/* X marks the spot */}
+      <path d="M110 130l20 20M130 130l-20 20" stroke="#3E2415" strokeWidth="4" strokeLinecap="round" />
+      {/* wavy sea lines */}
+      <path d="M0 60c20 8 40-8 60 0s40 8 60 0 40-8 60 0" stroke="#3E2415" strokeWidth="2" fill="none" />
+    </svg>
   );
 }
 
