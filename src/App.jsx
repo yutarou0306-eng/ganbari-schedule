@@ -256,6 +256,42 @@ export default function KidsScheduleApp() {
     return () => clearTimeout(t);
   }, [config, completions, recoveries, funStamps, notes, loaded]);
 
+  // iOS home-screen apps often get suspended instead of fully closed, and
+  // reopening them can show whatever was last in memory instead of fetching
+  // fresh data. Re-fetch whenever the app becomes visible again — but only
+  // while on the main calendar (never mid-edit), so this can't wipe out
+  // anything the person is in the middle of typing on the setup screen.
+  useEffect(() => {
+    if (!loaded) return;
+    function refresh() {
+      if (view !== "main") return;
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      (async () => {
+        try {
+          const res = await window.storage.get(STORAGE_KEY, false);
+          if (res && res.value) {
+            const data = JSON.parse(res.value);
+            if (data.config && data.config.subjects && data.config.subjects.length > 0) {
+              setConfig(data.config);
+            }
+            setCompletions(data.completions || {});
+            setRecoveries(data.recoveries || {});
+            setFunStamps(data.funStamps || {});
+            setNotes(data.notes || {});
+          }
+        } catch (e) {}
+      })();
+    }
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    window.addEventListener("pageshow", refresh);
+    return () => {
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("pageshow", refresh);
+    };
+  }, [loaded, view]);
+
   const showToast = useCallback((msg) => {
     setToast(msg);
     clearTimeout(toastTimer.current);
@@ -1521,7 +1557,7 @@ const styles = {
 
   toast: { position: "fixed", left: "50%", bottom: 20, transform: "translateX(-50%)", background: "#0B3D62", color: "#fff", padding: "12px 22px", borderRadius: 999, fontSize: 17, fontWeight: 700, boxShadow: "0 10px 24px rgba(0,0,0,0.3)", zIndex: 50, maxWidth: "90%", textAlign: "center" },
 
-  modalOverlay: { position: "absolute", inset: 0, background: "rgba(11,61,98,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 40, padding: 20 },
+  modalOverlay: { position: "fixed", inset: 0, background: "rgba(11,61,98,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 20 },
   modalCard: { background: "#fff", borderRadius: 20, padding: 26, maxWidth: 360, width: "100%", textAlign: "center", animation: "popIn 0.25s ease-out" },
   modalTitle: { margin: "0 0 8px", fontSize: 22, color: "#0B3D62" },
   modalMsg: { fontSize: 17, color: "#4a6c85", lineHeight: 1.6, marginBottom: 18 },
@@ -1531,10 +1567,10 @@ const styles = {
   modalConfirm: { flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
   modalDanger: { flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#E0526B", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
 
-  dayCelebrateOverlay: { position: "absolute", inset: 0, background: "rgba(11,61,98,0.25)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 45 },
+  dayCelebrateOverlay: { position: "fixed", inset: 0, background: "rgba(11,61,98,0.25)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1210 },
   dayCelebrateBadge: { background: "#fff", borderRadius: 20, padding: "24px 34px", textAlign: "center", animation: "popIn 0.3s ease-out", boxShadow: "0 20px 40px rgba(0,0,0,0.25)" },
 
-  weekCelebrateOverlay: { position: "absolute", inset: 0, background: "rgba(11,61,98,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 46 },
+  weekCelebrateOverlay: { position: "fixed", inset: 0, background: "rgba(11,61,98,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1220 },
   weekCelebrateCard: { position: "relative", background: "linear-gradient(180deg, #FFFBF3, #FFF3D6)", borderRadius: 24, padding: "34px 30px", textAlign: "center", maxWidth: 360, animation: "popIn 0.35s ease-out", boxShadow: "0 30px 60px rgba(0,0,0,0.4)" },
   chestEmoji: { fontSize: 56, marginBottom: 6 },
   weekCelebrateTitle: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 27, margin: "4px 0" },
