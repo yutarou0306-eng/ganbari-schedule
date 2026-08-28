@@ -81,7 +81,7 @@ function StampIcon({ index, color, size = 30, withFace = true }) {
   );
 }
 
-const CHEERS = ["やったね！", "すごいね！", "よくできました！", "ピカピカ★", "えらいね！", "ナイス！", "かんぺき！"];
+const CHEERS = ["やったね！", "すごいね！", "よくできました！", "ピカピカ★", "偉いね！", "ナイス！", "完璧！"];
 
 function uid() {
   return Math.random().toString(36).slice(2, 9);
@@ -151,7 +151,7 @@ function clampDuration(v) {
 function describeFrequency(subject) {
   if (subject.freqType === "weekday") {
     const days = (subject.weekdays || []).slice().sort();
-    if (days.length === 0) return "曜日みてい";
+    if (days.length === 0) return "曜日未定";
     return days.map((i) => DAY_LABELS[i]).join("・") + "曜日";
   }
   if (subject.freqType === "interval") {
@@ -317,7 +317,7 @@ export default function KidsScheduleApp() {
     } else if (cur === 1) {
       const backlog = missedBacklog(subject);
       if (backlog <= 0) {
-        showToast("すでに1かい押してあるよ。取り消すときは×ボタンをおしてね");
+        showToast("すでに1回押してあるよ。取り消すときは×ボタンを押してね");
         return;
       }
       next = 2;
@@ -355,7 +355,7 @@ export default function KidsScheduleApp() {
       setRecoveries((prev) => ({ ...prev, [subjId]: Math.max(0, (prev[subjId] || 0) + recoveryDelta) }));
     }
 
-    if (next === 2) showToast("すごい！2日ぶん取り戻したね！");
+    if (next === 2) showToast("すごい！2日分取り戻したね！");
   }
 
   function handleClearStamp(date, subjId) {
@@ -573,7 +573,7 @@ export default function KidsScheduleApp() {
         <PinModal
           correctPin={config.pin}
           onSuccess={doUnlock}
-          onFail={() => showToast("あんしょう番号がちがいます")}
+          onFail={() => showToast("暗証番号が違います")}
           onCancel={() => setShowPinModal(false)}
         />
       )}
@@ -629,7 +629,7 @@ function SubjectCard({ subject, onChange, onRemove, canRemove }) {
         <input
           value={subject.name}
           onChange={(e) => set({ name: e.target.value })}
-          placeholder="なにをがんばる？（例：ピアノ）"
+          placeholder="何を頑張る？（例：ピアノ）"
           style={styles.subjNameInput}
         />
         {canRemove && (
@@ -655,7 +655,7 @@ function SubjectCard({ subject, onChange, onRemove, canRemove }) {
       </div>
 
       <div style={styles.durationRow}>
-        <span style={{ fontSize: 13, color: "#4a6c85", fontWeight: 700 }}>とりくむ時間</span>
+        <span style={{ fontSize: 13, color: "#4a6c85", fontWeight: 700 }}>取り組む時間</span>
         <select
           value={subject.durationMinutes ?? 10}
           onChange={(e) => set({ durationMinutes: Number(e.target.value) })}
@@ -673,7 +673,7 @@ function SubjectCard({ subject, onChange, onRemove, canRemove }) {
         {[
           { k: "daily", label: "毎日" },
           { k: "interval", label: "〇日に1回" },
-          { k: "weekday", label: "曜日をえらぶ" },
+          { k: "weekday", label: "曜日を選ぶ" },
         ].map((f) => (
           <button
             key={f.k}
@@ -778,8 +778,8 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
             <ArrowLeft size={20} /> もどる
           </button>
         )}
-        <h1 style={styles.setupHeading}>{hasExisting ? "スケジュールを編集する" : "スケジュールをつくろう"}</h1>
-        <p style={styles.setupSub}>だれの、なにをがんばるスケジュールか、名前をつけてね</p>
+        <h1 style={styles.setupHeading}>{hasExisting ? "スケジュールを編集する" : "スケジュールを作ろう"}</h1>
+        <p style={styles.setupSub}>誰の、何を頑張るスケジュールか、名前をつけてね</p>
 
         <label style={styles.label}>タイトル</label>
         <input
@@ -796,7 +796,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={styles.dateInput} />
         </div>
 
-        <label style={{ ...styles.label, marginTop: 20 }}>保護者用 あんしょう番号（にんい・数字4〜6桁）</label>
+        <label style={{ ...styles.label, marginTop: 20 }}>保護者用 暗証番号（任意・数字4〜6桁）</label>
         <input
           type="password"
           value={pin}
@@ -806,13 +806,13 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
           autoComplete="off"
           style={styles.input}
         />
-        <p style={styles.tinyNote}>あんしょう番号を入れると、スタンプを押すときに保護者の確認が必要になります。</p>
+        <p style={styles.tinyNote}>暗証番号を入れると、スタンプを押すときに保護者の確認が必要になります。</p>
 
-        <label style={{ ...styles.label, marginTop: 20 }}>🎁 ぜんぶ たっせいしたときの ごほうび（にんい）</label>
+        <label style={{ ...styles.label, marginTop: 20 }}>🎁 全部達成したときのご褒美（任意）</label>
         <input
           value={reward}
           onChange={(e) => setReward(e.target.value)}
-          placeholder="例）アイスをたべる！／こうえんに行く！"
+          placeholder="例）アイスを食べる！／公園に行く！"
           style={styles.input}
         />
         <p style={styles.tinyNote}>期間の最後まで、すべてのやることを達成したときにお祝いのメッセージとして表示されます。</p>
@@ -834,7 +834,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
         </button>
 
         <button style={styles.saveBtn} onClick={handleSave}>
-          このスケジュールではじめる
+          このスケジュールで始める
         </button>
 
         {onRequestDelete && (
@@ -880,12 +880,12 @@ function MainScreen({
   const todayPct = todayStats.need > 0 ? Math.round((todayStats.done / todayStats.need) * 100) : 0;
   const mascotMsg =
     todayStats.need === 0
-      ? "今日はおやすみの日だよ〜"
+      ? "今日はお休みの日だよ〜"
       : todayStats.done === 0
-      ? "今日もいっしょに がんばろう！"
+      ? "今日も一緒に頑張ろう！"
       : todayStats.done < todayStats.need
-      ? "いいちょうし！ あと すこし！"
-      : "きょうも パーフェクト！すごいね！";
+      ? "いい調子！あと少し！"
+      : "今日もパーフェクト！すごいね！";
 
   // Build a Monday-to-Sunday grid covering the whole schedule period, like a
   // desk calendar: padded at both ends so every row is a full week.
@@ -944,9 +944,9 @@ function MainScreen({
             <div style={styles.mascotBubble}>{mascotMsg}</div>
             <div style={styles.todayProgressLine}>
               <span style={styles.todayProgressNum}>
-                きょう {todayStats.done}／{todayStats.need}
+                今日 {todayStats.done}／{todayStats.need}
               </span>
-              {streak > 0 && <span style={styles.streakBadge}>🔥 れんぞく{streak}日</span>}
+              {streak > 0 && <span style={styles.streakBadge}>🔥 連続{streak}日</span>}
             </div>
             {todayStats.need > 0 && (
               <div style={styles.todayBarTrack}>
@@ -967,12 +967,12 @@ function MainScreen({
               }}
             />
           ))}
-          <span style={styles.pearlPct}>{pct}%（きかん全体）</span>
+          <span style={styles.pearlPct}>{pct}%（期間全体）</span>
         </div>
 
         {config.reward && (
           <div style={styles.rewardPreview}>
-            🎁 ぜんぶ たっせいすると… <strong>{config.reward}</strong>
+            🎁 全部達成すると… <strong>{config.reward}</strong>
           </div>
         )}
       </header>
@@ -990,7 +990,7 @@ function MainScreen({
                 <div style={styles.subjectSpotlightDuration}>⏱ {s.durationMinutes || 10}分</div>
                 <div style={styles.subjectSpotlightFreq}>📅 {describeFrequency(s)}</div>
               </div>
-              {backlog > 0 && <span style={styles.backlogBadgeBig}>🔁 のこり{backlog}</span>}
+              {backlog > 0 && <span style={styles.backlogBadgeBig}>🔁 残り{backlog}</span>}
             </div>
           );
         })}
@@ -1001,12 +1001,12 @@ function MainScreen({
           <span style={{ ...styles.legendDot, background: "#14588C" }} /> 本スタンプ（今日だけ）
         </span>
         <span style={styles.calendarLegendItem}>
-          <span style={{ ...styles.legendDot, background: "#BFE3F0" }} /> 仮スタンプ（れんしゅう用）
+          <span style={{ ...styles.legendDot, background: "#BFE3F0" }} /> 仮スタンプ（練習用）
         </span>
       </div>
 
       <div style={styles.calendarPanel}>
-        <p style={styles.tableHint}>💡 今日のマスは「本スタンプ」。ほかの日は自由に「仮スタンプ」で練習できるよ！</p>
+        <p style={styles.tableHint}>💡 今日のマスは「本スタンプ」。他の日は自由に「仮スタンプ」で練習できるよ！</p>
         <div style={styles.calendarGrid}>
           {DAY_LABELS.map((label, i) => (
             <div key={`dow-${i}`} style={styles.weekdayHeadCell}>
@@ -1034,7 +1034,7 @@ function MainScreen({
               >
                 <div style={styles.dayCellTopRow}>
                   <span style={styles.dayNum}>{`${d.getMonth() + 1}/${d.getDate()}`}</span>
-                  {isToday && <span style={styles.dayHeadTodayTag}>きょう</span>}
+                  {isToday && <span style={styles.dayHeadTodayTag}>今日</span>}
                   {dayComplete && <span style={styles.dayHeadTrophy}>🏆</span>}
                 </div>
                 {inRange && (
@@ -1140,7 +1140,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear }) {
   useEffect(() => {
     if (count > prevCount.current) {
       setPopKey((k) => k + 1);
-      setComment(count === 2 ? "2日ぶん とりもどした！" : CHEERS[Math.floor(Math.random() * CHEERS.length)]);
+      setComment(count === 2 ? "2日分 取り戻した！" : CHEERS[Math.floor(Math.random() * CHEERS.length)]);
       clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setComment(null), 1300);
     }
@@ -1220,7 +1220,7 @@ function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
     <div style={styles.modalOverlay}>
       <div style={styles.modalCard}>
         <h3 style={styles.modalTitle}>保護者の方へ</h3>
-        <p style={styles.modalMsg}>あんしょう番号を入力してください</p>
+        <p style={styles.modalMsg}>暗証番号を入力してください</p>
         <input
           autoFocus
           type="password"
@@ -1250,13 +1250,13 @@ function NoteModal({ date, initialText, onSave, onClose }) {
   return (
     <div style={styles.modalOverlay}>
       <div style={styles.modalCard}>
-        <h3 style={styles.modalTitle}>📝 {dLabel} の きろく</h3>
-        <p style={styles.modalMsg}>やったこと・かんそうを書いておこう</p>
+        <h3 style={styles.modalTitle}>📝 {dLabel} の記録</h3>
+        <p style={styles.modalMsg}>やったこと・感想を書いておこう</p>
         <textarea
           autoFocus
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="れい）今日はスラスラ弾けた！たのしかった。"
+          placeholder="例）今日はスラスラ弾けた！楽しかった。"
           style={styles.noteTextarea}
           rows={5}
         />
@@ -1265,7 +1265,7 @@ function NoteModal({ date, initialText, onSave, onClose }) {
             とじる
           </button>
           <button style={styles.modalConfirm} onClick={() => onSave(text)}>
-            ほぞんする
+            保存する
           </button>
         </div>
       </div>
@@ -1282,7 +1282,7 @@ function DayCelebration({ onClose }) {
     <div style={styles.dayCelebrateOverlay} onClick={onClose}>
       <div style={styles.dayCelebrateBadge}>
         <span style={{ fontSize: 46 }}>🐚</span>
-        <div style={{ fontSize: 18, fontWeight: 700, color: "#0B3D62", marginTop: 4 }}>今日はぜんぶ できたね！</div>
+        <div style={{ fontSize: 18, fontWeight: 700, color: "#0B3D62", marginTop: 4 }}>今日は全部できたね！</div>
       </div>
     </div>
   );
@@ -1294,11 +1294,11 @@ function ScheduleCompleteCelebration({ onClose, title, reward }) {
       <Confetti />
       <div style={styles.weekCelebrateCard}>
         <div style={styles.chestEmoji}>🎉🏆🎉</div>
-        <h2 style={styles.weekCelebrateTitle}>ぜんぶ たっせい！！</h2>
-        <p style={styles.weekCelebrateSub}>{title} 最後まで、本当によくがんばったね！</p>
+        <h2 style={styles.weekCelebrateTitle}>全部達成！！</h2>
+        <p style={styles.weekCelebrateSub}>{title} 最後まで、本当によく頑張ったね！</p>
         {reward ? (
           <div style={styles.rewardCard}>
-            <div style={styles.rewardLabel}>🎁 ごほうび</div>
+            <div style={styles.rewardLabel}>🎁 ご褒美</div>
             <div style={styles.rewardText}>{reward}</div>
           </div>
         ) : (
