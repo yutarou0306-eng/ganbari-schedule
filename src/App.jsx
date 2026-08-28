@@ -16,14 +16,14 @@ const PASTELS = [
 ];
 
 const BOY_PALETTE = [
-  { name: "フレイム", hex: "#E5533D" },
-  { name: "ブロンズ", hex: "#C89B3C" },
-  { name: "フォレスト", hex: "#4B7A3C" },
-  { name: "アイアン", hex: "#6B7280" },
-  { name: "ポイズン", hex: "#7C5CBF" },
-  { name: "アイス", hex: "#38BDF8" },
-  { name: "アンバー", hex: "#D97706" },
-  { name: "ブラッド", hex: "#B91C1C" },
+  { name: "ソード", hex: "#4B7A3C" },
+  { name: "フレイム", hex: "#B4432F" },
+  { name: "ジェム", hex: "#2E7D8C" },
+  { name: "リーフ", hex: "#6B4C93" },
+  { name: "ゴールド", hex: "#C89B3C" },
+  { name: "スター", hex: "#3A6EA5" },
+  { name: "フェザー", hex: "#8B2E2E" },
+  { name: "アース", hex: "#6B4226" },
 ];
 
 const SHAPES = [
@@ -71,6 +71,16 @@ const SHAPES = [
 ];
 
 const HUNTER_SHAPES = [
+  // dragon face (used as the mascot / signature icon)
+  (c) => (
+    <>
+      <path d="M6 9c0-4 2.7-6.5 6-6.5S18 5 18 9c0 2-.6 3-1.2 4.2.6.3 1 .9 1 1.6 0 1-.8 1.8-1.8 1.8-.4 0-.8-.1-1.1-.4-.5 1.6-1.9 2.8-3.9 2.8s-3.4-1.2-3.9-2.8c-.3.3-.7.4-1.1.4-1 0-1.8-.8-1.8-1.8 0-.7.4-1.3 1-1.6C6.6 12 6 11 6 9z" fill={c} />
+      <path d="M6.5 5.5l-2-2.8 3.2 1M17.5 5.5l2-2.8-3.2 1" stroke={c} strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      <circle cx="9.3" cy="9.6" r="1.1" fill="#2b2b2b" />
+      <circle cx="14.7" cy="9.6" r="1.1" fill="#2b2b2b" />
+      <path d="M9 13.2c1 1 5 1 6 0" stroke="#2b2b2b" strokeWidth="1.1" fill="none" strokeLinecap="round" />
+    </>
+  ),
   // sword
   (c) => (
     <>
@@ -80,33 +90,37 @@ const HUNTER_SHAPES = [
       <circle cx="4.7" cy="13.7" r="1.15" fill={c} />
     </>
   ),
-  // shield
-  (c) => <path d="M12 2.5l8 3v5.2c0 6-3.5 9.5-8 10.8-4.5-1.3-8-4.8-8-10.8V5.5z" fill={c} />,
-  // ember / flame
+  // flame
   (c) => (
     <path
       d="M12 2c1 3-2.5 4-2.5 7.2A2.5 2.5 0 0012 11.7 2.5 2.5 0 0014.5 9.2c0-.9-.4-1.5-.9-2.1 2 1.2 4 3.7 4 7A5.6 5.6 0 0112 19.7 5.6 5.6 0 016.4 14.1c0-4.4 3.6-6.6 3.6-9.4 0-1 .6-2 2-2.7z"
       fill={c}
     />
   ),
-  // crystal / gem
+  // gem
   (c) => <path d="M12 2l6 5-2.5 12.5h-7L6 7z" fill={c} />,
-  // claw mark
+  // leaf
   (c) => (
     <path
-      d="M4 4c3 3 3 8 1 12M10 3c3 3 3 9 1 13M16 4c3 3 3 8 1 12"
-      stroke={c}
-      strokeWidth="2.6"
-      fill="none"
-      strokeLinecap="round"
+      d="M20 4C10 4 4 10 4 18c0 1 .8 2 2 2 8 0 14-6 14-16 0-.3 0-.7 0 0z"
+      fill={c}
     />
   ),
-  // potion
+  // hammer
   (c) => (
     <>
-      <rect x="10" y="2.5" width="4" height="3.5" fill={c} />
-      <path d="M9 6.5h6l2 4.5c1.5 3-1 9-5 9s-6.5-6-5-9z" fill={c} />
+      <rect x="3" y="3" width="10" height="7" rx="1.5" transform="rotate(-30 8 6.5)" fill={c} />
+      <rect x="10.5" y="10" width="3" height="11" rx="1.3" transform="rotate(-30 12 15.5)" fill={c} />
     </>
+  ),
+  // star
+  (c) => <path d="M12 2.5l2.6 6.2 6.7.5-5.1 4.4 1.6 6.6L12 16.8 6.2 20.2l1.6-6.6-5.1-4.4 6.7-.5L12 2.5z" fill={c} />,
+  // feather
+  (c) => (
+    <path
+      d="M18 3C10 5 5 11 4 20c6-1 10-4 12-9-2 .5-4 .5-5.5-.5 2-.3 3.8-1.3 5-3-1.8.4-3.3.1-4.2-1 2-.2 3.7-1.3 4.7-2.7-1.6.3-3 0-3.7-1C14 3.3 16 3 18 3z"
+      fill={c}
+    />
   ),
 ];
 
@@ -150,13 +164,13 @@ const THEMES = {
   boy: {
     key: "boy",
     label: "男の子むけ",
-    emoji: "⚔️",
-    bg: "linear-gradient(180deg, #170D08 0%, #3B1F0F 42%, #7A3B12 78%, #C76B1F 100%)",
-    accentGradient: "linear-gradient(90deg,#E5533D,#C89B3C)",
+    emoji: "🐉",
+    bg: "linear-gradient(180deg, #2A1A0D 0%, #4A2E18 38%, #8B5E34 72%, #C89B3C 100%)",
+    accentGradient: "linear-gradient(90deg,#C89B3C,#8B5E34)",
     palette: BOY_PALETTE,
-    headingFont: "'Dela Gothic One', sans-serif",
-    mascotBg: "#C89B3C",
-    mascotIconIndex: 1,
+    headingFont: "'Yuji Syuku', serif",
+    mascotBg: "#3F6B35",
+    mascotIconIndex: 0,
     shapes: HUNTER_SHAPES,
     withFace: false,
   },
@@ -1489,7 +1503,7 @@ function Confetti() {
 }
 
 function CornerArt({ theme }) {
-  if (theme === "boy") return <HunterCornerArt />;
+  if (theme === "boy") return <DragonCornerArt />;
   return (
     <>
       <svg style={{ position: "absolute", top: 6, right: -10, opacity: 0.5 }} width="150" height="90" viewBox="0 0 150 90">
@@ -1511,28 +1525,33 @@ function CornerArt({ theme }) {
   );
 }
 
-function HunterCornerArt() {
+function DragonCornerArt() {
   return (
     <>
-      {/* crossed sword & shield, top right */}
-      <svg style={{ position: "absolute", top: 6, right: 2, opacity: 0.85 }} width="100" height="100" viewBox="0 0 100 100">
-        <g transform="rotate(18 50 50)">
-          <rect x="47" y="6" width="6" height="46" rx="1.5" fill="#E2E8F0" />
-          <rect x="40" y="46" width="20" height="7" rx="1.5" fill="#8B5E34" />
-          <rect x="45" y="53" width="10" height="16" rx="2" fill="#8B5E34" />
-        </g>
-        <path d="M68 30l16 6v10c0 12-7 19-16 22-9-3-16-10-16-22V36z" fill="#C89B3C" opacity="0.9" />
-        <path d="M68 34l0 30M60 44h16" stroke="#7A3B12" strokeWidth="2" opacity="0.6" />
+      {/* dragon silhouette, top left */}
+      <svg style={{ position: "absolute", top: 2, left: -6, opacity: 0.85 }} width="120" height="110" viewBox="0 0 120 110">
+        <path
+          d="M18 70c-4-10 0-24 12-30-6-10-4-22 4-28 2 8 6 12 12 14 8-6 18-6 24 2-6 0-10 2-13 6 10 2 18 10 20 22-4-4-9-6-14-6 4 8 3 18-4 26-1-8-5-13-11-15 2 8-1 16-9 20 2-7 0-13-5-16-6 5-14 6-16 5z"
+          fill="#3F6B35"
+        />
+        <path d="M34 12c2 6 5 10 10 12-3-6-3-10 0-14-4 0-7 1-10 2z" fill="#4B7A3C" opacity="0.9" />
+        <circle cx="20" cy="52" r="1.6" fill="#F4C95D" />
+      </svg>
+      {/* compass rose, top right */}
+      <svg style={{ position: "absolute", top: 10, right: 8, opacity: 0.55 }} width="70" height="70" viewBox="0 0 70 70">
+        <circle cx="35" cy="35" r="26" fill="none" stroke="#C89B3C" strokeWidth="2" />
+        <path d="M35 12l5 20-5 3-5-3zM35 58l5-20-5-3-5 3z" fill="#C89B3C" />
+        <path d="M12 35l20-5 3 5-3 5zM58 35l-20-5-3 5 3 5z" fill="#C89B3C" opacity="0.8" />
       </svg>
       {/* rising embers, bottom right */}
-      <svg style={{ position: "absolute", bottom: 6, right: -4, opacity: 0.75 }} width="110" height="110" viewBox="0 0 110 110">
-        <path d="M55 30c5 10-8 12-8 22a8 8 0 0016 0c0-3-1-5-3-7 6 4 12 12 12 22a17 17 0 01-34 0c0-14 11-20 11-30 0-3 2-5 6-7z" fill="#E5533D" />
+      <svg style={{ position: "absolute", bottom: 6, right: -4, opacity: 0.7 }} width="110" height="110" viewBox="0 0 110 110">
+        <path d="M55 30c5 10-8 12-8 22a8 8 0 0016 0c0-3-1-5-3-7 6 4 12 12 12 22a17 17 0 01-34 0c0-14 11-20 11-30 0-3 2-5 6-7z" fill="#B4432F" />
       </svg>
       {/* claw marks, left */}
-      <svg style={{ position: "absolute", top: "40%", left: -10, opacity: 0.4 }} width="90" height="90" viewBox="0 0 90 90">
+      <svg style={{ position: "absolute", top: "58%", left: -10, opacity: 0.35 }} width="90" height="90" viewBox="0 0 90 90">
         <path d="M10 8c14 12 14 40 4 56M24 4c14 12 14 44 4 60M38 8c14 12 14 40 4 56" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" />
       </svg>
-      {/* embers scattered */}
+      {/* scattered sparkles */}
       {[
         [18, 55], [50, 15], [78, 62], [10, 18], [60, 85], [88, 25],
       ].map(([x, y], i) => (
@@ -1546,7 +1565,7 @@ function HunterCornerArt() {
             width: 5,
             height: 5,
             borderRadius: "50%",
-            background: "#FACC15",
+            background: "#F4C95D",
             opacity: 0.6,
           }}
         />
@@ -1558,7 +1577,7 @@ function HunterCornerArt() {
 function GlobalStyle() {
   return (
     <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Kaisei+Decol:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yuji+Syuku&family=Kaisei+Decol:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap');
       @keyframes confettiFall {
         0% { transform: translateY(0) rotate(0deg); opacity: 1; }
         100% { transform: translateY(520px) rotate(340deg); opacity: 0; }
