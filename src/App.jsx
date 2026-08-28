@@ -148,6 +148,18 @@ function clampDuration(v) {
   return Math.max(10, Math.min(100, n));
 }
 
+function describeFrequency(subject) {
+  if (subject.freqType === "weekday") {
+    const days = (subject.weekdays || []).slice().sort();
+    if (days.length === 0) return "曜日みてい";
+    return days.map((i) => DAY_LABELS[i]).join("・") + "曜日";
+  }
+  if (subject.freqType === "interval") {
+    return `${Math.max(1, subject.intervalDays || 2)}日に1回`;
+  }
+  return "毎日";
+}
+
 const DURATION_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
 
 function defaultEndDate() {
@@ -539,6 +551,7 @@ export default function KidsScheduleApp() {
           funStampFor={funStampFor}
           missedBacklog={missedBacklog}
           onOpenSettings={() => setView("setup")}
+          onRequestDelete={() => setShowDeleteConfirm(true)}
           stats={totalStats()}
           todayStats={todayStats()}
           streak={streakDays()}
@@ -785,10 +798,12 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
 
         <label style={{ ...styles.label, marginTop: 20 }}>保護者用 あんしょう番号（にんい・数字4〜6桁）</label>
         <input
+          type="password"
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
           placeholder="設定しない場合は空欄でOK"
           inputMode="numeric"
+          autoComplete="off"
           style={styles.input}
         />
         <p style={styles.tinyNote}>あんしょう番号を入れると、スタンプを押すときに保護者の確認が必要になります。</p>
@@ -851,6 +866,7 @@ function MainScreen({
   funStampFor,
   missedBacklog,
   onOpenSettings,
+  onRequestDelete,
   stats,
   todayStats,
   streak,
@@ -908,6 +924,14 @@ function MainScreen({
             </button>
           </div>
         </div>
+        <div style={styles.editDeleteRow}>
+          <button style={styles.editBtnSmall} onClick={onOpenSettings}>
+            ✏️ 修正する
+          </button>
+          <button style={styles.deleteBtnSmall} onClick={onRequestDelete}>
+            🗑 削除する
+          </button>
+        </div>
         <div style={styles.lockNote}>
           {locked ? "🔒 本スタンプは保護者の方がロックを開けてから押せます" : "🔓 本スタンプが押せます（3分後に自動ロック）"}
         </div>
@@ -964,6 +988,7 @@ function MainScreen({
               <div style={styles.subjectSpotlightTextWrap}>
                 <div style={styles.subjectSpotlightName}>{s.name}</div>
                 <div style={styles.subjectSpotlightDuration}>⏱ {s.durationMinutes || 10}分</div>
+                <div style={styles.subjectSpotlightFreq}>📅 {describeFrequency(s)}</div>
               </div>
               {backlog > 0 && <span style={styles.backlogBadgeBig}>🔁 のこり{backlog}</span>}
             </div>
@@ -1428,6 +1453,9 @@ const styles = {
   titleText: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 24, fontWeight: 700 },
   headerBtns: { display: "flex", gap: 8, flexShrink: 0 },
   iconBtn: { width: 46, height: 46, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.3)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)" },
+  editDeleteRow: { display: "flex", gap: 8, marginTop: 10, justifyContent: "center", flexWrap: "wrap" },
+  editBtnSmall: { border: "2px solid rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.15)", color: "#fff", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  deleteBtnSmall: { border: "2px solid #FBAEBE", background: "rgba(224,82,107,0.25)", color: "#fff", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
   lockNote: { color: "#EAF7FB", fontSize: 16, marginTop: 10, fontWeight: 700, textAlign: "center" },
 
   mascotRow: { display: "flex", alignItems: "flex-start", gap: 10, marginTop: 14 },
@@ -1451,6 +1479,7 @@ const styles = {
   subjectSpotlightTextWrap: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" },
   subjectSpotlightName: { fontFamily: "'Kaisei Decol', serif", fontSize: 26, fontWeight: 700, color: "#0B3D62", lineHeight: 1.2 },
   subjectSpotlightDuration: { fontSize: 16, fontWeight: 900, color: "#0B3D62", marginTop: 2 },
+  subjectSpotlightFreq: { fontSize: 13.5, fontWeight: 700, color: "#3d6a86", marginTop: 2 },
   backlogBadgeBig: { fontSize: 13.5, color: "#B5651D", background: "#FFE9B3", borderRadius: 999, padding: "5px 12px", fontWeight: 800, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" },
 
   calendarLegendRow: { position: "relative", zIndex: 2, display: "flex", gap: 14, padding: "10px 18px 0", flexWrap: "wrap", justifyContent: "center" },
