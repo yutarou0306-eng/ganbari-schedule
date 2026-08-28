@@ -57,9 +57,9 @@ export default function TopPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleCreate() {
+  function handleCreate(themeKey) {
     const id = generateScheduleId();
-    window.location.href = `${window.location.pathname}?id=${id}`;
+    window.location.href = `${window.location.pathname}?id=${id}&theme=${themeKey}`;
   }
 
   function handleOpen(id) {
@@ -161,7 +161,7 @@ export default function TopPage() {
               新しいスケジュールを作ります。作ったあとに出てくる「共有リンク」を、一緒に使うご家族に送ってください。
             </p>
             <button
-              onClick={handleCreate}
+              onClick={() => handleCreate("girl")}
               style={{
                 width: "100%",
                 padding: "16px 0",
@@ -170,13 +170,32 @@ export default function TopPage() {
                 background: "linear-gradient(135deg,#FFB6C9,#F4C95D)",
                 color: "#fff",
                 fontWeight: 900,
-                fontSize: 19,
+                fontSize: 17,
                 cursor: "pointer",
                 boxShadow: "0 10px 20px rgba(255,143,163,0.4)",
                 fontFamily: "inherit",
+                marginBottom: 12,
               }}
             >
-              ＋ 新しいスケジュールを作る
+              🎀 新しいスケジュールを作る（女の子用）
+            </button>
+            <button
+              onClick={() => handleCreate("boy")}
+              style={{
+                width: "100%",
+                padding: "16px 0",
+                borderRadius: 16,
+                border: "none",
+                background: "linear-gradient(135deg,#E5533D,#C89B3C)",
+                color: "#fff",
+                fontWeight: 900,
+                fontSize: 17,
+                cursor: "pointer",
+                boxShadow: "0 10px 20px rgba(199,107,31,0.4)",
+                fontFamily: "inherit",
+              }}
+            >
+              ⚔️ 新しいスケジュールを作る（男の子用）
             </button>
           </div>
         )}
