@@ -1528,7 +1528,8 @@ function MainScreen({
             top: theme.isMapTheme ? 246 : 236,
             right: 14,
             zIndex: 1,
-            background: theme.isMapTheme ? "rgba(62,42,22,0.55)" : "rgba(255,255,255,0.25)",
+            background: theme.isMapTheme ? "rgba(62,42,22,0.65)" : "rgba(255,255,255,0.3)",
+            border: theme.isMapTheme ? "2px solid #C89B3C" : "2px solid rgba(255,255,255,0.7)",
             borderRadius: 14,
             padding: "8px 12px",
             textAlign: "center",
@@ -1536,10 +1537,12 @@ function MainScreen({
             textDecoration: "none",
             cursor: "pointer",
             display: "block",
+            boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
           }}
         >
           <div style={{ fontSize: 11, fontWeight: 800, color: "#fff" }}>🌟 {linkedProfile.name || "スタンプ帳"}</div>
           <div style={{ fontSize: 18, fontWeight: 900, color: "#FFD966" }}>⭐️ {linkedProfile.totalStamps}</div>
+          <div style={{ fontSize: 10, fontWeight: 800, color: "#fff", opacity: 0.9, marginTop: 2 }}>タップして開く ▶</div>
         </a>
       )}
       <header style={styles.header}>
