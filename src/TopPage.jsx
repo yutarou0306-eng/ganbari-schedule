@@ -13,6 +13,62 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const BIRTH_YEAR_OPTIONS = Array.from({ length: 27 }, (_, i) => 2026 - i);
+const BIRTH_MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
+const BIRTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1);
+
+const dateSelectStyle = {
+  flex: 1,
+  minWidth: 0,
+  padding: "9px 6px",
+  borderRadius: 10,
+  border: "2px solid #BFE3F0",
+  fontSize: 13.5,
+  fontFamily: "inherit",
+  background: "#fff",
+  color: "#0B3D62",
+  fontWeight: 700,
+};
+
+// Year / month / day as three drum-roll <select> wheels instead of a native
+// date input — some browsers only let year+month scroll and make day a
+// separate calendar tap, so this keeps all three consistently quick.
+function BirthdateSelects({ value, onChange }) {
+  const [y, m, d] = (value || "").split("-");
+  function update(ny, nm, nd) {
+    if (ny && nm && nd) onChange(`${ny}-${String(nm).padStart(2, "0")}-${String(nd).padStart(2, "0")}`);
+    else onChange("");
+  }
+  return (
+    <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+      <select value={y || ""} onChange={(e) => update(e.target.value, m, d)} style={dateSelectStyle}>
+        <option value="">年</option>
+        {BIRTH_YEAR_OPTIONS.map((yy) => (
+          <option key={yy} value={yy}>
+            {yy}
+          </option>
+        ))}
+      </select>
+      <select value={m ? Number(m) : ""} onChange={(e) => update(y, e.target.value, d)} style={dateSelectStyle}>
+        <option value="">月</option>
+        {BIRTH_MONTH_OPTIONS.map((mm) => (
+          <option key={mm} value={mm}>
+            {mm}
+          </option>
+        ))}
+      </select>
+      <select value={d ? Number(d) : ""} onChange={(e) => update(y, m, e.target.value)} style={dateSelectStyle}>
+        <option value="">日</option>
+        {BIRTH_DAY_OPTIONS.map((dd) => (
+          <option key={dd} value={dd}>
+            {dd}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function formatRange(s, e) {
   if (!s || !e) return "";
   const fmt = (str) => {
@@ -477,22 +533,11 @@ export default function TopPage() {
                 boxSizing: "border-box",
               }}
             />
-            <input
-              type="date"
+            <BirthdateSelects
               value={findBirthdate}
-              onChange={(e) => {
-                setFindBirthdate(e.target.value);
+              onChange={(v) => {
+                setFindBirthdate(v);
                 setFindStatus("idle");
-              }}
-              style={{
-                width: "100%",
-                padding: "9px 10px",
-                borderRadius: 10,
-                border: "2px solid #BFE3F0",
-                fontSize: 13.5,
-                fontFamily: "inherit",
-                marginBottom: 10,
-                boxSizing: "border-box",
               }}
             />
             <button
@@ -557,22 +602,11 @@ export default function TopPage() {
                   boxSizing: "border-box",
                 }}
               />
-              <input
-                type="date"
+              <BirthdateSelects
                 value={findSchedBirthdate}
-                onChange={(e) => {
-                  setFindSchedBirthdate(e.target.value);
+                onChange={(v) => {
+                  setFindSchedBirthdate(v);
                   setFindSchedStatus("idle");
-                }}
-                style={{
-                  width: "100%",
-                  padding: "9px 10px",
-                  borderRadius: 10,
-                  border: "2px solid #BFE3F0",
-                  fontSize: 13.5,
-                  fontFamily: "inherit",
-                  marginBottom: 10,
-                  boxSizing: "border-box",
                 }}
               />
               <button

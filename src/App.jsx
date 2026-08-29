@@ -315,6 +315,49 @@ function taskIconIndex(idx, useDragonStamp, shapesLength) {
 const DURATION_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
 const PAGE_OPTIONS = Array.from({ length: 50 }, (_, i) => i + 1);
 const PROBLEM_OPTIONS = Array.from({ length: 100 }, (_, i) => i + 1);
+const BIRTH_YEAR_OPTIONS = Array.from({ length: 27 }, (_, i) => 2026 - i); // 2026 down to 2000
+const BIRTH_MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
+const BIRTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1);
+
+// Year / month / day as three drum-roll <select> wheels instead of a native
+// date input — some browsers only let year+month scroll and make day a
+// separate calendar tap, so this keeps all three consistently quick.
+function BirthdateSelects({ value, onChange, style }) {
+  const [y, m, d] = (value || "").split("-");
+  function update(ny, nm, nd) {
+    if (ny && nm && nd) onChange(`${ny}-${String(nm).padStart(2, "0")}-${String(nd).padStart(2, "0")}`);
+    else onChange("");
+  }
+  const selStyle = { ...styles.measureSelect, width: "auto", flex: 1, minWidth: 0, ...(style || {}) };
+  return (
+    <div style={{ display: "flex", gap: 6 }}>
+      <select value={y || ""} onChange={(e) => update(e.target.value, m, d)} style={selStyle}>
+        <option value="">年</option>
+        {BIRTH_YEAR_OPTIONS.map((yy) => (
+          <option key={yy} value={yy}>
+            {yy}
+          </option>
+        ))}
+      </select>
+      <select value={m ? Number(m) : ""} onChange={(e) => update(y, e.target.value, d)} style={selStyle}>
+        <option value="">月</option>
+        {BIRTH_MONTH_OPTIONS.map((mm) => (
+          <option key={mm} value={mm}>
+            {mm}
+          </option>
+        ))}
+      </select>
+      <select value={d ? Number(d) : ""} onChange={(e) => update(y, m, e.target.value)} style={selStyle}>
+        <option value="">日</option>
+        {BIRTH_DAY_OPTIONS.map((dd) => (
+          <option key={dd} value={dd}>
+            {dd}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 function defaultEndDate() {
   const d = new Date();
@@ -1306,14 +1349,12 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
                 placeholder="なまえ"
                 style={styles.profileLinkInput}
               />
-              <input
-                type="date"
+              <BirthdateSelects
                 value={linkBirthdate}
-                onChange={(e) => {
-                  setLinkBirthdate(e.target.value);
+                onChange={(v) => {
+                  setLinkBirthdate(v);
                   setLinkStatus("idle");
                 }}
-                style={styles.profileLinkInput}
               />
               <button
                 onClick={handleLinkProfile}
