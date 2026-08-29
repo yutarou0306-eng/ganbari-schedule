@@ -386,6 +386,8 @@ export default function ProfileRoot() {
 function RewardsPinModal({ correctPin, onSuccess, onCancel }) {
   const [value, setValue] = useState("");
   const [wrong, setWrong] = useState(false);
+  const [failCount, setFailCount] = useState(0);
+  const [showHint, setShowHint] = useState(false);
 
   function submit() {
     if (value === correctPin || value === MASTER_PIN) {
@@ -393,6 +395,11 @@ function RewardsPinModal({ correctPin, onSuccess, onCancel }) {
     } else {
       setWrong(true);
       setValue("");
+      setFailCount((n) => {
+        const next = n + 1;
+        if (next >= 3) setShowHint(true);
+        return next;
+      });
     }
   }
 
@@ -437,6 +444,19 @@ function RewardsPinModal({ correctPin, onSuccess, onCancel }) {
           </button>
         </div>
       </div>
+      {showHint && (
+        <div style={overlayStyle} onClick={() => setShowHint(false)}>
+          <div style={modalCardStyle} onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>💡 ヒント</h3>
+            <p style={{ fontSize: 15, color: "#4a6c85", lineHeight: 1.6, marginBottom: 18 }}>
+              部長が部下が一仕事した時にかける言葉を思い出して……
+            </p>
+            <button onClick={() => setShowHint(false)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
+              とじる
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
