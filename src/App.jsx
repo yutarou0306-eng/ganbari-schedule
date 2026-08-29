@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
+import { supabase } from "./db.js";
 
 const STORAGE_KEY = "pearl-sea-schedule-v2";
 const DAY_LABELS = ["月", "火", "水", "木", "金", "土", "日"]; // index 0=Mon ... 6=Sun
@@ -1110,6 +1111,56 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
   const palette = getTheme(theme).palette;
   const themeObj = getTheme(theme);
 
+  const [profileId, setProfileId] = useState(initial.profileId || "");
+  const [profileName, setProfileName] = useState("");
+  const [linkName, setLinkName] = useState("");
+  const [linkBirthdate, setLinkBirthdate] = useState("");
+  const [linkStatus, setLinkStatus] = useState("idle"); // idle | searching | notfound
+
+  useEffect(() => {
+    if (!profileId) {
+      setProfileName("");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.from("profiles").select("blob").eq("id", profileId).maybeSingle();
+        if (!cancelled && data && data.blob) setProfileName(data.blob.name || "");
+      } catch (e) {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
+
+  async function handleLinkProfile() {
+    const name = linkName.trim();
+    if (!name) return;
+    setLinkStatus("searching");
+    try {
+      let query = supabase.from("profiles").select("id, blob").eq("blob->>name", name);
+      if (linkBirthdate) query = query.eq("blob->>birthdate", linkBirthdate);
+      const { data, error } = await query;
+      if (error || !data || data.length === 0) {
+        setLinkStatus("notfound");
+        return;
+      }
+      setProfileId(data[0].id);
+      setProfileName((data[0].blob && data[0].blob.name) || "");
+      setLinkName("");
+      setLinkBirthdate("");
+      setLinkStatus("idle");
+    } catch (e) {
+      setLinkStatus("notfound");
+    }
+  }
+
+  function handleUnlinkProfile() {
+    setProfileId("");
+    setProfileName("");
+  }
+
   function addSubject() {
     setSubjects((prev) => [
       ...prev,
@@ -1140,6 +1191,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
       subjects: cleanSubjects,
       pin: pin.trim(),
       reward: reward.trim(),
+      ...(profileId ? { profileId } : {}),
     });
   }
 
@@ -1163,6 +1215,47 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
           {hasExisting ? "スケジュールを編集する" : "スケジュールを作ろう"}
         </h1>
         <p style={styles.setupSub}>誰の、何を頑張るスケジュールか、名前をつけてね</p>
+
+        {profileId ? (
+          <div style={styles.profileLinkedBanner}>
+            <span>🌟 {profileName || "スタンプ帳"} のスタンプ帳と連携しています</span>
+            <button onClick={handleUnlinkProfile} style={styles.profileUnlinkBtn}>
+              連携を外す
+            </button>
+          </div>
+        ) : (
+          <div style={styles.profileLinkBox}>
+            <div style={styles.profileLinkLabel}>🌟 スタンプ帳と連携する（任意）</div>
+            <div style={styles.profileLinkRow}>
+              <input
+                value={linkName}
+                onChange={(e) => {
+                  setLinkName(e.target.value);
+                  setLinkStatus("idle");
+                }}
+                placeholder="なまえ"
+                style={styles.profileLinkInput}
+              />
+              <input
+                type="date"
+                value={linkBirthdate}
+                onChange={(e) => {
+                  setLinkBirthdate(e.target.value);
+                  setLinkStatus("idle");
+                }}
+                style={styles.profileLinkInput}
+              />
+              <button
+                onClick={handleLinkProfile}
+                disabled={!linkName.trim() || linkStatus === "searching"}
+                style={{ ...styles.profileLinkBtn, opacity: linkName.trim() ? 1 : 0.5 }}
+              >
+                {linkStatus === "searching" ? "…" : "連携する"}
+              </button>
+            </div>
+            {linkStatus === "notfound" && <p style={styles.profileLinkError}>見つかりませんでした。</p>}
+          </div>
+        )}
 
         <label style={styles.label}>タイトル</label>
         <input
@@ -2256,6 +2349,14 @@ const styles = {
   backBtn: { display: "inline-flex", alignItems: "center", gap: 6, background: "none", border: "none", color: "#14588C", fontWeight: 700, cursor: "pointer", marginBottom: 8, fontFamily: "inherit", fontSize: 18 },
   setupHeading: { fontFamily: "'Kaisei Decol', serif", fontSize: 34, margin: "4px 0 2px", color: "#0B3D62" },
   setupSub: { fontSize: 17, color: "#4a6c85", marginBottom: 18 },
+  profileLinkedBanner: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, background: "linear-gradient(135deg,#F4E2B8,#E5C878)", borderRadius: 14, padding: "10px 14px", marginBottom: 18, fontSize: 14, fontWeight: 800, color: "#5C3A21", flexWrap: "wrap" },
+  profileUnlinkBtn: { border: "none", background: "rgba(255,255,255,0.5)", color: "#5C3A21", borderRadius: 999, padding: "6px 12px", fontSize: 12.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
+  profileLinkBox: { background: "#F4F9FB", border: "2px dashed #BFE3F0", borderRadius: 14, padding: 12, marginBottom: 18 },
+  profileLinkLabel: { fontSize: 13.5, fontWeight: 800, color: "#14588C", marginBottom: 8 },
+  profileLinkRow: { display: "flex", gap: 6, flexWrap: "wrap" },
+  profileLinkInput: { flex: "1 1 100px", padding: "8px 10px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 13.5, fontFamily: "inherit", boxSizing: "border-box" },
+  profileLinkBtn: { border: "none", borderRadius: 10, padding: "8px 14px", background: "#14588C", color: "#fff", fontWeight: 700, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
+  profileLinkError: { color: "#E0526B", fontSize: 12.5, marginTop: 6, marginBottom: 0 },
   label: { display: "block", fontWeight: 700, fontSize: 18, marginBottom: 8, color: "#14588C" },
   tinyNote: { fontSize: 15, color: "#7c98aa", marginTop: 6 },
   input: { width: "100%", padding: "14px 16px", borderRadius: 14, border: "2px solid #BFE3F0", fontSize: 19, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff" },
