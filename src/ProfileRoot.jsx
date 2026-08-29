@@ -20,14 +20,14 @@ function countStampsInBlob(blob) {
   return n;
 }
 
-const BIRTH_YEAR_OPTIONS = Array.from({ length: 27 }, (_, i) => 2026 - i);
+const BIRTH_YEAR_OPTIONS = Array.from({ length: 57 }, (_, i) => 2026 - i); // 2026 down to 1970
 const BIRTH_MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 const BIRTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1);
 
 const dateSelectStyle = {
   flex: 1,
   minWidth: 0,
-  padding: "10px 6px",
+  padding: "10px 4px",
   borderRadius: 10,
   border: "2px solid #BFE3F0",
   fontSize: 14,
@@ -36,6 +36,7 @@ const dateSelectStyle = {
   color: "#0B3D62",
   fontWeight: 700,
 };
+const dateSelectYearStyle = { ...dateSelectStyle, flex: 1.6, minWidth: 70, padding: "10px 2px" };
 
 // Year / month / day as three drum-roll <select> wheels instead of a native
 // date input — some browsers only let year+month scroll and make day a
@@ -48,7 +49,7 @@ function BirthdateSelects({ value, onChange }) {
   }
   return (
     <div style={{ display: "flex", gap: 6 }}>
-      <select value={y || ""} onChange={(e) => update(e.target.value, m, d)} style={dateSelectStyle}>
+      <select value={y || ""} onChange={(e) => update(e.target.value, m, d)} style={dateSelectYearStyle}>
         <option value="">年</option>
         {BIRTH_YEAR_OPTIONS.map((yy) => (
           <option key={yy} value={yy}>

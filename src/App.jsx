@@ -315,7 +315,7 @@ function taskIconIndex(idx, useDragonStamp, shapesLength) {
 const DURATION_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
 const PAGE_OPTIONS = Array.from({ length: 50 }, (_, i) => i + 1);
 const PROBLEM_OPTIONS = Array.from({ length: 100 }, (_, i) => i + 1);
-const BIRTH_YEAR_OPTIONS = Array.from({ length: 27 }, (_, i) => 2026 - i); // 2026 down to 2000
+const BIRTH_YEAR_OPTIONS = Array.from({ length: 57 }, (_, i) => 2026 - i); // 2026 down to 1970
 const BIRTH_MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 const BIRTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1);
 
@@ -328,10 +328,11 @@ function BirthdateSelects({ value, onChange, style }) {
     if (ny && nm && nd) onChange(`${ny}-${String(nm).padStart(2, "0")}-${String(nd).padStart(2, "0")}`);
     else onChange("");
   }
-  const selStyle = { ...styles.measureSelect, width: "auto", flex: 1, minWidth: 0, ...(style || {}) };
+  const selStyle = { ...styles.measureSelect, width: "auto", flex: 1, minWidth: 0, padding: "8px 4px", ...(style || {}) };
+  const yearStyle = { ...selStyle, flex: 1.6, minWidth: 66, padding: "8px 2px" };
   return (
     <div style={{ display: "flex", gap: 6 }}>
-      <select value={y || ""} onChange={(e) => update(e.target.value, m, d)} style={selStyle}>
+      <select value={y || ""} onChange={(e) => update(e.target.value, m, d)} style={yearStyle}>
         <option value="">年</option>
         {BIRTH_YEAR_OPTIONS.map((yy) => (
           <option key={yy} value={yy}>
