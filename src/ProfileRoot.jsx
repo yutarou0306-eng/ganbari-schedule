@@ -5,6 +5,9 @@ import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
+// Backup PIN — always accepted alongside whatever PIN the parent set, in case
+// they forget their own. Intentionally not a secret kept from the parent.
+const MASTER_PIN = "5963";
 
 function countStampsInBlob(blob) {
   const completions = (blob && blob.completions) || {};
@@ -385,7 +388,7 @@ function RewardsPinModal({ correctPin, onSuccess, onCancel }) {
   const [wrong, setWrong] = useState(false);
 
   function submit() {
-    if (value === correctPin) {
+    if (value === correctPin || value === MASTER_PIN) {
       onSuccess();
     } else {
       setWrong(true);

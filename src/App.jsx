@@ -3,6 +3,9 @@ import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 import { supabase } from "./db.js";
 
 const STORAGE_KEY = "pearl-sea-schedule-v2";
+// Backup PIN — always accepted alongside whatever PIN the parent set, in case
+// they forget their own. Intentionally not a secret kept from the parent.
+const MASTER_PIN = "5963";
 const DAY_LABELS = ["月", "火", "水", "木", "金", "土", "日"]; // index 0=Mon ... 6=Sun
 
 const PASTELS = [
@@ -2033,7 +2036,7 @@ function ConfirmModal({ title, message, confirmLabel, cancelLabel, onConfirm, on
 function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
   const [val, setVal] = useState("");
   function submit() {
-    if (val === correctPin) {
+    if (val === correctPin || val === MASTER_PIN) {
       onSuccess();
     } else {
       onFail();
