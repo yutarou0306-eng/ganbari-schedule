@@ -1520,31 +1520,6 @@ function MainScreen({
     >
       {theme.isMapTheme && <MapDoodles />}
       <CornerArt theme={theme.key} pct={pct} />
-      {linkedProfile && (
-        <a
-          href={`${window.location.pathname}?profile=${config.profileId}`}
-          style={{
-            position: "absolute",
-            top: theme.isMapTheme ? 246 : 236,
-            right: 14,
-            zIndex: 1,
-            background: theme.isMapTheme ? "rgba(62,42,22,0.65)" : "rgba(255,255,255,0.3)",
-            border: theme.isMapTheme ? "2px solid #C89B3C" : "2px solid rgba(255,255,255,0.7)",
-            borderRadius: 14,
-            padding: "8px 12px",
-            textAlign: "center",
-            maxWidth: 130,
-            textDecoration: "none",
-            cursor: "pointer",
-            display: "block",
-            boxShadow: "0 4px 10px rgba(0,0,0,0.25)",
-          }}
-        >
-          <div style={{ fontSize: 11, fontWeight: 800, color: "#fff" }}>🌟 {linkedProfile.name || "スタンプ帳"}</div>
-          <div style={{ fontSize: 18, fontWeight: 900, color: "#FFD966" }}>⭐️ {linkedProfile.totalStamps}</div>
-          <div style={{ fontSize: 10, fontWeight: 800, color: "#fff", opacity: 0.9, marginTop: 2 }}>タップして開く ▶</div>
-        </a>
-      )}
       <header style={styles.header}>
         <div style={styles.headerTop}>
           <div style={styles.titleBanner}>
@@ -1678,6 +1653,31 @@ function MainScreen({
               {stats.done}／{stats.need}個
             </span>
           </div>
+        )}
+
+        {linkedProfile && (
+          <a
+            href={`${window.location.pathname}?profile=${config.profileId}`}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              marginTop: 12,
+              background: theme.overlayBg,
+              border: theme.isMapTheme ? "2px solid #C89B3C" : "2px solid rgba(255,255,255,0.7)",
+              borderRadius: 999,
+              padding: "9px 16px",
+              textDecoration: "none",
+              cursor: "pointer",
+            }}
+          >
+            <span style={{ fontSize: 13, fontWeight: 800, color: theme.headerTextColor }}>
+              🌟 {linkedProfile.name || "スタンプ帳"}
+            </span>
+            <span style={{ fontSize: 15, fontWeight: 900, color: "#FFD966" }}>⭐️ {linkedProfile.totalStamps}</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: theme.headerTextColor, opacity: 0.85 }}>を開く ▶</span>
+          </a>
         )}
       </header>
 
