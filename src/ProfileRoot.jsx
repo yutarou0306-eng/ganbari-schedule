@@ -31,8 +31,9 @@ export default function ProfileRoot() {
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showRewardsPin, setShowRewardsPin] = useState(false);
-  const [showRewardsConfirm, setShowRewardsConfirm] = useState(false);
+  const [gateTarget, setGateTarget] = useState(null); // "rewards" | "editProfile" | null
+  const [showGatePin, setShowGatePin] = useState(false);
+  const [showGateConfirm, setShowGateConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -101,12 +102,26 @@ export default function ProfileRoot() {
     window.location.href = window.location.pathname;
   }
 
-  function handleRequestEditRewards() {
+  function requestParentGate(target) {
+    setGateTarget(target);
     if (profile.pin && profile.pin.length > 0) {
-      setShowRewardsPin(true);
+      setShowGatePin(true);
     } else {
-      setShowRewardsConfirm(true);
+      setShowGateConfirm(true);
     }
+  }
+
+  function handleGateSuccess() {
+    setShowGatePin(false);
+    setShowGateConfirm(false);
+    if (gateTarget) setView(gateTarget);
+    setGateTarget(null);
+  }
+
+  function handleGateCancel() {
+    setShowGatePin(false);
+    setShowGateConfirm(false);
+    setGateTarget(null);
   }
 
   const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
@@ -206,7 +221,7 @@ export default function ProfileRoot() {
               🏠 トップへ
             </span>
           </a>
-          <button onClick={() => setView("editProfile")} style={iconBtnStyle}>
+          <button onClick={() => requestParentGate("editProfile")} style={iconBtnStyle}>
             ⚙️
           </button>
         </div>
@@ -269,7 +284,7 @@ export default function ProfileRoot() {
             </div>
           )}
         </div>
-        <button onClick={handleRequestEditRewards} style={{ ...linkBtnStyle, marginBottom: 22 }}>
+        <button onClick={() => requestParentGate("rewards")} style={{ ...linkBtnStyle, marginBottom: 22 }}>
           ✏️ 景品を編集する（保護者のみ）
         </button>
 
@@ -341,24 +356,18 @@ export default function ProfileRoot() {
         </div>
       )}
 
-      {showRewardsConfirm && (
+      {showGateConfirm && (
         <div style={overlayStyle}>
           <div style={modalCardStyle}>
             <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>保護者の方へ</h3>
             <p style={{ fontSize: 15, color: "#4a6c85", lineHeight: 1.6, marginBottom: 20 }}>
-              ここから先は景品リストを編集できます。保護者の方が操作していますか？
+              ここから先は{gateTarget === "rewards" ? "景品リストを編集" : "プロフィールの設定を変更"}できます。保護者の方が操作していますか？
             </p>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setShowRewardsConfirm(false)} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
+              <button onClick={handleGateCancel} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
                 やめる
               </button>
-              <button
-                onClick={() => {
-                  setShowRewardsConfirm(false);
-                  setView("rewards");
-                }}
-                style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}
-              >
+              <button onClick={handleGateSuccess} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
                 はい、開けます
               </button>
             </div>
@@ -366,16 +375,7 @@ export default function ProfileRoot() {
         </div>
       )}
 
-      {showRewardsPin && (
-        <RewardsPinModal
-          correctPin={profile.pin}
-          onSuccess={() => {
-            setShowRewardsPin(false);
-            setView("rewards");
-          }}
-          onCancel={() => setShowRewardsPin(false)}
-        />
-      )}
+      {showGatePin && <RewardsPinModal correctPin={profile.pin} onSuccess={handleGateSuccess} onCancel={handleGateCancel} />}
     </div>
   );
 }
