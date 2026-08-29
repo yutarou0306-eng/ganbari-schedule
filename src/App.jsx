@@ -1120,7 +1120,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="例）ゆうたろうの夏休みチャレンジ"
+          placeholder="例）祐太郎9月のチャレンジ"
           style={styles.input}
         />
 
@@ -1147,7 +1147,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
         <input
           value={reward}
           onChange={(e) => setReward(e.target.value)}
-          placeholder="例）アイスを食べる！／公園に行く！"
+          placeholder="例）焼肉を食べに行く！／お小遣いをもらう！"
           style={styles.input}
         />
         <p style={styles.tinyNote}>期間の最後まで、すべてのやることを達成したときにお祝いのメッセージとして表示されます。</p>
