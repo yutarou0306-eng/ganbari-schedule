@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
-import { upsertKnownProfile } from "./profileRegistry.js";
+import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
@@ -30,6 +30,8 @@ export default function ProfileRoot() {
   const [view, setView] = useState("main"); // main | editProfile | rewards
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
   const [copied, setCopied] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -88,6 +90,15 @@ export default function ProfileRoot() {
     window.location.href = `${window.location.pathname}?id=${id}&theme=${themeKey}&profileId=${profileId}`;
   }
 
+  async function handleDeleteProfile() {
+    setDeleting(true);
+    try {
+      await supabase.from("profiles").delete().eq("id", profileId);
+    } catch (e) {}
+    removeKnownProfile(profileId);
+    window.location.href = window.location.pathname;
+  }
+
   const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
   const totalSpent = (profile.redemptions || []).reduce((sum, r) => sum + r.cost, 0);
   const available = totalEarned - totalSpent;
@@ -129,7 +140,37 @@ export default function ProfileRoot() {
   }
 
   if (view === "editProfile") {
-    return <ProfileSetupScreen initial={profile} isNew={!exists} onSave={handleCreateOrEditProfile} onCancel={exists ? () => setView("main") : null} />;
+    return (
+      <>
+        <ProfileSetupScreen
+          initial={profile}
+          isNew={!exists}
+          onSave={handleCreateOrEditProfile}
+          onCancel={exists ? () => setView("main") : null}
+          onRequestDelete={exists ? () => setShowDeleteConfirm(true) : null}
+        />
+        {showDeleteConfirm && (
+          <div style={overlayStyle}>
+            <div style={modalCardStyle}>
+              <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>このスタンプ帳を削除しますか？</h3>
+              <p style={{ fontSize: 14.5, color: "#4a6c85", lineHeight: 1.6, marginBottom: 20 }}>
+                「{profile.name || "スタンプ帳"}」を削除します。たまったスタンプの記録・景品・交換履歴はすべて消え、元に戻せません。
+                <br />
+                （つながっているスケジュール自体は消えず、そのまま個別に残ります）
+              </p>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={() => setShowDeleteConfirm(false)} disabled={deleting} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
+                  やめる
+                </button>
+                <button onClick={handleDeleteProfile} disabled={deleting} style={{ ...modalBtnStyle, background: "#E0526B", color: "#fff", border: "none" }}>
+                  {deleting ? "削除中…" : "削除する"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    );
   }
 
   if (view === "rewards") {
@@ -376,7 +417,7 @@ const modalBtnStyle = {
   fontSize: 15,
 };
 
-function ProfileSetupScreen({ initial, isNew, onSave, onCancel }) {
+function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete }) {
   const [name, setName] = useState(initial.name || "");
   const [birthdate, setBirthdate] = useState(initial.birthdate || "");
 
@@ -429,6 +470,27 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel }) {
         >
           {isNew ? "スタンプ帳をはじめる" : "保存する"}
         </button>
+
+        {onRequestDelete && (
+          <button
+            onClick={onRequestDelete}
+            style={{
+              width: "100%",
+              padding: "13px 0",
+              borderRadius: 16,
+              border: "2px solid #FBD4DB",
+              background: "#fff",
+              color: "#E0526B",
+              fontWeight: 700,
+              fontSize: 15,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              marginTop: 14,
+            }}
+          >
+            🗑 このスタンプ帳を削除する
+          </button>
+        )}
       </div>
     </div>
   );
