@@ -1455,7 +1455,7 @@ function MainScreen({
         <div
           style={{
             position: "absolute",
-            top: theme.isMapTheme ? 246 : 100,
+            top: theme.isMapTheme ? 246 : 236,
             right: 14,
             zIndex: 1,
             background: theme.isMapTheme ? "rgba(62,42,22,0.55)" : "rgba(255,255,255,0.25)",
@@ -2225,10 +2225,44 @@ function Confetti() {
   );
 }
 
+function unicornStageImage(pct) {
+  if (pct >= 90) return "/unicorn-100.png";
+  if (pct >= 70) return "/unicorn-80.png";
+  if (pct >= 50) return "/unicorn-60.png";
+  if (pct >= 30) return "/unicorn-40.png";
+  if (pct >= 10) return "/unicorn-20.png";
+  return "/unicorn-0.png";
+}
+
 function CornerArt({ theme, pct }) {
   if (theme === "boy") return <DragonCornerArt pct={pct} />;
   return (
     <>
+      {/* growth-stage unicorn — grows through stages with progress, sits in
+          the open space below the トップへ button */}
+      <div
+        style={{
+          position: "absolute",
+          top: 108,
+          right: 14,
+          width: 120,
+          height: 120,
+          pointerEvents: "none",
+          zIndex: 0,
+        }}
+      >
+        <img
+          src={unicornStageImage(pct)}
+          alt=""
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            objectPosition: "center top",
+            filter: "drop-shadow(0 4px 8px rgba(11,61,98,0.3))",
+          }}
+        />
+      </div>
       <svg style={{ position: "absolute", top: 6, right: -10, opacity: 0.5 }} width="150" height="90" viewBox="0 0 150 90">
         <path d="M10 45c20-30 60-38 100-25 15 5 25 13 30 22-8 6-20 10-32 8 3 6 3 12 0 17-10-2-18-8-22-16-20 10-52 8-76-6z" fill="#EAF7FB" />
         <circle cx="45" cy="42" r="2.4" fill="#0B3D62" />
