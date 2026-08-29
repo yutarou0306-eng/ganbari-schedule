@@ -2035,12 +2035,20 @@ function ConfirmModal({ title, message, confirmLabel, cancelLabel, onConfirm, on
 
 function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
   const [val, setVal] = useState("");
+  const [failCount, setFailCount] = useState(0);
+  const [showHint, setShowHint] = useState(false);
+
   function submit() {
     if (val === correctPin || val === MASTER_PIN) {
       onSuccess();
     } else {
       onFail();
       setVal("");
+      setFailCount((n) => {
+        const next = n + 1;
+        if (next >= 3) setShowHint(true);
+        return next;
+      });
     }
   }
   return (
@@ -2067,6 +2075,17 @@ function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
           </button>
         </div>
       </div>
+      {showHint && (
+        <div style={styles.modalOverlay} onClick={() => setShowHint(false)}>
+          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <h3 style={styles.modalTitle}>💡 ヒント</h3>
+            <p style={styles.modalMsg}>部長が部下が一仕事した時にかける言葉を思い出して……</p>
+            <button style={styles.modalConfirm} onClick={() => setShowHint(false)}>
+              とじる
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
