@@ -2119,21 +2119,33 @@ function dragonStageImage(pct) {
 function DragonCornerArt({ pct }) {
   return (
     <>
-      {/* dragon illustration, top left — grows through stages with progress, tucked below the fixed トップへ button */}
-      <img
-        src={dragonStageImage(pct)}
-        alt=""
+      {/* dragon illustration, top left — grows through stages with progress.
+          Fixed-size box + object-fit keeps every stage (even the taller egg)
+          the same footprint, tucked inside the frame and below トップへ. */}
+      <div
         style={{
           position: "absolute",
-          top: 46,
-          left: -8,
-          width: 100,
-          opacity: 0.9,
-          filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.35))",
+          top: 44,
+          left: 6,
+          width: 72,
+          height: 72,
           pointerEvents: "none",
           zIndex: 0,
         }}
-      />
+      >
+        <img
+          src={dragonStageImage(pct)}
+          alt=""
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            objectPosition: "center top",
+            opacity: 0.9,
+            filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.35))",
+          }}
+        />
+      </div>
       {/* compass rose, top right */}
       <svg style={{ position: "absolute", top: 10, right: 8, opacity: 0.55 }} width="70" height="70" viewBox="0 0 70 70">
         <circle cx="35" cy="35" r="26" fill="none" stroke="#C89B3C" strokeWidth="2" />
