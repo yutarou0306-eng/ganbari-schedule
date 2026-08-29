@@ -26,6 +26,8 @@ export default function TopPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, title } | null
   const [deleting, setDeleting] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
+  const [appCopied, setAppCopied] = useState(false);
 
   // Refresh cached progress numbers from Supabase in one batched query.
   useEffect(() => {
@@ -68,6 +70,46 @@ export default function TopPage() {
 
   function handleEdit(id) {
     window.location.href = `${window.location.pathname}?id=${id}&edit=1`;
+  }
+
+  async function handleShare(id, title) {
+    const url = `${window.location.origin}${window.location.pathname}?id=${id}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: title || "がんばりスケジュール", url });
+      } catch (e) {
+        // user cancelled the share sheet — nothing to do
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+      } catch (e) {}
+    }
+  }
+
+  const appUrl = `${window.location.origin}${window.location.pathname}`;
+
+  async function handleShareApp() {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "頑張りスケジュール", url: appUrl });
+      } catch (e) {
+        // user cancelled the share sheet — nothing to do
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(appUrl);
+        setAppCopied(true);
+        setTimeout(() => setAppCopied(false), 2000);
+      } catch (e) {}
+    }
+  }
+
+  function handleLineShareApp() {
+    const encoded = encodeURIComponent(appUrl);
+    window.open(`https://social-plugins.line.me/lineit/share?url=${encoded}`, "_blank", "noopener,noreferrer");
   }
 
   async function handleConfirmDelete() {
@@ -116,9 +158,67 @@ export default function TopPage() {
         >
           🐚 がんばりスケジュール
         </h1>
-        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 15, marginBottom: 22 }}>
+        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 15, marginBottom: 14 }}>
           作る・見る・振り返る、全部ここから
         </p>
+
+        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
+          {typeof navigator !== "undefined" && navigator.share && (
+            <button
+              onClick={handleShareApp}
+              style={{
+                border: "none",
+                borderRadius: 999,
+                padding: "8px 16px",
+                fontSize: 13,
+                fontWeight: 700,
+                fontFamily: "inherit",
+                background: "#5A4FCF",
+                color: "#fff",
+                cursor: "pointer",
+                boxShadow: "0 6px 14px rgba(0,0,0,0.25)",
+              }}
+            >
+              {appCopied ? "✅ コピーしました！" : "📤 アプリを共有（AirDropなど）"}
+            </button>
+          )}
+          <button
+            onClick={handleLineShareApp}
+            style={{
+              border: "none",
+              borderRadius: 999,
+              padding: "8px 16px",
+              fontSize: 13,
+              fontWeight: 700,
+              fontFamily: "inherit",
+              background: "#06C755",
+              color: "#fff",
+              cursor: "pointer",
+              boxShadow: "0 6px 14px rgba(0,0,0,0.25)",
+            }}
+          >
+            LINEでシェア
+          </button>
+          {!(typeof navigator !== "undefined" && navigator.share) && (
+            <button
+              onClick={handleShareApp}
+              style={{
+                border: "none",
+                borderRadius: 999,
+                padding: "8px 16px",
+                fontSize: 13,
+                fontWeight: 700,
+                fontFamily: "inherit",
+                background: "#14588C",
+                color: "#fff",
+                cursor: "pointer",
+                boxShadow: "0 6px 14px rgba(0,0,0,0.25)",
+              }}
+            >
+              {appCopied ? "✅ コピーしました！" : "🔗 アプリのリンクをコピー"}
+            </button>
+          )}
+        </div>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
           {[
@@ -207,6 +307,8 @@ export default function TopPage() {
             onOpen={handleOpen}
             onEdit={handleEdit}
             onDelete={(s) => setDeleteTarget(s)}
+            onShare={handleShare}
+            copiedId={copiedId}
             refreshing={refreshing}
           />
         )}
@@ -218,6 +320,8 @@ export default function TopPage() {
             onOpen={handleOpen}
             onEdit={handleEdit}
             onDelete={(s) => setDeleteTarget(s)}
+            onShare={handleShare}
+            copiedId={copiedId}
             refreshing={refreshing}
           />
         )}
@@ -303,7 +407,7 @@ export default function TopPage() {
   );
 }
 
-function ScheduleList({ items, emptyText, onOpen, onEdit, onDelete, refreshing }) {
+function ScheduleList({ items, emptyText, onOpen, onEdit, onDelete, onShare, copiedId, refreshing }) {
   if (items.length === 0) {
     return (
       <div
@@ -337,8 +441,31 @@ function ScheduleList({ items, emptyText, onOpen, onEdit, onDelete, refreshing }
             boxShadow: "0 8px 18px rgba(11,61,98,0.25)",
           }}
         >
-          {/* edit / delete — top-right corner */}
+          {/* share / edit / delete — top-right corner */}
           <div style={{ position: "absolute", top: 10, right: 10, display: "flex", gap: 6, zIndex: 2 }}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onShare(s.id, s.title);
+              }}
+              aria-label="共有する"
+              title="共有する"
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                border: "2px solid #BFE3F0",
+                background: copiedId === s.id ? "#DCEEF7" : "#fff",
+                color: "#14588C",
+                fontSize: 18,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {copiedId === s.id ? "✅" : "📤"}
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -396,7 +523,7 @@ function ScheduleList({ items, emptyText, onOpen, onEdit, onDelete, refreshing }
               background: "none",
               border: "none",
               padding: 0,
-              paddingRight: 96,
+              paddingRight: 148,
               cursor: "pointer",
               fontFamily: "inherit",
             }}
