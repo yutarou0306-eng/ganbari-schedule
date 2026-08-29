@@ -310,6 +310,8 @@ function taskIconIndex(idx, useDragonStamp, shapesLength) {
 }
 
 const DURATION_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
+const PAGE_OPTIONS = Array.from({ length: 50 }, (_, i) => i + 1);
+const PROBLEM_OPTIONS = Array.from({ length: 100 }, (_, i) => i + 1);
 
 function defaultEndDate() {
   const d = new Date();
@@ -997,14 +999,17 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
             </button>
             {subject.measureTime && (
               <>
-                <input
-                  type="number"
-                  min={1}
-                  max={300}
+                <select
                   value={subject.targetMinutes ?? 30}
-                  onChange={(e) => set({ targetMinutes: Math.max(1, Number(e.target.value) || 1) })}
-                  style={styles.measureInput}
-                />
+                  onChange={(e) => set({ targetMinutes: Number(e.target.value) })}
+                  style={styles.measureSelect}
+                >
+                  {DURATION_OPTIONS.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
                 <span style={styles.measureUnit}>分</span>
               </>
             )}
@@ -1019,14 +1024,17 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
             </button>
             {subject.measurePages && (
               <>
-                <input
-                  type="number"
-                  min={1}
-                  max={999}
+                <select
                   value={subject.targetPages ?? 5}
-                  onChange={(e) => set({ targetPages: Math.max(1, Number(e.target.value) || 1) })}
-                  style={styles.measureInput}
-                />
+                  onChange={(e) => set({ targetPages: Number(e.target.value) })}
+                  style={styles.measureSelect}
+                >
+                  {PAGE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
                 <span style={styles.measureUnit}>ページ</span>
               </>
             )}
@@ -1041,14 +1049,17 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
             </button>
             {subject.measureProblems && (
               <>
-                <input
-                  type="number"
-                  min={1}
-                  max={999}
+                <select
                   value={subject.targetProblems ?? 10}
-                  onChange={(e) => set({ targetProblems: Math.max(1, Number(e.target.value) || 1) })}
-                  style={styles.measureInput}
-                />
+                  onChange={(e) => set({ targetProblems: Number(e.target.value) })}
+                  style={styles.measureSelect}
+                >
+                  {PROBLEM_OPTIONS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
                 <span style={styles.measureUnit}>問</span>
               </>
             )}
@@ -2434,6 +2445,7 @@ const styles = {
   measureToggle: { border: "2px solid #C89B3C", borderRadius: 999, padding: "7px 14px", fontSize: 14.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: "#fff", color: "#8B5E34", minWidth: 108 },
   measureToggleOn: { background: "#8B5E34", color: "#fff" },
   measureInput: { width: 72, padding: "8px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 17, fontFamily: "inherit", textAlign: "center" },
+  measureSelect: { width: 80, padding: "8px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 16, fontFamily: "inherit", textAlign: "center", background: "#fff", color: "#0B3D62", fontWeight: 700 },
   measureUnit: { fontSize: 14, fontWeight: 700, color: "#4a6c85" },
   intervalInput: { width: 68, padding: "8px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 18, fontFamily: "inherit", textAlign: "center" },
   weekdayPicker: { display: "flex", gap: 6, flexWrap: "wrap" },
