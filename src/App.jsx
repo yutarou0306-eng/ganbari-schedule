@@ -404,10 +404,14 @@ export default function KidsScheduleApp() {
 
     function applyThemeFromUrl() {
       try {
-        const t = new URLSearchParams(window.location.search).get("theme");
-        if (t === "girl" || t === "boy") {
-          setConfig((prev) => ({ ...prev, theme: t }));
-        }
+        const params = new URLSearchParams(window.location.search);
+        const t = params.get("theme");
+        const p = params.get("profileId");
+        setConfig((prev) => ({
+          ...prev,
+          ...(t === "girl" || t === "boy" ? { theme: t } : {}),
+          ...(p ? { profileId: p } : {}),
+        }));
       } catch (e) {}
     }
   }, []);

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { getKnownSchedules, upsertKnownSchedule, removeKnownSchedule } from "./registry.js";
 import { generateScheduleId } from "./scheduleId.js";
+import { generateProfileId } from "./profileId.js";
 import { supabase } from "./db.js";
 import { computeOverallStats } from "./progress.js";
 
@@ -112,6 +113,11 @@ export default function TopPage() {
     window.open(`https://social-plugins.line.me/lineit/share?url=${encoded}`, "_blank", "noopener,noreferrer");
   }
 
+  function handleCreateProfile() {
+    const id = generateProfileId();
+    window.location.href = `${window.location.pathname}?profile=${id}`;
+  }
+
   async function handleConfirmDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -219,6 +225,27 @@ export default function TopPage() {
             </button>
           )}
         </div>
+
+        <button
+          onClick={handleCreateProfile}
+          style={{
+            display: "block",
+            width: "100%",
+            border: "none",
+            borderRadius: 16,
+            padding: "13px 0",
+            marginBottom: 16,
+            fontWeight: 900,
+            fontSize: 14.5,
+            color: "#5C3A21",
+            cursor: "pointer",
+            fontFamily: "inherit",
+            background: "linear-gradient(135deg,#F4E2B8,#E5C878)",
+            boxShadow: "0 8px 18px rgba(0,0,0,0.2)",
+          }}
+        >
+          🌟 スタンプ帳をつくる（名前を登録してスタンプを貯める）
+        </button>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
           {[

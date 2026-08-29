@@ -1,0 +1,495 @@
+import React, { useEffect, useState } from "react";
+import { supabase } from "./db.js";
+import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
+import { generateScheduleId } from "./scheduleId.js";
+
+const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
+
+function countStampsInBlob(blob) {
+  const completions = (blob && blob.completions) || {};
+  let n = 0;
+  Object.values(completions).forEach((day) => {
+    Object.values(day || {}).forEach((v) => {
+      if (v >= 1) n++;
+    });
+  });
+  return n;
+}
+
+function freshProfile() {
+  return { name: "", birthdate: "", rewards: [], redemptions: [] };
+}
+
+export default function ProfileRoot() {
+  const profileId = getProfileIdFromUrl();
+  const [loaded, setLoaded] = useState(false);
+  const [exists, setExists] = useState(false);
+  const [profile, setProfile] = useState(freshProfile());
+  const [schedules, setSchedules] = useState([]); // [{id, title, theme, stamps}]
+  const [view, setView] = useState("main"); // main | editProfile | rewards
+  const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from("profiles").select("blob").eq("id", profileId).maybeSingle();
+        if (data && data.blob) {
+          setProfile({ ...freshProfile(), ...data.blob });
+          setExists(true);
+          await loadSchedules();
+        } else {
+          setView("editProfile");
+        }
+      } catch (e) {
+        setView("editProfile");
+      }
+      setLoaded(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function loadSchedules() {
+    try {
+      const { data } = await supabase
+        .from("schedules")
+        .select("id, blob")
+        .eq("blob->config->>profileId", profileId);
+      const list = (data || [])
+        .filter((row) => row.blob && row.blob.config)
+        .map((row) => ({
+          id: row.id,
+          title: row.blob.config.title,
+          theme: row.blob.config.theme || "girl",
+          stamps: countStampsInBlob(row.blob),
+        }));
+      setSchedules(list);
+    } catch (e) {}
+  }
+
+  async function saveProfile(next) {
+    await supabase.from("profiles").upsert({ id: profileId, blob: next, updated_at: new Date().toISOString() });
+    setProfile(next);
+    setExists(true);
+  }
+
+  async function handleCreateOrEditProfile(name, birthdate) {
+    const next = { ...profile, name: name.trim(), birthdate };
+    await saveProfile(next);
+    setView("main");
+    if (!exists) await loadSchedules();
+  }
+
+  function handleCreateSchedule(themeKey) {
+    const id = generateScheduleId();
+    window.location.href = `${window.location.pathname}?id=${id}&theme=${themeKey}&profileId=${profileId}`;
+  }
+
+  const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
+  const totalSpent = (profile.redemptions || []).reduce((sum, r) => sum + r.cost, 0);
+  const available = totalEarned - totalSpent;
+
+  async function handleRedeem(reward) {
+    if (available < reward.cost) return;
+    const next = {
+      ...profile,
+      redemptions: [
+        ...(profile.redemptions || []),
+        { id: generateScheduleId(6), rewardId: reward.id, rewardName: reward.name, cost: reward.cost, date: new Date().toISOString().slice(0, 10) },
+      ],
+    };
+    await saveProfile(next);
+    setRedeemTarget(null);
+  }
+
+  async function handleShare() {
+    const url = `${window.location.origin}${window.location.pathname}?profile=${profileId}`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: `${profile.name || "スタンプ帳"}`, url });
+      } catch (e) {}
+    } else {
+      try {
+        await navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (e) {}
+    }
+  }
+
+  if (!loaded) {
+    return (
+      <div style={{ minHeight: "100vh", background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ color: "#fff", fontSize: 18 }}>読み込み中…</div>
+      </div>
+    );
+  }
+
+  if (view === "editProfile") {
+    return <ProfileSetupScreen initial={profile} isNew={!exists} onSave={handleCreateOrEditProfile} onCancel={exists ? () => setView("main") : null} />;
+  }
+
+  if (view === "rewards") {
+    return (
+      <RewardsEditor
+        rewards={profile.rewards || []}
+        onSave={async (rewards) => {
+          await saveProfile({ ...profile, rewards });
+          setView("main");
+        }}
+        onCancel={() => setView("main")}
+      />
+    );
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: bg, fontFamily: "'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', sans-serif", padding: "28px 16px" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap');`}</style>
+      <div style={{ maxWidth: 480, margin: "0 auto" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <a href={window.location.pathname} style={{ textDecoration: "none" }}>
+            <span style={{ background: "rgba(11,61,98,0.85)", color: "#fff", borderRadius: 999, padding: "8px 14px", fontSize: 12.5, fontWeight: 700 }}>
+              🏠 トップへ
+            </span>
+          </a>
+          <button onClick={() => setView("editProfile")} style={iconBtnStyle}>
+            ⚙️
+          </button>
+        </div>
+
+        <div style={{ textAlign: "center", marginBottom: 18 }}>
+          <div style={{ fontFamily: "'Kaisei Decol', serif", color: "#fff", fontSize: 28, textShadow: "0 2px 10px rgba(11,61,98,0.5)" }}>
+            🌟 {profile.name || "スタンプ帳"} の スタンプ帳
+          </div>
+          {profile.birthdate && <div style={{ color: "#EAF7FB", fontSize: 13, marginTop: 2 }}>生年月日：{profile.birthdate}</div>}
+        </div>
+
+        <div style={{ background: "#fff", borderRadius: 22, padding: "22px 20px", textAlign: "center", boxShadow: "0 16px 34px rgba(11,61,98,0.3)", marginBottom: 16 }}>
+          <div style={{ fontSize: 14, color: "#7c98aa", fontWeight: 700 }}>今もっているスタンプ</div>
+          <div style={{ fontSize: 48, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif" }}>⭐️ {available}</div>
+          <div style={{ fontSize: 12.5, color: "#a8bcc9" }}>
+            これまでに獲得 {totalEarned} － 交換した分 {totalSpent}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          <button onClick={handleShare} style={{ ...actionBtnStyle, background: "#5A4FCF" }}>
+            {copied ? "✅ コピーしました！" : "📤 プロフィールを共有"}
+          </button>
+        </div>
+
+        <SectionTitle>🎁 景品と交換</SectionTitle>
+        <div style={{ marginBottom: 8 }}>
+          {(profile.rewards || []).length === 0 ? (
+            <div style={emptyCardStyle}>まだ景品が登録されていません。⚙️の「景品を編集する」から追加できます。</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {(profile.rewards || []).map((r) => {
+                const can = available >= r.cost;
+                return (
+                  <div key={r.id} style={{ background: "#fff", borderRadius: 16, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 6px 14px rgba(11,61,98,0.2)" }}>
+                    <div>
+                      <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 16 }}>{r.name}</div>
+                      <div style={{ fontSize: 13, color: "#7c98aa", fontWeight: 700 }}>⭐️ {r.cost}個</div>
+                    </div>
+                    <button
+                      onClick={() => setRedeemTarget(r)}
+                      disabled={!can}
+                      style={{
+                        border: "none",
+                        borderRadius: 999,
+                        padding: "9px 16px",
+                        fontWeight: 900,
+                        fontSize: 13.5,
+                        cursor: can ? "pointer" : "default",
+                        background: can ? "linear-gradient(135deg,#FFB6C9,#F4C95D)" : "#e5edf1",
+                        color: can ? "#fff" : "#aab8c0",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      交換する
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <button onClick={() => setView("rewards")} style={{ ...linkBtnStyle, marginBottom: 22 }}>
+          ✏️ 景品を編集する
+        </button>
+
+        <SectionTitle>📅 つながっているスケジュール</SectionTitle>
+        <div style={{ marginBottom: 10 }}>
+          {schedules.length === 0 ? (
+            <div style={emptyCardStyle}>まだスケジュールがありません。下のボタンから作ってみましょう。</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {schedules.map((s) => (
+                <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
+                  <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
+                    <span style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14.5 }}>
+                      {s.theme === "boy" ? "🐉" : "🎀"} {s.title || "無題のスケジュール"}
+                    </span>
+                    <span style={{ color: "#B5651D", fontWeight: 800, fontSize: 13.5 }}>⭐️ {s.stamps}</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
+          <button onClick={() => handleCreateSchedule("girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
+            🎀 新しいスケジュールを作る（女の子用）
+          </button>
+          <button onClick={() => handleCreateSchedule("boy")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#8B5E34,#C89B3C)" }}>
+            🐉 新しいスケジュールを作る（男の子用）
+          </button>
+        </div>
+
+        {(profile.redemptions || []).length > 0 && (
+          <>
+            <SectionTitle>📖 交換した記録</SectionTitle>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
+              {[...(profile.redemptions || [])]
+                .reverse()
+                .map((r) => (
+                  <div key={r.id} style={{ background: "rgba(255,255,255,0.85)", borderRadius: 12, padding: "8px 14px", fontSize: 13.5, color: "#0B3D62", display: "flex", justifyContent: "space-between" }}>
+                    <span>{r.date}：{r.rewardName}</span>
+                    <span style={{ fontWeight: 800 }}>-⭐️{r.cost}</span>
+                  </div>
+                ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      {redeemTarget && (
+        <div style={overlayStyle}>
+          <div style={modalCardStyle}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>これと交換する？</h3>
+            <p style={{ fontSize: 16, color: "#4a6c85", marginBottom: 6 }}>
+              <strong>{redeemTarget.name}</strong>
+            </p>
+            <p style={{ fontSize: 14, color: "#7c98aa", marginBottom: 20 }}>
+              ⭐️{redeemTarget.cost}個 使います（残り {available - redeemTarget.cost} 個になります）
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setRedeemTarget(null)} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
+                やめる
+              </button>
+              <button onClick={() => handleRedeem(redeemTarget)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
+                交換する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SectionTitle({ children }) {
+  return <div style={{ color: "#fff", fontWeight: 900, fontSize: 15, marginBottom: 8, textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>{children}</div>;
+}
+
+const iconBtnStyle = {
+  width: 40,
+  height: 40,
+  borderRadius: "50%",
+  border: "none",
+  background: "rgba(255,255,255,0.3)",
+  color: "#fff",
+  fontSize: 18,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const actionBtnStyle = {
+  flex: 1,
+  border: "none",
+  borderRadius: 14,
+  padding: "13px 0",
+  fontWeight: 900,
+  fontSize: 14.5,
+  color: "#fff",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  boxShadow: "0 8px 18px rgba(0,0,0,0.25)",
+};
+
+const linkBtnStyle = {
+  display: "inline-block",
+  background: "none",
+  border: "none",
+  color: "#EAF7FB",
+  fontSize: 13,
+  fontWeight: 700,
+  textDecoration: "underline",
+  cursor: "pointer",
+  fontFamily: "inherit",
+  padding: 0,
+};
+
+const emptyCardStyle = {
+  background: "rgba(255,255,255,0.9)",
+  borderRadius: 14,
+  padding: 16,
+  color: "#7c98aa",
+  fontSize: 13.5,
+  lineHeight: 1.6,
+};
+
+const overlayStyle = {
+  position: "fixed",
+  inset: 0,
+  background: "rgba(11,61,98,0.55)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 1000,
+  padding: 20,
+};
+
+const modalCardStyle = {
+  background: "#fff",
+  borderRadius: 20,
+  padding: 24,
+  maxWidth: 340,
+  width: "100%",
+  textAlign: "center",
+};
+
+const modalBtnStyle = {
+  flex: 1,
+  padding: "12px 0",
+  borderRadius: 12,
+  fontWeight: 700,
+  cursor: "pointer",
+  fontFamily: "inherit",
+  fontSize: 15,
+};
+
+function ProfileSetupScreen({ initial, isNew, onSave, onCancel }) {
+  const [name, setName] = useState(initial.name || "");
+  const [birthdate, setBirthdate] = useState(initial.birthdate || "");
+
+  return (
+    <div style={{ minHeight: "100vh", background: bg, padding: "28px 16px", display: "flex", justifyContent: "center" }}>
+      <div style={{ background: "linear-gradient(180deg,#FFFBF3,#FFF7EC)", borderRadius: 24, padding: 26, maxWidth: 420, width: "100%", height: "fit-content", boxShadow: "0 20px 50px rgba(11,61,98,0.35)" }}>
+        {onCancel && (
+          <button onClick={onCancel} style={{ background: "none", border: "none", color: "#14588C", fontWeight: 700, marginBottom: 10, cursor: "pointer", fontSize: 15, fontFamily: "inherit" }}>
+            ← もどる
+          </button>
+        )}
+        <h1 style={{ fontFamily: "'Kaisei Decol', serif", fontSize: 26, color: "#0B3D62", margin: "0 0 6px" }}>
+          {isNew ? "スタンプ帳をつくろう" : "プロフィールを編集する"}
+        </h1>
+        <p style={{ color: "#4a6c85", fontSize: 14.5, marginBottom: 20 }}>
+          名前と生年月日だけの、かんたんなプロフィールです。むずかしい登録は必要ありません。
+        </p>
+
+        <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>なまえ</label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="例）美月"
+          style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 16, fontFamily: "inherit", marginBottom: 18, boxSizing: "border-box" }}
+        />
+
+        <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>生年月日（任意）</label>
+        <input
+          type="date"
+          value={birthdate}
+          onChange={(e) => setBirthdate(e.target.value)}
+          style={{ width: "100%", padding: "11px 12px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 15, fontFamily: "inherit", marginBottom: 22, boxSizing: "border-box" }}
+        />
+
+        <button
+          onClick={() => name.trim() && onSave(name, birthdate)}
+          disabled={!name.trim()}
+          style={{
+            width: "100%",
+            padding: "15px 0",
+            borderRadius: 16,
+            border: "none",
+            background: name.trim() ? "linear-gradient(135deg,#FFB6C9,#F4C95D)" : "#e5edf1",
+            color: name.trim() ? "#fff" : "#aab8c0",
+            fontWeight: 900,
+            fontSize: 17,
+            cursor: name.trim() ? "pointer" : "default",
+            fontFamily: "inherit",
+          }}
+        >
+          {isNew ? "スタンプ帳をはじめる" : "保存する"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RewardsEditor({ rewards, onSave, onCancel }) {
+  const [list, setList] = useState(rewards.length ? rewards : []);
+
+  function addReward() {
+    setList((prev) => [...prev, { id: generateScheduleId(6), name: "", cost: 10 }]);
+  }
+  function update(id, patch) {
+    setList((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  }
+  function remove(id) {
+    setList((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", background: bg, padding: "28px 16px", display: "flex", justifyContent: "center" }}>
+      <div style={{ background: "linear-gradient(180deg,#FFFBF3,#FFF7EC)", borderRadius: 24, padding: 26, maxWidth: 420, width: "100%", height: "fit-content", boxShadow: "0 20px 50px rgba(11,61,98,0.35)" }}>
+        <button onClick={onCancel} style={{ background: "none", border: "none", color: "#14588C", fontWeight: 700, marginBottom: 10, cursor: "pointer", fontSize: 15, fontFamily: "inherit" }}>
+          ← もどる
+        </button>
+        <h1 style={{ fontFamily: "'Kaisei Decol', serif", fontSize: 24, color: "#0B3D62", margin: "0 0 16px" }}>景品リストを編集</h1>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
+          {list.map((r) => (
+            <div key={r.id} style={{ background: "#fff", border: "2px solid #EAF7FB", borderRadius: 14, padding: 12, display: "flex", gap: 8, alignItems: "center" }}>
+              <input
+                value={r.name}
+                onChange={(e) => update(r.id, { name: e.target.value })}
+                placeholder="景品名（例：ガチャ1回）"
+                style={{ flex: 1, border: "none", borderBottom: "2px solid #EAF7FB", padding: "6px 2px", fontSize: 15, fontFamily: "inherit", outline: "none" }}
+              />
+              <input
+                type="number"
+                min={1}
+                value={r.cost}
+                onChange={(e) => update(r.id, { cost: Math.max(1, Number(e.target.value) || 1) })}
+                style={{ width: 60, padding: "6px 6px", borderRadius: 8, border: "2px solid #BFE3F0", fontSize: 14, textAlign: "center", fontFamily: "inherit" }}
+              />
+              <span style={{ fontSize: 13, color: "#7c98aa" }}>個</span>
+              <button onClick={() => remove(r.id)} style={{ border: "none", background: "rgba(224,82,107,0.12)", color: "#E0526B", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", fontSize: 14 }}>
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={addReward}
+          style={{ display: "block", width: "100%", padding: "12px 0", borderRadius: 14, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", marginBottom: 16 }}
+        >
+          ＋ 景品を追加
+        </button>
+
+        <button
+          onClick={() => onSave(list.filter((r) => r.name.trim()))}
+          style={{ width: "100%", padding: "15px 0", borderRadius: 16, border: "none", background: "linear-gradient(135deg,#FFB6C9,#F4C95D)", color: "#fff", fontWeight: 900, fontSize: 17, cursor: "pointer", fontFamily: "inherit" }}
+        >
+          保存する
+        </button>
+      </div>
+    </div>
+  );
+}

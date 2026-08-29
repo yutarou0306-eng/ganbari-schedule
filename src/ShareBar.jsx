@@ -31,6 +31,18 @@ export default function ShareBar() {
     window.open(`https://social-plugins.line.me/lineit/share?url=${url}`, "_blank", "noopener,noreferrer");
   }
 
+  async function handleNativeShare() {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: document.title, url: window.location.href });
+      } catch (e) {
+        // user cancelled the share sheet — nothing to do
+      }
+    } else {
+      handleCopy();
+    }
+  }
+
   return (
     <>
       <div style={{ position: "fixed", top: 8, left: 8, zIndex: 999 }}>
@@ -39,7 +51,12 @@ export default function ShareBar() {
         </button>
       </div>
 
-      <div style={{ position: "fixed", top: 8, right: 8, zIndex: 999, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "60%" }}>
+      <div style={{ position: "fixed", top: 8, right: 8, zIndex: 999, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "70%" }}>
+        {typeof navigator !== "undefined" && navigator.share && (
+          <button onClick={handleNativeShare} style={{ ...pillStyle, background: "#5A4FCF", color: "#fff" }}>
+            📤 共有（AirDropなど）
+          </button>
+        )}
         <button onClick={handleLineShare} style={{ ...pillStyle, background: "#06C755", color: "#fff" }}>
           LINEでシェア
         </button>
