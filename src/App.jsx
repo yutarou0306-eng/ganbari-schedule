@@ -1579,17 +1579,28 @@ function MainScreen({
               />
             )
           )}
-          <div style={{ marginLeft: "auto", textAlign: "right" }}>
-            <div style={{ ...styles.pearlPct, marginLeft: 0, color: theme.headerTextColor }}>{pct}%（期間全体）</div>
-            <div style={{ ...styles.pearlCount, color: theme.headerTextColor }}>
-              {stats.done}／{stats.need}個
-            </div>
-          </div>
+          <span style={{ ...styles.pearlPct, color: theme.headerTextColor }}>{pct}%（期間全体）</span>
         </div>
 
         {config.reward && (
-          <div style={{ ...styles.rewardPreview, background: theme.overlayBg, color: theme.headerTextColor }}>
-            🎁 全部達成すると… <strong>{config.reward}</strong>
+          <div
+            style={{
+              ...styles.rewardPreview,
+              background: theme.overlayBg,
+              color: theme.headerTextColor,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <span>
+              🎁 全部達成すると… <strong>{config.reward}</strong>
+            </span>
+            <span style={{ fontSize: 12.5, fontWeight: 800, whiteSpace: "nowrap", opacity: 0.9 }}>
+              {stats.done}／{stats.need}個
+            </span>
           </div>
         )}
       </header>
