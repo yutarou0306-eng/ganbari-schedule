@@ -355,6 +355,7 @@ export default function KidsScheduleApp() {
   const [notes, setNotes] = useState({});
   const [achievements, setAchievements] = useState({});
   const [noteModalDate, setNoteModalDate] = useState(null);
+  const [linkedProfile, setLinkedProfile] = useState(null); // { name, totalStamps } | null
   const [showRecordsList, setShowRecordsList] = useState(false);
   const [locked, setLocked] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -477,6 +478,38 @@ export default function KidsScheduleApp() {
     clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 2200);
   }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    if (!config.profileId) {
+      setLinkedProfile(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [{ data: profData }, { data: schedData }] = await Promise.all([
+          supabase.from("profiles").select("blob").eq("id", config.profileId).maybeSingle(),
+          supabase.from("schedules").select("blob").eq("blob->config->>profileId", config.profileId),
+        ]);
+        let total = 0;
+        (schedData || []).forEach((row) => {
+          const completions = (row.blob && row.blob.completions) || {};
+          Object.values(completions).forEach((day) => {
+            Object.values(day || {}).forEach((v) => {
+              if (v >= 1) total++;
+            });
+          });
+        });
+        if (!cancelled) {
+          setLinkedProfile({ name: (profData && profData.blob && profData.blob.name) || "", totalStamps: total });
+        }
+      } catch (e) {}
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loaded, config.profileId]);
 
   const startDate = parseDate(config.startDate) || new Date();
   const endDate = parseDate(config.endDate) || addDays(startDate, 27);
@@ -829,6 +862,7 @@ export default function KidsScheduleApp() {
           achievements={achievements}
           onOpenNote={handleOpenNote}
           onOpenRecords={() => setShowRecordsList(true)}
+          linkedProfile={linkedProfile}
           daySubjectsFor={daySubjectsFor}
           isStamped={isStamped}
           countFor={countFor}
@@ -1353,6 +1387,7 @@ function MainScreen({
   achievements,
   onOpenNote,
   onOpenRecords,
+  linkedProfile,
 }) {
   const pct = stats.need > 0 ? Math.round((stats.done / stats.need) * 100) : 0;
   const pearlCount = 10;
@@ -1405,6 +1440,24 @@ function MainScreen({
     >
       {theme.isMapTheme && <MapDoodles />}
       <CornerArt theme={theme.key} pct={pct} />
+      {linkedProfile && (
+        <div
+          style={{
+            position: "absolute",
+            top: theme.isMapTheme ? 246 : 100,
+            right: 14,
+            zIndex: 1,
+            background: theme.isMapTheme ? "rgba(62,42,22,0.55)" : "rgba(255,255,255,0.25)",
+            borderRadius: 14,
+            padding: "8px 12px",
+            textAlign: "center",
+            maxWidth: 130,
+          }}
+        >
+          <div style={{ fontSize: 11, fontWeight: 800, color: "#fff" }}>🌟 {linkedProfile.name || "スタンプ帳"}</div>
+          <div style={{ fontSize: 18, fontWeight: 900, color: "#FFD966" }}>⭐️ {linkedProfile.totalStamps}</div>
+        </div>
+      )}
       <header style={styles.header}>
         <div style={styles.headerTop}>
           <div style={styles.titleBanner}>
