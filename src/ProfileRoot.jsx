@@ -605,6 +605,31 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
   const [name, setName] = useState(initial.name || "");
   const [birthdate, setBirthdate] = useState(initial.birthdate || "");
   const [pin, setPin] = useState(initial.pin || "");
+  const [dupProfile, setDupProfile] = useState(null); // { id, name } | null
+  const [checking, setChecking] = useState(false);
+
+  async function handleSaveClick() {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    setDupProfile(null);
+
+    if (isNew) {
+      setChecking(true);
+      try {
+        let query = supabase.from("profiles").select("id, blob").eq("blob->>name", trimmedName);
+        if (birthdate) query = query.eq("blob->>birthdate", birthdate);
+        const { data } = await query;
+        if (data && data.length > 0) {
+          setDupProfile({ id: data[0].id, name: (data[0].blob && data[0].blob.name) || trimmedName });
+          setChecking(false);
+          return;
+        }
+      } catch (e) {}
+      setChecking(false);
+    }
+
+    onSave(name, birthdate, pin);
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: bg, padding: "28px 16px", display: "flex", justifyContent: "center" }}>
@@ -629,14 +654,23 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
         <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>なまえ</label>
         <input
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            setDupProfile(null);
+          }}
           placeholder="例）美月"
           style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 16, fontFamily: "inherit", marginBottom: 18, boxSizing: "border-box" }}
         />
 
         <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>生年月日（任意）</label>
         <div style={{ marginBottom: 22 }}>
-          <BirthdateSelects value={birthdate} onChange={setBirthdate} />
+          <BirthdateSelects
+            value={birthdate}
+            onChange={(v) => {
+              setBirthdate(v);
+              setDupProfile(null);
+            }}
+          />
         </div>
 
         <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>
@@ -655,9 +689,23 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
           設定すると、「景品を編集する」を開くときにこの番号の入力が必要になります（お子さんが誤って変更しないためです）。
         </p>
 
+        {dupProfile && (
+          <div style={{ background: "#FFF3E0", border: "2px solid #F4C95D", borderRadius: 14, padding: "12px 14px", marginBottom: 16 }}>
+            <p style={{ margin: "0 0 8px", color: "#8B5E34", fontWeight: 800, fontSize: 14.5 }}>
+              🌟 そのスタンプ帳はもうあるよ
+            </p>
+            <a
+              href={`${window.location.pathname}?profile=${dupProfile.id}`}
+              style={{ color: "#14588C", fontWeight: 700, fontSize: 13.5, textDecoration: "underline" }}
+            >
+              「{dupProfile.name}」のスタンプ帳を開く
+            </a>
+          </div>
+        )}
+
         <button
-          onClick={() => name.trim() && onSave(name, birthdate, pin)}
-          disabled={!name.trim()}
+          onClick={handleSaveClick}
+          disabled={!name.trim() || checking}
           style={{
             width: "100%",
             padding: "15px 0",
@@ -671,7 +719,7 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
             fontFamily: "inherit",
           }}
         >
-          {isNew ? "スタンプ帳をはじめる" : "保存する"}
+          {checking ? "確認しています…" : isNew ? "スタンプ帳をはじめる" : "保存する"}
         </button>
 
         {onRequestDelete && (
