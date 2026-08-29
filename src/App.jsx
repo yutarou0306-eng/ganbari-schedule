@@ -289,6 +289,14 @@ function subjectIsMeasurable(subject) {
   return !!(subject.measureTime || subject.measurePages || subject.measureProblems);
 }
 
+function formatAchvShort(vals) {
+  const parts = [];
+  if (vals.minutes) parts.push(`⏱${vals.minutes}分`);
+  if (vals.pages) parts.push(`📖${vals.pages}p`);
+  if (vals.problems) parts.push(`✏️${vals.problems}問`);
+  return parts.join(" ");
+}
+
 const DURATION_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
 
 function defaultEndDate() {
@@ -1504,6 +1512,8 @@ function MainScreen({
                   <div style={styles.dayStampsRow}>
                     {dayReq.map((s, idx) => {
                       const count = countFor(dKey, s.id);
+                      const achv = achievements[dKey] && achievements[dKey][s.id];
+                      const achvLabel = theme.isMapTheme && achv ? formatAchvShort(achv) : "";
                       if (isToday) {
                         return (
                           <div key={s.id} style={styles.stampSlot}>
@@ -1518,6 +1528,7 @@ function MainScreen({
                               onTap={() => onTapStamp(d, s.id)}
                               onClear={() => onClearStamp(d, s.id)}
                             />
+                            {achvLabel && <div style={styles.achvMiniLabel}>{achvLabel}</div>}
                           </div>
                         );
                       }
@@ -1539,6 +1550,7 @@ function MainScreen({
                             locked={locked || isFuture}
                             onTogglePast={() => onTogglePastStamp(d, s.id)}
                           />
+                          {achvLabel && <div style={styles.achvMiniLabel}>{achvLabel}</div>}
                         </div>
                       );
                     })}
@@ -2280,6 +2292,7 @@ const styles = {
 
   dayStampsRow: { display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center", width: "100%" },
   stampSlot: { flex: "1 1 0", minWidth: 26, maxWidth: 90 },
+  achvMiniLabel: { fontSize: 8.5, fontWeight: 800, color: "#5C3A21", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%", textAlign: "center" },
   stampCellWrap: { position: "relative", width: "100%" },
   stampCircle: { width: "100%", aspectRatio: "1", borderRadius: "50%", border: "3px dashed", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", overflow: "visible", boxSizing: "border-box" },
   stampPopWrap: { display: "flex", alignItems: "center", justifyContent: "center", animation: "stampPop 0.45s cubic-bezier(.34,1.56,.64,1)" },
