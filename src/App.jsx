@@ -297,10 +297,13 @@ function formatAchvShort(vals) {
   return parts.join(" ");
 }
 
-// Which vector icon to show as a small "which task is this?" hint on an
-// otherwise-blank stamp. For the boy theme, index 0 is reserved for the
-// dragon completion image, so hints cycle through the other shapes instead.
-function hintIconIndex(idx, useDragonStamp, shapesLength) {
+// Which vector icon represents a given subject/task. Used consistently
+// everywhere a subject's icon is shown (the spotlight card, blank-stamp
+// hints, practice stamps) so the same subject always shows the same icon.
+// For the boy theme, index 0 is reserved for the dragon completion image,
+// so regular task icons cycle through the other shapes instead — the
+// dragon shape is never handed out as an ordinary task icon.
+function taskIconIndex(idx, useDragonStamp, shapesLength) {
   if (useDragonStamp && shapesLength > 1) return (idx % (shapesLength - 1)) + 1;
   return idx % shapesLength;
 }
@@ -1431,7 +1434,13 @@ function MainScreen({
           return (
             <div key={s.id} style={{ ...styles.subjectSpotlight, background: `linear-gradient(135deg, ${s.color}, #ffffff)` }}>
               <div style={{ ...styles.subjectSpotlightIcon, background: s.color }}>
-                <StampIcon index={idx} color="#ffffff" size="60%" shapes={theme.shapes} withFace={theme.withFace} />
+                <StampIcon
+                  index={taskIconIndex(idx, theme.isMapTheme, theme.shapes.length)}
+                  color="#ffffff"
+                  size="60%"
+                  shapes={theme.shapes}
+                  withFace={theme.withFace}
+                />
               </div>
               <div style={styles.subjectSpotlightTextWrap}>
                 <div style={styles.subjectSpotlightName}>{s.name}</div>
@@ -1518,7 +1527,7 @@ function MainScreen({
                   <span style={styles.dashMark}>ー</span>
                 ) : (
                   <div style={styles.dayStampsRow}>
-                    {dayReq.map((s) => {
+                    {(theme.isMapTheme ? [...dayReq].reverse() : dayReq).map((s) => {
                       const stableIdx = subjects.findIndex((x) => x.id === s.id);
                       const count = countFor(dKey, s.id);
                       const achv = achievements[dKey] && achievements[dKey][s.id];
@@ -1581,7 +1590,7 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
   ) : (
     <StampIcon index={iconIndex} color={color} size="76%" shapes={shapes} withFace={withFace} />
   );
-  const hintIdx = hintIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1);
+  const hintIdx = taskIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1);
   const hintIcon = (
     <span style={styles.stampHintIcon}>
       <StampIcon index={hintIdx} color={color} size="52%" shapes={shapes} withFace={false} />
@@ -1756,7 +1765,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, wit
         ) : (
           <span style={styles.stampHintIcon}>
             <StampIcon
-              index={hintIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1)}
+              index={taskIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1)}
               color={color}
               size="52%"
               shapes={shapes}
