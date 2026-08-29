@@ -18,7 +18,7 @@ function countStampsInBlob(blob) {
 }
 
 function freshProfile() {
-  return { name: "", birthdate: "", rewards: [], redemptions: [] };
+  return { name: "", birthdate: "", pin: "", rewards: [], redemptions: [] };
 }
 
 export default function ProfileRoot() {
@@ -31,6 +31,8 @@ export default function ProfileRoot() {
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showRewardsPin, setShowRewardsPin] = useState(false);
+  const [showRewardsConfirm, setShowRewardsConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -78,8 +80,8 @@ export default function ProfileRoot() {
     upsertKnownProfile({ id: profileId, name: next.name || "" });
   }
 
-  async function handleCreateOrEditProfile(name, birthdate) {
-    const next = { ...profile, name: name.trim(), birthdate };
+  async function handleCreateOrEditProfile(name, birthdate, pin) {
+    const next = { ...profile, name: name.trim(), birthdate, pin: (pin || "").trim() };
     await saveProfile(next);
     setView("main");
     if (!exists) await loadSchedules();
@@ -97,6 +99,14 @@ export default function ProfileRoot() {
     } catch (e) {}
     removeKnownProfile(profileId);
     window.location.href = window.location.pathname;
+  }
+
+  function handleRequestEditRewards() {
+    if (profile.pin && profile.pin.length > 0) {
+      setShowRewardsPin(true);
+    } else {
+      setShowRewardsConfirm(true);
+    }
   }
 
   const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
@@ -259,8 +269,8 @@ export default function ProfileRoot() {
             </div>
           )}
         </div>
-        <button onClick={() => setView("rewards")} style={{ ...linkBtnStyle, marginBottom: 22 }}>
-          ✏️ 景品を編集する
+        <button onClick={handleRequestEditRewards} style={{ ...linkBtnStyle, marginBottom: 22 }}>
+          ✏️ 景品を編集する（保護者のみ）
         </button>
 
         <SectionTitle>📅 つながっているスケジュール</SectionTitle>
@@ -330,6 +340,100 @@ export default function ProfileRoot() {
           </div>
         </div>
       )}
+
+      {showRewardsConfirm && (
+        <div style={overlayStyle}>
+          <div style={modalCardStyle}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>保護者の方へ</h3>
+            <p style={{ fontSize: 15, color: "#4a6c85", lineHeight: 1.6, marginBottom: 20 }}>
+              ここから先は景品リストを編集できます。保護者の方が操作していますか？
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setShowRewardsConfirm(false)} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
+                やめる
+              </button>
+              <button
+                onClick={() => {
+                  setShowRewardsConfirm(false);
+                  setView("rewards");
+                }}
+                style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}
+              >
+                はい、開けます
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRewardsPin && (
+        <RewardsPinModal
+          correctPin={profile.pin}
+          onSuccess={() => {
+            setShowRewardsPin(false);
+            setView("rewards");
+          }}
+          onCancel={() => setShowRewardsPin(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function RewardsPinModal({ correctPin, onSuccess, onCancel }) {
+  const [value, setValue] = useState("");
+  const [wrong, setWrong] = useState(false);
+
+  function submit() {
+    if (value === correctPin) {
+      onSuccess();
+    } else {
+      setWrong(true);
+      setValue("");
+    }
+  }
+
+  return (
+    <div style={overlayStyle}>
+      <div style={modalCardStyle}>
+        <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>保護者の方へ</h3>
+        <p style={{ fontSize: 15, color: "#4a6c85", lineHeight: 1.6, marginBottom: 14 }}>
+          景品リストを編集するには、暗証番号を入力してください。
+        </p>
+        <input
+          type="password"
+          inputMode="numeric"
+          autoFocus
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value.replace(/[^0-9]/g, "").slice(0, 6));
+            setWrong(false);
+          }}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="••••"
+          style={{
+            width: "100%",
+            padding: "12px 14px",
+            borderRadius: 12,
+            border: wrong ? "2px solid #E0526B" : "2px solid #BFE3F0",
+            fontSize: 20,
+            textAlign: "center",
+            letterSpacing: 6,
+            fontFamily: "inherit",
+            marginBottom: wrong ? 8 : 18,
+            boxSizing: "border-box",
+          }}
+        />
+        {wrong && <p style={{ color: "#E0526B", fontSize: 13, marginTop: 0, marginBottom: 14 }}>暗証番号がちがいます</p>}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onCancel} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
+            やめる
+          </button>
+          <button onClick={submit} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
+            開ける
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -420,6 +524,7 @@ const modalBtnStyle = {
 function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete }) {
   const [name, setName] = useState(initial.name || "");
   const [birthdate, setBirthdate] = useState(initial.birthdate || "");
+  const [pin, setPin] = useState(initial.pin || "");
 
   return (
     <div style={{ minHeight: "100vh", background: bg, padding: "28px 16px", display: "flex", justifyContent: "center" }}>
@@ -452,8 +557,24 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
           style={{ width: "100%", padding: "11px 12px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 15, fontFamily: "inherit", marginBottom: 22, boxSizing: "border-box" }}
         />
 
+        <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>
+          保護者用 暗証番号（任意・数字4〜6桁）
+        </label>
+        <input
+          type="password"
+          inputMode="numeric"
+          autoComplete="off"
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
+          placeholder="設定しない場合は空欄でOK"
+          style={{ width: "100%", padding: "11px 12px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 15, fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" }}
+        />
+        <p style={{ color: "#7c98aa", fontSize: 12.5, marginTop: 0, marginBottom: 22, lineHeight: 1.5 }}>
+          設定すると、「景品を編集する」を開くときにこの番号の入力が必要になります（お子さんが誤って変更しないためです）。
+        </p>
+
         <button
-          onClick={() => name.trim() && onSave(name, birthdate)}
+          onClick={() => name.trim() && onSave(name, birthdate, pin)}
           disabled={!name.trim()}
           style={{
             width: "100%",
