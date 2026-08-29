@@ -335,6 +335,7 @@ export default function KidsScheduleApp() {
   const [notes, setNotes] = useState({});
   const [achievements, setAchievements] = useState({});
   const [noteModalDate, setNoteModalDate] = useState(null);
+  const [showRecordsList, setShowRecordsList] = useState(false);
   const [locked, setLocked] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
@@ -626,6 +627,21 @@ export default function KidsScheduleApp() {
     });
   }
 
+  function buildRecordsList() {
+    const entries = [];
+    for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) {
+      const dKey = dateKey(d);
+      const note = notes[dKey];
+      const achv = achievements[dKey];
+      const hasAchv = achv && Object.keys(achv).length > 0;
+      if (note || hasAchv) {
+        entries.push({ date: new Date(d), dKey, note, achv: hasAchv ? achv : null });
+      }
+    }
+    entries.sort((a, b) => b.date.getTime() - a.date.getTime());
+    return entries;
+  }
+
   function handleOpenNote(date) {
     setNoteModalDate(date);
   }
@@ -788,6 +804,7 @@ export default function KidsScheduleApp() {
           notes={notes}
           achievements={achievements}
           onOpenNote={handleOpenNote}
+          onOpenRecords={() => setShowRecordsList(true)}
           daySubjectsFor={daySubjectsFor}
           isStamped={isStamped}
           countFor={countFor}
@@ -842,6 +859,14 @@ export default function KidsScheduleApp() {
           isMapTheme={getTheme(config.theme).isMapTheme}
           onSave={handleSaveNote}
           onClose={handleCloseNote}
+        />
+      )}
+
+      {showRecordsList && (
+        <RecordsListModal
+          entries={buildRecordsList()}
+          subjects={config.subjects}
+          onClose={() => setShowRecordsList(false)}
         />
       )}
 
@@ -1211,6 +1236,7 @@ function MainScreen({
   notes,
   achievements,
   onOpenNote,
+  onOpenRecords,
 }) {
   const pct = stats.need > 0 ? Math.round((stats.done / stats.need) * 100) : 0;
   const pearlCount = 10;
@@ -1287,6 +1313,17 @@ function MainScreen({
           </div>
         </div>
         <div style={styles.editDeleteRow}>
+          <button
+            style={{
+              ...styles.editBtnSmall,
+              background: theme.overlayBg,
+              borderColor: theme.headerTextColor,
+              color: theme.headerTextColor,
+            }}
+            onClick={onOpenRecords}
+          >
+            📋 記録を見る
+          </button>
           <button
             style={{
               ...styles.editBtnSmall,
@@ -1858,6 +1895,52 @@ function NoteModal({ date, initialText, initialAchievements, subjects, isMapThem
   );
 }
 
+function RecordsListModal({ entries, subjects, onClose }) {
+  return (
+    <div style={styles.modalOverlay}>
+      <div style={styles.recordsListCard}>
+        <h3 style={styles.modalTitle}>📋 きろく一覧</h3>
+        {entries.length === 0 ? (
+          <p style={styles.modalMsg}>まだ記録がありません。日付の「📝メモ」から書いてみよう！</p>
+        ) : (
+          <div style={styles.recordsListScroll}>
+            {entries.map((e) => {
+              const achvParts = [];
+              if (e.achv) {
+                Object.entries(e.achv).forEach(([subjId, vals]) => {
+                  const s = subjects.find((x) => x.id === subjId);
+                  if (!s) return;
+                  const parts = [];
+                  if (vals.minutes) parts.push(`⏱${vals.minutes}分`);
+                  if (vals.pages) parts.push(`📖${vals.pages}ページ`);
+                  if (vals.problems) parts.push(`✏️${vals.problems}問`);
+                  if (parts.length > 0) achvParts.push({ name: s.name, color: s.color, text: parts.join(" ") });
+                });
+              }
+              return (
+                <div key={e.dKey} style={styles.recordEntryCard}>
+                  <div style={styles.recordEntryDate}>
+                    {e.date.getMonth() + 1}月{e.date.getDate()}日
+                  </div>
+                  {achvParts.map((a) => (
+                    <div key={a.name} style={{ ...styles.recordEntryAchv, color: a.color }}>
+                      {a.name}：{a.text}
+                    </div>
+                  ))}
+                  {e.note && <div style={styles.recordEntryNote}>{e.note}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <button style={{ ...styles.modalConfirm, width: "100%" }} onClick={onClose}>
+          とじる
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function DayCelebration({ onClose, theme }) {
   useEffect(() => {
     const t = setTimeout(onClose, 1800);
@@ -1993,12 +2076,13 @@ function DragonCornerArt() {
         alt=""
         style={{
           position: "absolute",
-          top: -6,
-          left: -14,
-          width: 150,
-          opacity: 0.92,
+          top: -4,
+          left: -10,
+          width: 110,
+          opacity: 0.9,
           filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.35))",
           pointerEvents: "none",
+          zIndex: 0,
         }}
       />
       {/* compass rose, top right */}
@@ -2131,10 +2215,10 @@ const styles = {
 
   mainWrap: { position: "relative", background: oceanBg, minHeight: 560, overflow: "hidden", paddingBottom: 30 },
   header: { position: "relative", padding: "24px 18px 16px", zIndex: 2 },
-  headerTop: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 },
-  titleBanner: { background: "#fff", borderRadius: 999, padding: "10px 22px", boxShadow: "0 8px 18px rgba(11,61,98,0.3)", maxWidth: "78%" },
+  headerTop: { display: "flex", alignItems: "flex-start", justifyContent: "center", gap: 10, position: "relative" },
+  titleBanner: { background: "#fff", borderRadius: 999, padding: "10px 22px", boxShadow: "0 8px 18px rgba(11,61,98,0.3)", maxWidth: "72%", position: "relative", zIndex: 1 },
   titleText: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 24, fontWeight: 700 },
-  headerBtns: { display: "flex", gap: 8, flexShrink: 0 },
+  headerBtns: { display: "flex", gap: 8, flexShrink: 0, position: "absolute", top: 0, right: 0 },
   iconBtn: { width: 46, height: 46, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.3)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", backdropFilter: "blur(4px)" },
   editDeleteRow: { display: "flex", gap: 8, marginTop: 10, justifyContent: "center", flexWrap: "wrap" },
   editBtnSmall: { border: "2px solid rgba(255,255,255,0.6)", background: "rgba(255,255,255,0.15)", color: "#fff", borderRadius: 999, padding: "6px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },
@@ -2218,6 +2302,12 @@ const styles = {
   achievementFieldsRow: { display: "flex", flexWrap: "wrap", gap: 10 },
   achievementField: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13.5, fontWeight: 700, color: "#5C3A21" },
   achievementInput: { width: 56, padding: "5px 6px", borderRadius: 8, border: "2px solid #E0C68A", fontSize: 14, fontFamily: "inherit", textAlign: "center" },
+  recordsListCard: { background: "#fff", borderRadius: 20, padding: 24, maxWidth: 420, width: "100%", textAlign: "left", animation: "popIn 0.25s ease-out", maxHeight: "82vh", display: "flex", flexDirection: "column" },
+  recordsListScroll: { overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, marginBottom: 16, paddingRight: 2 },
+  recordEntryCard: { background: "#FFF7EC", border: "2px solid #F0DBA6", borderRadius: 14, padding: "10px 14px" },
+  recordEntryDate: { fontSize: 14, fontWeight: 900, color: "#8B5E34", marginBottom: 4 },
+  recordEntryAchv: { fontSize: 13.5, fontWeight: 800, marginBottom: 2 },
+  recordEntryNote: { fontSize: 14, color: "#4a6c85", lineHeight: 1.6, marginTop: 4, whiteSpace: "pre-wrap" },
   modalBtns: { display: "flex", gap: 10 },
   modalCancel: { flex: 1, padding: "12px 0", borderRadius: 12, border: "2px solid #d7ecf3", background: "#fff", color: "#5a7d94", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
   modalConfirm: { flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
