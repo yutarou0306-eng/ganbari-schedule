@@ -277,6 +277,18 @@ function describeFrequency(subject) {
   return "毎日";
 }
 
+function describeTargets(subject) {
+  const parts = [];
+  if (subject.measureTime) parts.push(`⏱${subject.targetMinutes || 30}分`);
+  if (subject.measurePages) parts.push(`📖${subject.targetPages || 5}ページ`);
+  if (subject.measureProblems) parts.push(`✏️${subject.targetProblems || 10}問`);
+  return parts;
+}
+
+function subjectIsMeasurable(subject) {
+  return !!(subject.measureTime || subject.measurePages || subject.measureProblems);
+}
+
 const DURATION_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
 
 function defaultEndDate() {
@@ -293,6 +305,12 @@ const DEFAULT_SUBJECT = (palette) => ({
   intervalDays: 2,
   weekdays: [0, 1, 2, 3, 4],
   durationMinutes: 10,
+  measureTime: true,
+  targetMinutes: 30,
+  measurePages: false,
+  targetPages: 5,
+  measureProblems: false,
+  targetProblems: 10,
 });
 
 function freshConfig() {
@@ -315,6 +333,7 @@ export default function KidsScheduleApp() {
   const [recoveries, setRecoveries] = useState({});
   const [funStamps, setFunStamps] = useState({});
   const [notes, setNotes] = useState({});
+  const [achievements, setAchievements] = useState({});
   const [noteModalDate, setNoteModalDate] = useState(null);
   const [locked, setLocked] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -340,6 +359,7 @@ export default function KidsScheduleApp() {
             setRecoveries(data.recoveries || {});
             setFunStamps(data.funStamps || {});
             setNotes(data.notes || {});
+            setAchievements(data.achievements || {});
             // A "?edit=1" URL flag (used by the top-page's edit button) jumps
             // straight into the setup/edit screen instead of the main view.
             let wantsEdit = false;
@@ -380,11 +400,15 @@ export default function KidsScheduleApp() {
     }
     const t = setTimeout(async () => {
       try {
-        await window.storage.set(STORAGE_KEY, JSON.stringify({ config, completions, recoveries, funStamps, notes }), false);
+        await window.storage.set(
+          STORAGE_KEY,
+          JSON.stringify({ config, completions, recoveries, funStamps, notes, achievements }),
+          false
+        );
       } catch (e) {}
     }, 350);
     return () => clearTimeout(t);
-  }, [config, completions, recoveries, funStamps, notes, loaded]);
+  }, [config, completions, recoveries, funStamps, notes, achievements, loaded]);
 
   // iOS home-screen apps often get suspended instead of fully closed, and
   // reopening them can show whatever was last in memory instead of fetching
@@ -408,6 +432,7 @@ export default function KidsScheduleApp() {
             setRecoveries(data.recoveries || {});
             setFunStamps(data.funStamps || {});
             setNotes(data.notes || {});
+            setAchievements(data.achievements || {});
           }
         } catch (e) {}
       })();
@@ -567,6 +592,40 @@ export default function KidsScheduleApp() {
     });
   }
 
+  // Lets an unlocked (parent-confirmed) view mark or unmark a genuine
+  // completion on a PAST day — for backfilling a forgotten stamp. Only
+  // ever called while unlocked; never touches today (that uses the normal
+  // flow) or future days.
+  function handleTogglePastStamp(date, subjId) {
+    if (locked) return;
+    const dKey = dateKey(date);
+    if (dKey >= todayKey) return;
+
+    setCompletions((prev) => {
+      const day = { ...(prev[dKey] || {}) };
+      const cur = day[subjId] || 0;
+      if (cur >= 1) delete day[subjId];
+      else day[subjId] = 1;
+      const updated = { ...prev, [dKey]: day };
+
+      const need = daySubjectsFor(date).map((s) => s.id);
+      const allDone = need.length > 0 && need.every((id) => (day[id] || 0) >= 1);
+      if (allDone) setTimeout(() => setCelebrateDay(dKey), 50);
+
+      const allDays = [];
+      for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) allDays.push(d);
+      const scheduleAllDone = allDays.every((d) => {
+        const req = daySubjectsFor(d).map((s) => s.id);
+        if (req.length === 0) return true;
+        const rec = updated[dateKey(d)] || {};
+        return req.every((id) => (rec[id] || 0) >= 1);
+      });
+      if (scheduleAllDone) setTimeout(() => setCelebrateSchedule(true), 400);
+
+      return updated;
+    });
+  }
+
   function handleOpenNote(date) {
     setNoteModalDate(date);
   }
@@ -575,7 +634,7 @@ export default function KidsScheduleApp() {
     setNoteModalDate(null);
   }
 
-  function handleSaveNote(text) {
+  function handleSaveNote(text, achv) {
     if (!noteModalDate) return;
     const dKey = dateKey(noteModalDate);
     setNotes((prev) => {
@@ -584,6 +643,22 @@ export default function KidsScheduleApp() {
       else delete next[dKey];
       return next;
     });
+    if (achv && Object.keys(achv).length > 0) {
+      setAchievements((prev) => {
+        // drop subjects whose fields are all empty so we don't store clutter
+        const cleaned = {};
+        Object.entries(achv).forEach(([subjId, vals]) => {
+          const hasAny = ["minutes", "pages", "problems"].some(
+            (k) => vals[k] !== undefined && vals[k] !== "" && vals[k] !== null
+          );
+          if (hasAny) cleaned[subjId] = vals;
+        });
+        const next = { ...prev };
+        if (Object.keys(cleaned).length > 0) next[dKey] = cleaned;
+        else delete next[dKey];
+        return next;
+      });
+    }
     setNoteModalDate(null);
   }
 
@@ -709,7 +784,9 @@ export default function KidsScheduleApp() {
           onTapStamp={handleTapStamp}
           onClearStamp={handleClearStamp}
           onToggleFunStamp={handleToggleFunStamp}
+          onTogglePastStamp={handleTogglePastStamp}
           notes={notes}
+          achievements={achievements}
           onOpenNote={handleOpenNote}
           daySubjectsFor={daySubjectsFor}
           isStamped={isStamped}
@@ -760,6 +837,9 @@ export default function KidsScheduleApp() {
         <NoteModal
           date={noteModalDate}
           initialText={notes[dateKey(noteModalDate)] || ""}
+          initialAchievements={achievements[dateKey(noteModalDate)] || {}}
+          subjects={config.subjects}
+          isMapTheme={getTheme(config.theme).isMapTheme}
           onSave={handleSaveNote}
           onClose={handleCloseNote}
         />
@@ -781,7 +861,7 @@ export default function KidsScheduleApp() {
 
 /* ---------------- Setup Screen ---------------- */
 
-function SubjectCard({ subject, onChange, onRemove, canRemove, palette }) {
+function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapTheme }) {
   function set(patch) {
     onChange({ ...subject, ...patch });
   }
@@ -821,20 +901,92 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette }) {
         ))}
       </div>
 
-      <div style={styles.durationRow}>
-        <span style={{ fontSize: 13, color: "#4a6c85", fontWeight: 700 }}>取り組む時間</span>
-        <select
-          value={subject.durationMinutes ?? 10}
-          onChange={(e) => set({ durationMinutes: Number(e.target.value) })}
-          style={styles.durationSelect}
-        >
-          {DURATION_OPTIONS.map((m) => (
-            <option key={m} value={m}>
-              {m}分
-            </option>
-          ))}
-        </select>
-      </div>
+      {isMapTheme ? (
+        <div style={styles.measureSection}>
+          <span style={styles.measureSectionLabel}>目標（複数選べます）</span>
+
+          <div style={styles.measureRow}>
+            <button
+              onClick={() => set({ measureTime: !subject.measureTime })}
+              style={{ ...styles.measureToggle, ...(subject.measureTime ? styles.measureToggleOn : {}) }}
+            >
+              ⏱ 時間
+            </button>
+            {subject.measureTime && (
+              <>
+                <input
+                  type="number"
+                  min={1}
+                  max={300}
+                  value={subject.targetMinutes ?? 30}
+                  onChange={(e) => set({ targetMinutes: Math.max(1, Number(e.target.value) || 1) })}
+                  style={styles.measureInput}
+                />
+                <span style={styles.measureUnit}>分</span>
+              </>
+            )}
+          </div>
+
+          <div style={styles.measureRow}>
+            <button
+              onClick={() => set({ measurePages: !subject.measurePages })}
+              style={{ ...styles.measureToggle, ...(subject.measurePages ? styles.measureToggleOn : {}) }}
+            >
+              📖 ページ数
+            </button>
+            {subject.measurePages && (
+              <>
+                <input
+                  type="number"
+                  min={1}
+                  max={999}
+                  value={subject.targetPages ?? 5}
+                  onChange={(e) => set({ targetPages: Math.max(1, Number(e.target.value) || 1) })}
+                  style={styles.measureInput}
+                />
+                <span style={styles.measureUnit}>ページ</span>
+              </>
+            )}
+          </div>
+
+          <div style={styles.measureRow}>
+            <button
+              onClick={() => set({ measureProblems: !subject.measureProblems })}
+              style={{ ...styles.measureToggle, ...(subject.measureProblems ? styles.measureToggleOn : {}) }}
+            >
+              ✏️ 問題数
+            </button>
+            {subject.measureProblems && (
+              <>
+                <input
+                  type="number"
+                  min={1}
+                  max={999}
+                  value={subject.targetProblems ?? 10}
+                  onChange={(e) => set({ targetProblems: Math.max(1, Number(e.target.value) || 1) })}
+                  style={styles.measureInput}
+                />
+                <span style={styles.measureUnit}>問</span>
+              </>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div style={styles.durationRow}>
+          <span style={{ fontSize: 13, color: "#4a6c85", fontWeight: 700 }}>取り組む時間</span>
+          <select
+            value={subject.durationMinutes ?? 10}
+            onChange={(e) => set({ durationMinutes: Number(e.target.value) })}
+            style={styles.durationSelect}
+          >
+            {DURATION_OPTIONS.map((m) => (
+              <option key={m} value={m}>
+                {m}分
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div style={styles.freqRow}>
         {[
@@ -1010,6 +1162,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
               onRemove={() => removeSubject(s.id)}
               canRemove={subjects.length > 1}
               palette={palette}
+              isMapTheme={themeObj.isMapTheme}
             />
           ))}
         </div>
@@ -1044,6 +1197,7 @@ function MainScreen({
   onTapStamp,
   onClearStamp,
   onToggleFunStamp,
+  onTogglePastStamp,
   daySubjectsFor,
   isStamped,
   countFor,
@@ -1055,6 +1209,7 @@ function MainScreen({
   todayStats,
   streak,
   notes,
+  achievements,
   onOpenNote,
 }) {
   const pct = stats.need > 0 ? Math.round((stats.done / stats.need) * 100) : 0;
@@ -1156,7 +1311,9 @@ function MainScreen({
           </button>
         </div>
         <div style={{ ...styles.lockNote, color: theme.headerTextColor }}>
-          {locked ? "🔒 本スタンプは保護者の方がロックを開けてから押せます" : "🔓 本スタンプが押せます（3分後に自動ロック）"}
+          {locked
+            ? "🔒 本スタンプは保護者の方がロックを開けてから押せます"
+            : "🔓 本スタンプが押せます。過去の押し忘れもタップで記録できます（3分後に自動ロック）"}
         </div>
 
         <div style={styles.mascotRow}>
@@ -1225,7 +1382,9 @@ function MainScreen({
               </div>
               <div style={styles.subjectSpotlightTextWrap}>
                 <div style={styles.subjectSpotlightName}>{s.name}</div>
-                <div style={styles.subjectSpotlightDuration}>⏱ {s.durationMinutes || 10}分</div>
+                <div style={styles.subjectSpotlightDuration}>
+                  {theme.isMapTheme ? describeTargets(s).join(" ") || "目標未設定" : `⏱ ${s.durationMinutes || 10}分`}
+                </div>
                 <div style={styles.subjectSpotlightFreq}>📅 {describeFrequency(s)}</div>
               </div>
               {backlog > 0 && <span style={styles.backlogBadgeBig}>🔁 残り{backlog}</span>}
@@ -1286,9 +1445,9 @@ function MainScreen({
                       ...styles.memoBtn,
                       ...(theme.isMapTheme
                         ? {
-                            background: notes[dKey] ? "#F4C95D" : "rgba(139,94,52,0.12)",
-                            border: notes[dKey] ? "1px solid #8B5E34" : "1px dashed #C4A876",
-                            color: notes[dKey] ? "#5C3A21" : "#8B6B47",
+                            background: notes[dKey] || achievements[dKey] ? "#F4C95D" : "rgba(139,94,52,0.12)",
+                            border: notes[dKey] || achievements[dKey] ? "1px solid #8B5E34" : "1px dashed #C4A876",
+                            color: notes[dKey] || achievements[dKey] ? "#5C3A21" : "#8B6B47",
                           }
                         : notes[dKey]
                         ? styles.memoBtnFilled
@@ -1326,6 +1485,7 @@ function MainScreen({
                         );
                       }
                       const isPastMiss = dKey < todayKey && count === 0;
+                      const isFuture = dKey > todayKey;
                       return (
                         <div key={s.id} style={styles.stampSlot}>
                           <HistoryCell
@@ -1339,6 +1499,8 @@ function MainScreen({
                             withFace={theme.withFace}
                             useDragonStamp={theme.isMapTheme}
                             onToggleFun={() => onToggleFunStamp(d, s.id)}
+                            locked={locked || isFuture}
+                            onTogglePast={() => onTogglePastStamp(d, s.id)}
                           />
                         </div>
                       );
@@ -1354,10 +1516,31 @@ function MainScreen({
   );
 }
 
-function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun, shapes, withFace, useDragonStamp }) {
+function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun, onTogglePast, locked, shapes, withFace, useDragonStamp }) {
   const real = count >= 1;
+  const icon = useDragonStamp ? (
+    <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
+  ) : (
+    <StampIcon index={iconIndex} color={color} size="62%" shapes={shapes} withFace={withFace} />
+  );
+
   if (real) {
-    // A genuine past completion — shown vivid and solid, not editable here.
+    if (!locked) {
+      // Parent has unlocked: this real stamp (even a backfilled one) can be undone.
+      return (
+        <div style={styles.stampCellWrap}>
+          <button
+            onClick={onTogglePast}
+            style={{ ...styles.stampCircle, borderColor: color, borderStyle: "solid", background: color + "22" }}
+            aria-label={`${label} の記録を取り消す`}
+          >
+            {icon}
+            {count === 2 && <span style={styles.x2Badge}>×2</span>}
+          </button>
+        </div>
+      );
+    }
+    // Locked (everyday/kid view) — a genuine past completion, shown vivid, not editable.
     return (
       <div
         style={{
@@ -1368,17 +1551,32 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
           background: color + "22",
         }}
       >
-        {useDragonStamp ? (
-          <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
-        ) : (
-          <StampIcon index={iconIndex} color={color} size="62%" shapes={shapes} withFace={withFace} />
-        )}
+        {icon}
         {count === 2 && <span style={styles.x2Badge}>×2</span>}
       </div>
     );
   }
-  // No real record here — a free, playful "practice" stamp the child can pop
-  // on and off. Always tappable, always pale, never affects real progress.
+
+  if (!locked) {
+    // Parent has unlocked this past day: tap to backfill a forgotten stamp.
+    return (
+      <button
+        onClick={onTogglePast}
+        style={{
+          ...styles.stampCircle,
+          borderColor: missed ? "#F4C95D" : "#dbe8ee",
+          background: "#fff",
+        }}
+        aria-label={`${label} を記録する（押し忘れの記録）`}
+      >
+        <span style={styles.backfillHint}>＋</span>
+      </button>
+    );
+  }
+
+  // No real record here, still locked — a free, playful "practice" stamp the
+  // child can pop on and off. Always tappable, always pale, never affects
+  // real progress.
   return (
     <button
       onClick={onToggleFun}
@@ -1567,27 +1765,91 @@ function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
   );
 }
 
-function NoteModal({ date, initialText, onSave, onClose }) {
+function NoteModal({ date, initialText, initialAchievements, subjects, isMapTheme, onSave, onClose }) {
   const [text, setText] = useState(initialText || "");
+  const [achv, setAchv] = useState(initialAchievements || {});
   const dLabel = `${date.getMonth() + 1}月${date.getDate()}日`;
+
+  function setField(subjId, field, value) {
+    setAchv((prev) => ({ ...prev, [subjId]: { ...(prev[subjId] || {}), [field]: value } }));
+  }
+
+  const measurableSubjects = isMapTheme ? (subjects || []).filter(subjectIsMeasurable) : [];
+
   return (
     <div style={styles.modalOverlay}>
       <div style={styles.modalCard}>
         <h3 style={styles.modalTitle}>📝 {dLabel} の記録</h3>
+
+        {measurableSubjects.length > 0 && (
+          <div style={styles.achievementSection}>
+            <p style={styles.achievementSectionLabel}>実際にどれだけできた？</p>
+            {measurableSubjects.map((s) => (
+              <div key={s.id} style={styles.achievementSubjectRow}>
+                <div style={{ ...styles.achievementSubjectName, color: s.color }}>{s.name}</div>
+                <div style={styles.achievementFieldsRow}>
+                  {s.measureTime && (
+                    <label style={styles.achievementField}>
+                      ⏱
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder={String(s.targetMinutes || 30)}
+                        value={achv[s.id]?.minutes ?? ""}
+                        onChange={(e) => setField(s.id, "minutes", e.target.value)}
+                        style={styles.achievementInput}
+                      />
+                      分
+                    </label>
+                  )}
+                  {s.measurePages && (
+                    <label style={styles.achievementField}>
+                      📖
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder={String(s.targetPages || 5)}
+                        value={achv[s.id]?.pages ?? ""}
+                        onChange={(e) => setField(s.id, "pages", e.target.value)}
+                        style={styles.achievementInput}
+                      />
+                      ページ
+                    </label>
+                  )}
+                  {s.measureProblems && (
+                    <label style={styles.achievementField}>
+                      ✏️
+                      <input
+                        type="number"
+                        min={0}
+                        placeholder={String(s.targetProblems || 10)}
+                        value={achv[s.id]?.problems ?? ""}
+                        onChange={(e) => setField(s.id, "problems", e.target.value)}
+                        style={styles.achievementInput}
+                      />
+                      問
+                    </label>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         <p style={styles.modalMsg}>やったこと・感想を書いておこう</p>
         <textarea
-          autoFocus
+          autoFocus={measurableSubjects.length === 0}
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="例）今日はスラスラ弾けた！楽しかった。"
           style={styles.noteTextarea}
-          rows={5}
+          rows={4}
         />
         <div style={styles.modalBtns}>
           <button style={styles.modalCancel} onClick={onClose}>
             とじる
           </button>
-          <button style={styles.modalConfirm} onClick={() => onSave(text)}>
+          <button style={styles.modalConfirm} onClick={() => onSave(text, achv)}>
             保存する
           </button>
         </div>
@@ -1852,6 +2114,13 @@ const styles = {
   intervalRow: { display: "flex", alignItems: "center", gap: 8 },
   durationRow: { display: "flex", alignItems: "center", gap: 10, marginBottom: 10 },
   durationSelect: { flex: 1, maxWidth: 180, padding: "12px 12px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 19, fontFamily: "inherit", background: "#fff", color: "#0B3D62", fontWeight: 700 },
+  measureSection: { marginBottom: 12, display: "flex", flexDirection: "column", gap: 8 },
+  measureSectionLabel: { fontSize: 13, color: "#4a6c85", fontWeight: 700 },
+  measureRow: { display: "flex", alignItems: "center", gap: 8 },
+  measureToggle: { border: "2px solid #C89B3C", borderRadius: 999, padding: "7px 14px", fontSize: 14.5, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", background: "#fff", color: "#8B5E34", minWidth: 108 },
+  measureToggleOn: { background: "#8B5E34", color: "#fff" },
+  measureInput: { width: 72, padding: "8px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 17, fontFamily: "inherit", textAlign: "center" },
+  measureUnit: { fontSize: 14, fontWeight: 700, color: "#4a6c85" },
   intervalInput: { width: 68, padding: "8px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 18, fontFamily: "inherit", textAlign: "center" },
   weekdayPicker: { display: "flex", gap: 6, flexWrap: "wrap" },
   weekdayToggle: { width: 42, height: 42, borderRadius: 10, border: "2px solid", cursor: "pointer", fontSize: 16, color: "#0B3D62", fontFamily: "inherit" },
@@ -1942,6 +2211,13 @@ const styles = {
   modalTitle: { margin: "0 0 8px", fontSize: 22, color: "#0B3D62" },
   modalMsg: { fontSize: 17, color: "#4a6c85", lineHeight: 1.6, marginBottom: 18 },
   noteTextarea: { width: "100%", padding: "12px 14px", borderRadius: 14, border: "2px solid #BFE3F0", fontSize: 16, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff", resize: "vertical", marginBottom: 18, color: "#0B3D62" },
+  achievementSection: { textAlign: "left", background: "#FFF7EC", border: "2px solid #F0DBA6", borderRadius: 14, padding: 12, marginBottom: 16 },
+  achievementSectionLabel: { fontSize: 13, fontWeight: 800, color: "#8B5E34", margin: "0 0 8px" },
+  achievementSubjectRow: { marginBottom: 8 },
+  achievementSubjectName: { fontWeight: 900, fontSize: 14.5, marginBottom: 4 },
+  achievementFieldsRow: { display: "flex", flexWrap: "wrap", gap: 10 },
+  achievementField: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13.5, fontWeight: 700, color: "#5C3A21" },
+  achievementInput: { width: 56, padding: "5px 6px", borderRadius: 8, border: "2px solid #E0C68A", fontSize: 14, fontFamily: "inherit", textAlign: "center" },
   modalBtns: { display: "flex", gap: 10 },
   modalCancel: { flex: 1, padding: "12px 0", borderRadius: 12, border: "2px solid #d7ecf3", background: "#fff", color: "#5a7d94", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
   modalConfirm: { flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
@@ -1955,6 +2231,7 @@ const styles = {
   chestEmoji: { fontSize: 56, marginBottom: 6 },
   celebrateDragonImg: { width: 120, height: 120, borderRadius: "50%", marginBottom: 10, boxShadow: "0 8px 20px rgba(0,0,0,0.35)" },
   dragonStampImg: { width: "82%", height: "82%", borderRadius: "50%", objectFit: "cover" },
+  backfillHint: { fontSize: 20, fontWeight: 900, color: "#c9d8e0" },
   weekCelebrateTitle: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 27, margin: "4px 0" },
   weekCelebrateSub: { fontSize: 17, color: "#5a7d94", marginBottom: 16, lineHeight: 1.6 },
   bigStamp: { display: "inline-block", border: "4px solid #FF8FA3", color: "#FF8FA3", fontWeight: 900, fontSize: 26, padding: "10px 26px", borderRadius: 14, transform: "rotate(-8deg)", marginBottom: 18, fontFamily: "'Kaisei Decol', serif" },
