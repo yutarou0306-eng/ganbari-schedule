@@ -175,6 +175,8 @@ export default function TopPage() {
         setFoundSchedules([]);
         return;
       }
+      list.forEach((item) => upsertKnownSchedule(item));
+      setSchedules(getKnownSchedules());
       setFoundSchedules(list);
       setFindSchedStatus("found");
     } catch (e) {
@@ -336,81 +338,6 @@ export default function TopPage() {
           </div>
         )}
 
-        <div
-          style={{
-            background: "rgba(255,255,255,0.9)",
-            borderRadius: 16,
-            padding: 16,
-            marginBottom: 18,
-          }}
-        >
-          <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 14, marginBottom: 10 }}>
-            🔍 別の端末で作ったスタンプ帳をさがす
-          </div>
-          <input
-            value={findName}
-            onChange={(e) => {
-              setFindName(e.target.value);
-              setFindStatus("idle");
-            }}
-            placeholder="なまえ（例：美月）"
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              borderRadius: 10,
-              border: "2px solid #BFE3F0",
-              fontSize: 14,
-              fontFamily: "inherit",
-              marginBottom: 8,
-              boxSizing: "border-box",
-            }}
-          />
-          <input
-            type="date"
-            value={findBirthdate}
-            onChange={(e) => {
-              setFindBirthdate(e.target.value);
-              setFindStatus("idle");
-            }}
-            style={{
-              width: "100%",
-              padding: "9px 10px",
-              borderRadius: 10,
-              border: "2px solid #BFE3F0",
-              fontSize: 13.5,
-              fontFamily: "inherit",
-              marginBottom: 10,
-              boxSizing: "border-box",
-            }}
-          />
-          <button
-            onClick={handleFindProfile}
-            disabled={!findName.trim() || findStatus === "searching"}
-            style={{
-              width: "100%",
-              border: "none",
-              borderRadius: 12,
-              padding: "11px 0",
-              fontWeight: 800,
-              fontSize: 14,
-              color: "#fff",
-              cursor: findName.trim() ? "pointer" : "default",
-              fontFamily: "inherit",
-              background: findName.trim() ? "#14588C" : "#c7d8e0",
-            }}
-          >
-            {findStatus === "searching" ? "さがしています…" : "さがす"}
-          </button>
-          {findStatus === "notfound" && (
-            <p style={{ color: "#E0526B", fontSize: 13, marginTop: 8, marginBottom: 0 }}>
-              見つかりませんでした。なまえ・生年月日が正しいか確認してください。
-            </p>
-          )}
-          <p style={{ color: "#7c98aa", fontSize: 11.5, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
-            ※ かんたんな確認のためのものなので、パスワードのような強いセキュリティではありません。
-          </p>
-        </div>
-
         <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
           {[
             ["create", "① 作る"],
@@ -491,12 +418,96 @@ export default function TopPage() {
           </div>
         )}
 
+        {tab === "create" && (
+          <div
+            style={{
+              background: "rgba(255,255,255,0.9)",
+              borderRadius: 16,
+              padding: 16,
+              marginTop: 16,
+            }}
+          >
+            <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 14, marginBottom: 10 }}>🔍 スタンプ帳を探す</div>
+            <input
+              value={findName}
+              onChange={(e) => {
+                setFindName(e.target.value);
+                setFindStatus("idle");
+              }}
+              placeholder="なまえ（例：美月）"
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: 10,
+                border: "2px solid #BFE3F0",
+                fontSize: 14,
+                fontFamily: "inherit",
+                marginBottom: 8,
+                boxSizing: "border-box",
+              }}
+            />
+            <input
+              type="date"
+              value={findBirthdate}
+              onChange={(e) => {
+                setFindBirthdate(e.target.value);
+                setFindStatus("idle");
+              }}
+              style={{
+                width: "100%",
+                padding: "9px 10px",
+                borderRadius: 10,
+                border: "2px solid #BFE3F0",
+                fontSize: 13.5,
+                fontFamily: "inherit",
+                marginBottom: 10,
+                boxSizing: "border-box",
+              }}
+            />
+            <button
+              onClick={handleFindProfile}
+              disabled={!findName.trim() || findStatus === "searching"}
+              style={{
+                width: "100%",
+                border: "none",
+                borderRadius: 12,
+                padding: "11px 0",
+                fontWeight: 800,
+                fontSize: 14,
+                color: "#fff",
+                cursor: findName.trim() ? "pointer" : "default",
+                fontFamily: "inherit",
+                background: findName.trim() ? "#14588C" : "#c7d8e0",
+              }}
+            >
+              {findStatus === "searching" ? "さがしています…" : "さがす"}
+            </button>
+            {findStatus === "notfound" && (
+              <p style={{ color: "#E0526B", fontSize: 13, marginTop: 8, marginBottom: 0 }}>
+                見つかりませんでした。なまえ・生年月日が正しいか確認してください。
+              </p>
+            )}
+            <p style={{ color: "#7c98aa", fontSize: 11.5, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
+              ※ かんたんな確認のためのものなので、パスワードのような強いセキュリティではありません。
+            </p>
+          </div>
+        )}
+
         {tab === "active" && (
           <>
-            <div style={{ background: "rgba(255,255,255,0.9)", borderRadius: 16, padding: 16, marginBottom: 16 }}>
-              <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 14, marginBottom: 10 }}>
-                🔍 なまえ・生年月日でスケジュールをさがす
-              </div>
+            <ScheduleList
+              items={active}
+              emptyText='まだ進行中のスケジュールはありません。「① 作る」から作ってみましょう。'
+              onOpen={handleOpen}
+              onEdit={handleEdit}
+              onDelete={(s) => setDeleteTarget(s)}
+              onShare={handleShare}
+              copiedId={copiedId}
+              refreshing={refreshing}
+            />
+
+            <div style={{ background: "rgba(255,255,255,0.9)", borderRadius: 16, padding: 16, marginTop: 16 }}>
+              <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 14, marginBottom: 10 }}>🔍 スケジュールをさがす</div>
               <input
                 value={findSchedName}
                 onChange={(e) => {
@@ -556,37 +567,15 @@ export default function TopPage() {
                   見つかりませんでした。なまえ・生年月日が正しいか、スタンプ帳にスケジュールが紐づいているか確認してください。
                 </p>
               )}
+              {findSchedStatus === "found" && (
+                <p style={{ color: "#3F8A5C", fontSize: 13, marginTop: 8, marginBottom: 0, fontWeight: 700 }}>
+                  見つかりました！上の一覧に追加されました。
+                </p>
+              )}
               <p style={{ color: "#7c98aa", fontSize: 11.5, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
                 ※「🌟 スタンプ帳」から作った・紐づけたスケジュールのみ見つかります。
               </p>
             </div>
-
-            {findSchedStatus === "found" && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ color: "#fff", fontWeight: 800, fontSize: 13, marginBottom: 8 }}>検索結果</div>
-                <ScheduleList
-                  items={foundSchedules}
-                  emptyText=""
-                  onOpen={handleOpen}
-                  onEdit={handleEdit}
-                  onDelete={(s) => setDeleteTarget(s)}
-                  onShare={handleShare}
-                  copiedId={copiedId}
-                  refreshing={false}
-                />
-              </div>
-            )}
-
-            <ScheduleList
-              items={active}
-              emptyText='まだ進行中のスケジュールはありません。「① 作る」から作ってみましょう。'
-              onOpen={handleOpen}
-              onEdit={handleEdit}
-              onDelete={(s) => setDeleteTarget(s)}
-              onShare={handleShare}
-              copiedId={copiedId}
-              refreshing={refreshing}
-            />
           </>
         )}
 
