@@ -2119,16 +2119,17 @@ function dragonStageImage(pct) {
 function DragonCornerArt({ pct }) {
   return (
     <>
-      {/* dragon illustration, top left — grows through stages with progress.
+      {/* dragon illustration — grows through stages with progress. Sits in
+          the open space on the right, below the LINE/コピー buttons.
           Fixed-size box + object-fit keeps every stage (even the taller egg)
-          the same footprint, tucked inside the frame and below トップへ. */}
+          the same footprint. */}
       <div
         style={{
           position: "absolute",
-          top: 44,
-          left: 6,
-          width: 72,
-          height: 72,
+          top: 108,
+          right: 14,
+          width: 130,
+          height: 130,
           pointerEvents: "none",
           zIndex: 0,
         }}
