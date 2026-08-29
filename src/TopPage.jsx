@@ -218,6 +218,73 @@ export default function TopPage() {
       }}
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap');`}</style>
+
+      <div style={{ position: "fixed", top: 8, right: 8, zIndex: 999, display: "flex", gap: 6 }}>
+        {typeof navigator !== "undefined" && navigator.share ? (
+          <button
+            onClick={handleShareApp}
+            title="アプリを共有（AirDropなど）"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: "50%",
+              border: "none",
+              background: "#5A4FCF",
+              color: "#fff",
+              fontSize: 16,
+              cursor: "pointer",
+              boxShadow: "0 6px 14px rgba(0,0,0,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {appCopied ? "✅" : "📤"}
+          </button>
+        ) : (
+          <button
+            onClick={handleShareApp}
+            title="アプリのリンクをコピー"
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: "50%",
+              border: "none",
+              background: "#14588C",
+              color: "#fff",
+              fontSize: 16,
+              cursor: "pointer",
+              boxShadow: "0 6px 14px rgba(0,0,0,0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {appCopied ? "✅" : "🔗"}
+          </button>
+        )}
+        <button
+          onClick={handleLineShareApp}
+          title="LINEでシェア"
+          style={{
+            width: 38,
+            height: 38,
+            borderRadius: "50%",
+            border: "none",
+            background: "#06C755",
+            color: "#fff",
+            fontSize: 16,
+            cursor: "pointer",
+            boxShadow: "0 6px 14px rgba(0,0,0,0.3)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          💬
+        </button>
+      </div>
+
       <div style={{ maxWidth: 480, margin: "0 auto" }}>
         <h1
           style={{
@@ -231,67 +298,9 @@ export default function TopPage() {
         >
           🐚 がんばりスケジュール
         </h1>
-        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 15, marginBottom: 14 }}>
+        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 15, marginBottom: 22 }}>
           作る・見る・振り返る、全部ここから
         </p>
-
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
-          {typeof navigator !== "undefined" && navigator.share && (
-            <button
-              onClick={handleShareApp}
-              style={{
-                border: "none",
-                borderRadius: 999,
-                padding: "8px 16px",
-                fontSize: 13,
-                fontWeight: 700,
-                fontFamily: "inherit",
-                background: "#5A4FCF",
-                color: "#fff",
-                cursor: "pointer",
-                boxShadow: "0 6px 14px rgba(0,0,0,0.25)",
-              }}
-            >
-              {appCopied ? "✅ コピーしました！" : "📤 アプリを共有（AirDropなど）"}
-            </button>
-          )}
-          <button
-            onClick={handleLineShareApp}
-            style={{
-              border: "none",
-              borderRadius: 999,
-              padding: "8px 16px",
-              fontSize: 13,
-              fontWeight: 700,
-              fontFamily: "inherit",
-              background: "#06C755",
-              color: "#fff",
-              cursor: "pointer",
-              boxShadow: "0 6px 14px rgba(0,0,0,0.25)",
-            }}
-          >
-            LINEでシェア
-          </button>
-          {!(typeof navigator !== "undefined" && navigator.share) && (
-            <button
-              onClick={handleShareApp}
-              style={{
-                border: "none",
-                borderRadius: 999,
-                padding: "8px 16px",
-                fontSize: 13,
-                fontWeight: 700,
-                fontFamily: "inherit",
-                background: "#14588C",
-                color: "#fff",
-                cursor: "pointer",
-                boxShadow: "0 6px 14px rgba(0,0,0,0.25)",
-              }}
-            >
-              {appCopied ? "✅ コピーしました！" : "🔗 アプリのリンクをコピー"}
-            </button>
-          )}
-        </div>
 
         <button
           onClick={handleCreateProfile}
@@ -300,69 +309,91 @@ export default function TopPage() {
             width: "100%",
             border: "none",
             borderRadius: 16,
-            padding: "13px 0",
-            marginBottom: 16,
+            padding: "15px 0",
+            marginBottom: profiles.length > 0 ? 10 : 20,
             fontWeight: 900,
-            fontSize: 14.5,
+            fontSize: 15.5,
             color: "#5C3A21",
             cursor: "pointer",
             fontFamily: "inherit",
             background: "linear-gradient(135deg,#F4E2B8,#E5C878)",
-            boxShadow: "0 8px 18px rgba(0,0,0,0.2)",
+            boxShadow: "0 10px 20px rgba(0,0,0,0.25)",
           }}
         >
           🌟 スタンプ帳をつくる（名前を登録してスタンプを貯める）
         </button>
 
         {profiles.length > 0 && (
-          <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 6 }}>
-            {profiles.map((p) => (
-              <a key={p.id} href={`${window.location.pathname}?profile=${p.id}`} style={{ textDecoration: "none" }}>
-                <div
-                  style={{
-                    background: "rgba(255,255,255,0.9)",
-                    borderRadius: 12,
-                    padding: "10px 14px",
-                    fontWeight: 800,
-                    color: "#5C3A21",
-                    fontSize: 14,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  🌟 {p.name || "スタンプ帳"} のスタンプ帳を開く
-                </div>
-              </a>
-            ))}
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ color: "#EAF7FB", fontSize: 12, fontWeight: 700, marginBottom: 6, paddingLeft: 4 }}>
+              作成ずみのスタンプ帳
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              {profiles.map((p) => (
+                <a key={p.id} href={`${window.location.pathname}?profile=${p.id}`} style={{ textDecoration: "none" }}>
+                  <div
+                    style={{
+                      background: "rgba(255,255,255,0.55)",
+                      border: "1.5px solid rgba(255,255,255,0.7)",
+                      borderRadius: 10,
+                      padding: "7px 12px",
+                      fontWeight: 700,
+                      color: "#fff",
+                      fontSize: 13,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <span style={{ fontSize: 12 }}>🌟</span>
+                    <span style={{ flex: 1 }}>{p.name || "スタンプ帳"}</span>
+                    <span style={{ opacity: 0.8 }}>›</span>
+                  </div>
+                </a>
+              ))}
+            </div>
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-          {[
-            ["create", "① 作る"],
-            ["active", "② 見る"],
-            ["done", "③ 完了"],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              style={{
-                flex: 1,
-                padding: "12px 0",
-                borderRadius: 999,
-                border: "none",
-                fontWeight: 900,
-                fontSize: 16,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                background: tab === key ? "#fff" : "rgba(255,255,255,0.25)",
-                color: tab === key ? "#14588C" : "#fff",
-              }}
-            >
-              {label}
-            </button>
-          ))}
+        <div
+          style={{
+            background: "rgba(11,61,98,0.35)",
+            borderRadius: 20,
+            padding: 10,
+            marginBottom: 18,
+          }}
+        >
+          <div style={{ color: "#EAF7FB", fontSize: 11.5, fontWeight: 700, marginBottom: 6, paddingLeft: 4 }}>
+            メニュー
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {[
+              ["create", "① 作る"],
+              ["active", "② 見る"],
+              ["done", "③ 完了"],
+            ].map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setTab(key)}
+                style={{
+                  flex: 1,
+                  padding: "13px 0",
+                  borderRadius: 14,
+                  border: "none",
+                  fontWeight: 900,
+                  fontSize: 16,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  background: tab === key ? "#fff" : "transparent",
+                  color: tab === key ? "#14588C" : "#EAF7FB",
+                  boxShadow: tab === key ? "0 4px 10px rgba(0,0,0,0.2)" : "none",
+                  transition: "background 0.15s",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {tab === "create" && (
