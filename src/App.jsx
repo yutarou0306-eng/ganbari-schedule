@@ -297,6 +297,14 @@ function formatAchvShort(vals) {
   return parts.join(" ");
 }
 
+// Which vector icon to show as a small "which task is this?" hint on an
+// otherwise-blank stamp. For the boy theme, index 0 is reserved for the
+// dragon completion image, so hints cycle through the other shapes instead.
+function hintIconIndex(idx, useDragonStamp, shapesLength) {
+  if (useDragonStamp && shapesLength > 1) return (idx % (shapesLength - 1)) + 1;
+  return idx % shapesLength;
+}
+
 const DURATION_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
 
 function defaultEndDate() {
@@ -1296,7 +1304,7 @@ function MainScreen({
       }}
     >
       {theme.isMapTheme && <MapDoodles />}
-      <CornerArt theme={theme.key} />
+      <CornerArt theme={theme.key} pct={pct} />
       <header style={styles.header}>
         <div style={styles.headerTop}>
           <div style={styles.titleBanner}>
@@ -1572,6 +1580,12 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
   ) : (
     <StampIcon index={iconIndex} color={color} size="62%" shapes={shapes} withFace={withFace} />
   );
+  const hintIdx = hintIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1);
+  const hintIcon = (
+    <span style={styles.stampHintIcon}>
+      <StampIcon index={hintIdx} color={color} size="34%" shapes={shapes} withFace={false} />
+    </span>
+  );
 
   if (real) {
     if (!locked) {
@@ -1618,14 +1632,15 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
         }}
         aria-label={`${label} を記録する（押し忘れの記録）`}
       >
-        <span style={styles.backfillHint}>＋</span>
+        {hintIcon}
       </button>
     );
   }
 
   // No real record here, still locked — a free, playful "practice" stamp the
   // child can pop on and off. Always tappable, always pale, never affects
-  // real progress.
+  // real progress. Shows a faint hint icon even before tapping, so it's
+  // clear which task this blank stamp belongs to.
   return (
     <button
       onClick={onToggleFun}
@@ -1636,12 +1651,15 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
       }}
       aria-label={`${label} れんしゅうスタンプ`}
     >
-      {fun &&
-        (useDragonStamp ? (
+      {fun ? (
+        useDragonStamp ? (
           <img src="/dragon-stamp.png" alt="" style={{ ...styles.dragonStampImg, opacity: 0.55 }} />
         ) : (
           <StampIcon index={iconIndex} color={color} size="60%" shapes={shapes} withFace={false} />
-        ))}
+        )
+      ) : (
+        hintIcon
+      )}
     </button>
   );
 }
@@ -1726,13 +1744,23 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, wit
         }}
         aria-label={`${label} スタンプ`}
       >
-        {count >= 1 && (
+        {count >= 1 ? (
           <span key={popKey} style={styles.stampPopWrap}>
             {useDragonStamp ? (
               <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
             ) : (
               <StampIcon index={iconIndex} color={color} size="65%" shapes={shapes} withFace={withFace} />
             )}
+          </span>
+        ) : (
+          <span style={styles.stampHintIcon}>
+            <StampIcon
+              index={hintIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1)}
+              color={color}
+              size="34%"
+              shapes={shapes}
+              withFace={false}
+            />
           </span>
         )}
         {count === 2 && <span style={styles.x2Badge}>×2</span>}
@@ -2026,8 +2054,8 @@ function Confetti() {
   );
 }
 
-function CornerArt({ theme }) {
-  if (theme === "boy") return <DragonCornerArt />;
+function CornerArt({ theme, pct }) {
+  if (theme === "boy") return <DragonCornerArt pct={pct} />;
   return (
     <>
       <svg style={{ position: "absolute", top: 6, right: -10, opacity: 0.5 }} width="150" height="90" viewBox="0 0 150 90">
@@ -2079,18 +2107,27 @@ function MapDoodles() {
   );
 }
 
-function DragonCornerArt() {
+function dragonStageImage(pct) {
+  if (pct >= 90) return "/master.png";
+  if (pct >= 70) return "/adult.png";
+  if (pct >= 50) return "/kids.png";
+  if (pct >= 30) return "/infant.png";
+  if (pct >= 10) return "/baby.png";
+  return "/egg.png";
+}
+
+function DragonCornerArt({ pct }) {
   return (
     <>
-      {/* dragon illustration, top left */}
+      {/* dragon illustration, top left — grows through stages with progress, tucked below the fixed トップへ button */}
       <img
-        src="/dragon-full.png"
+        src={dragonStageImage(pct)}
         alt=""
         style={{
           position: "absolute",
-          top: -4,
-          left: -10,
-          width: 110,
+          top: 46,
+          left: -8,
+          width: 100,
           opacity: 0.9,
           filter: "drop-shadow(0 6px 10px rgba(0,0,0,0.35))",
           pointerEvents: "none",
@@ -2335,6 +2372,7 @@ const styles = {
   celebrateDragonImg: { width: 120, height: 120, borderRadius: "50%", marginBottom: 10, boxShadow: "0 8px 20px rgba(0,0,0,0.35)" },
   dragonStampImg: { width: "82%", height: "82%", borderRadius: "50%", objectFit: "cover" },
   backfillHint: { fontSize: 20, fontWeight: 900, color: "#c9d8e0" },
+  stampHintIcon: { display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.55 },
   weekCelebrateTitle: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 27, margin: "4px 0" },
   weekCelebrateSub: { fontSize: 17, color: "#5a7d94", marginBottom: 16, lineHeight: 1.6 },
   bigStamp: { display: "inline-block", border: "4px solid #FF8FA3", color: "#FF8FA3", fontWeight: 900, fontSize: 26, padding: "10px 26px", borderRadius: 14, transform: "rotate(-8deg)", marginBottom: 18, fontFamily: "'Kaisei Decol', serif" },
