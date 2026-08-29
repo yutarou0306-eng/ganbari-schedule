@@ -15,3 +15,18 @@ create policy "allow read/write via anon key"
   for all
   using (true)
   with check (true);
+
+-- 「スタンプ帳（プロフィール）」機能のためのテーブル
+create table profiles (
+  id text primary key,
+  blob jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table profiles enable row level security;
+
+create policy "allow read/write via anon key"
+  on profiles
+  for all
+  using (true)
+  with check (true);
