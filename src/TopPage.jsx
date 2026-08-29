@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { getKnownSchedules, upsertKnownSchedule, removeKnownSchedule } from "./registry.js";
 import { generateScheduleId } from "./scheduleId.js";
 import { generateProfileId } from "./profileId.js";
+import { getKnownProfiles } from "./profileRegistry.js";
 import { supabase } from "./db.js";
 import { computeOverallStats } from "./progress.js";
 
@@ -24,11 +25,19 @@ function formatRange(s, e) {
 export default function TopPage() {
   const [tab, setTab] = useState("create"); // create | active | done
   const [schedules, setSchedules] = useState(getKnownSchedules());
+  const [profiles, setProfiles] = useState(getKnownProfiles());
   const [refreshing, setRefreshing] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, title } | null
   const [deleting, setDeleting] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const [appCopied, setAppCopied] = useState(false);
+  const [findName, setFindName] = useState("");
+  const [findBirthdate, setFindBirthdate] = useState("");
+  const [findStatus, setFindStatus] = useState("idle"); // idle | searching | notfound
+  const [findSchedName, setFindSchedName] = useState("");
+  const [findSchedBirthdate, setFindSchedBirthdate] = useState("");
+  const [findSchedStatus, setFindSchedStatus] = useState("idle"); // idle | searching | notfound | found
+  const [foundSchedules, setFoundSchedules] = useState([]);
 
   // Refresh cached progress numbers from Supabase in one batched query.
   useEffect(() => {
@@ -116,6 +125,62 @@ export default function TopPage() {
   function handleCreateProfile() {
     const id = generateProfileId();
     window.location.href = `${window.location.pathname}?profile=${id}`;
+  }
+
+  async function handleFindProfile() {
+    const name = findName.trim();
+    if (!name) return;
+    setFindStatus("searching");
+    try {
+      let query = supabase.from("profiles").select("id, blob").eq("blob->>name", name);
+      if (findBirthdate) query = query.eq("blob->>birthdate", findBirthdate);
+      const { data, error } = await query;
+      if (error || !data || data.length === 0) {
+        setFindStatus("notfound");
+        return;
+      }
+      window.location.href = `${window.location.pathname}?profile=${data[0].id}`;
+    } catch (e) {
+      setFindStatus("notfound");
+    }
+  }
+
+  async function handleFindSchedules() {
+    const name = findSchedName.trim();
+    if (!name) return;
+    setFindSchedStatus("searching");
+    try {
+      let profQuery = supabase.from("profiles").select("id, blob").eq("blob->>name", name);
+      if (findSchedBirthdate) profQuery = profQuery.eq("blob->>birthdate", findSchedBirthdate);
+      const { data: profData, error: profErr } = await profQuery;
+      if (profErr || !profData || profData.length === 0) {
+        setFindSchedStatus("notfound");
+        setFoundSchedules([]);
+        return;
+      }
+      const profileId = profData[0].id;
+      const { data: schedData } = await supabase
+        .from("schedules")
+        .select("id, blob")
+        .eq("blob->config->>profileId", profileId);
+      const list = (schedData || [])
+        .filter((row) => row.blob && row.blob.config)
+        .map((row) => {
+          const cfg = row.blob.config;
+          const stats = computeOverallStats(cfg, row.blob.completions);
+          return { id: row.id, title: cfg.title, startDate: cfg.startDate, endDate: cfg.endDate, pct: stats.pct };
+        });
+      if (list.length === 0) {
+        setFindSchedStatus("notfound");
+        setFoundSchedules([]);
+        return;
+      }
+      setFoundSchedules(list);
+      setFindSchedStatus("found");
+    } catch (e) {
+      setFindSchedStatus("notfound");
+      setFoundSchedules([]);
+    }
   }
 
   async function handleConfirmDelete() {
@@ -247,6 +312,105 @@ export default function TopPage() {
           🌟 スタンプ帳をつくる（名前を登録してスタンプを貯める）
         </button>
 
+        {profiles.length > 0 && (
+          <div style={{ marginBottom: 16, display: "flex", flexDirection: "column", gap: 6 }}>
+            {profiles.map((p) => (
+              <a key={p.id} href={`${window.location.pathname}?profile=${p.id}`} style={{ textDecoration: "none" }}>
+                <div
+                  style={{
+                    background: "rgba(255,255,255,0.9)",
+                    borderRadius: 12,
+                    padding: "10px 14px",
+                    fontWeight: 800,
+                    color: "#5C3A21",
+                    fontSize: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  🌟 {p.name || "スタンプ帳"} のスタンプ帳を開く
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
+
+        <div
+          style={{
+            background: "rgba(255,255,255,0.9)",
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 18,
+          }}
+        >
+          <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 14, marginBottom: 10 }}>
+            🔍 別の端末で作ったスタンプ帳をさがす
+          </div>
+          <input
+            value={findName}
+            onChange={(e) => {
+              setFindName(e.target.value);
+              setFindStatus("idle");
+            }}
+            placeholder="なまえ（例：美月）"
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "2px solid #BFE3F0",
+              fontSize: 14,
+              fontFamily: "inherit",
+              marginBottom: 8,
+              boxSizing: "border-box",
+            }}
+          />
+          <input
+            type="date"
+            value={findBirthdate}
+            onChange={(e) => {
+              setFindBirthdate(e.target.value);
+              setFindStatus("idle");
+            }}
+            style={{
+              width: "100%",
+              padding: "9px 10px",
+              borderRadius: 10,
+              border: "2px solid #BFE3F0",
+              fontSize: 13.5,
+              fontFamily: "inherit",
+              marginBottom: 10,
+              boxSizing: "border-box",
+            }}
+          />
+          <button
+            onClick={handleFindProfile}
+            disabled={!findName.trim() || findStatus === "searching"}
+            style={{
+              width: "100%",
+              border: "none",
+              borderRadius: 12,
+              padding: "11px 0",
+              fontWeight: 800,
+              fontSize: 14,
+              color: "#fff",
+              cursor: findName.trim() ? "pointer" : "default",
+              fontFamily: "inherit",
+              background: findName.trim() ? "#14588C" : "#c7d8e0",
+            }}
+          >
+            {findStatus === "searching" ? "さがしています…" : "さがす"}
+          </button>
+          {findStatus === "notfound" && (
+            <p style={{ color: "#E0526B", fontSize: 13, marginTop: 8, marginBottom: 0 }}>
+              見つかりませんでした。なまえ・生年月日が正しいか確認してください。
+            </p>
+          )}
+          <p style={{ color: "#7c98aa", fontSize: 11.5, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
+            ※ かんたんな確認のためのものなので、パスワードのような強いセキュリティではありません。
+          </p>
+        </div>
+
         <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
           {[
             ["create", "① 作る"],
@@ -328,16 +492,102 @@ export default function TopPage() {
         )}
 
         {tab === "active" && (
-          <ScheduleList
-            items={active}
-            emptyText='まだ進行中のスケジュールはありません。「① 作る」から作ってみましょう。'
-            onOpen={handleOpen}
-            onEdit={handleEdit}
-            onDelete={(s) => setDeleteTarget(s)}
-            onShare={handleShare}
-            copiedId={copiedId}
-            refreshing={refreshing}
-          />
+          <>
+            <div style={{ background: "rgba(255,255,255,0.9)", borderRadius: 16, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 14, marginBottom: 10 }}>
+                🔍 なまえ・生年月日でスケジュールをさがす
+              </div>
+              <input
+                value={findSchedName}
+                onChange={(e) => {
+                  setFindSchedName(e.target.value);
+                  setFindSchedStatus("idle");
+                }}
+                placeholder="なまえ（例：美月）"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: "2px solid #BFE3F0",
+                  fontSize: 14,
+                  fontFamily: "inherit",
+                  marginBottom: 8,
+                  boxSizing: "border-box",
+                }}
+              />
+              <input
+                type="date"
+                value={findSchedBirthdate}
+                onChange={(e) => {
+                  setFindSchedBirthdate(e.target.value);
+                  setFindSchedStatus("idle");
+                }}
+                style={{
+                  width: "100%",
+                  padding: "9px 10px",
+                  borderRadius: 10,
+                  border: "2px solid #BFE3F0",
+                  fontSize: 13.5,
+                  fontFamily: "inherit",
+                  marginBottom: 10,
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                onClick={handleFindSchedules}
+                disabled={!findSchedName.trim() || findSchedStatus === "searching"}
+                style={{
+                  width: "100%",
+                  border: "none",
+                  borderRadius: 12,
+                  padding: "11px 0",
+                  fontWeight: 800,
+                  fontSize: 14,
+                  color: "#fff",
+                  cursor: findSchedName.trim() ? "pointer" : "default",
+                  fontFamily: "inherit",
+                  background: findSchedName.trim() ? "#14588C" : "#c7d8e0",
+                }}
+              >
+                {findSchedStatus === "searching" ? "さがしています…" : "さがす"}
+              </button>
+              {findSchedStatus === "notfound" && (
+                <p style={{ color: "#E0526B", fontSize: 13, marginTop: 8, marginBottom: 0 }}>
+                  見つかりませんでした。なまえ・生年月日が正しいか、スタンプ帳にスケジュールが紐づいているか確認してください。
+                </p>
+              )}
+              <p style={{ color: "#7c98aa", fontSize: 11.5, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
+                ※「🌟 スタンプ帳」から作った・紐づけたスケジュールのみ見つかります。
+              </p>
+            </div>
+
+            {findSchedStatus === "found" && (
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ color: "#fff", fontWeight: 800, fontSize: 13, marginBottom: 8 }}>検索結果</div>
+                <ScheduleList
+                  items={foundSchedules}
+                  emptyText=""
+                  onOpen={handleOpen}
+                  onEdit={handleEdit}
+                  onDelete={(s) => setDeleteTarget(s)}
+                  onShare={handleShare}
+                  copiedId={copiedId}
+                  refreshing={false}
+                />
+              </div>
+            )}
+
+            <ScheduleList
+              items={active}
+              emptyText='まだ進行中のスケジュールはありません。「① 作る」から作ってみましょう。'
+              onOpen={handleOpen}
+              onEdit={handleEdit}
+              onDelete={(s) => setDeleteTarget(s)}
+              onShare={handleShare}
+              copiedId={copiedId}
+              refreshing={refreshing}
+            />
+          </>
         )}
 
         {tab === "done" && (
