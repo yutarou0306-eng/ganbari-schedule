@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
+import { upsertKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
@@ -37,6 +38,7 @@ export default function ProfileRoot() {
         if (data && data.blob) {
           setProfile({ ...freshProfile(), ...data.blob });
           setExists(true);
+          upsertKnownProfile({ id: profileId, name: data.blob.name || "" });
           await loadSchedules();
         } else {
           setView("editProfile");
@@ -71,6 +73,7 @@ export default function ProfileRoot() {
     await supabase.from("profiles").upsert({ id: profileId, blob: next, updated_at: new Date().toISOString() });
     setProfile(next);
     setExists(true);
+    upsertKnownProfile({ id: profileId, name: next.name || "" });
   }
 
   async function handleCreateOrEditProfile(name, birthdate) {
