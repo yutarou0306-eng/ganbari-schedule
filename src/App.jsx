@@ -350,6 +350,7 @@ function freshConfig() {
 export default function KidsScheduleApp() {
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState("loading");
+  const [focusSubjectId, setFocusSubjectId] = useState(null);
   const [config, setConfig] = useState(freshConfig());
   const [completions, setCompletions] = useState({});
   const [recoveries, setRecoveries] = useState({});
@@ -825,11 +826,13 @@ export default function KidsScheduleApp() {
         <SetupScreen
           initial={config}
           hasExisting={!!config.title}
+          focusSubjectId={focusSubjectId}
           onCancel={config.title ? () => setView("main") : null}
           onRequestDelete={config.title ? () => setShowDeleteConfirm(true) : null}
           onSave={(cfg) => {
             setConfig(cfg);
             setView("main");
+            setFocusSubjectId(null);
             // Clear the ?edit=1 flag so a later refresh lands on the main view.
             try {
               const url = new URL(window.location.href);
@@ -871,6 +874,10 @@ export default function KidsScheduleApp() {
           funStampFor={funStampFor}
           missedBacklog={missedBacklog}
           onOpenSettings={() => setView("setup")}
+          onEditSubject={(subjectId) => {
+            setFocusSubjectId(subjectId);
+            setView("setup");
+          }}
           onRequestDelete={() => setShowDeleteConfirm(true)}
           stats={totalStats()}
           todayStats={todayStats()}
@@ -946,7 +953,7 @@ export default function KidsScheduleApp() {
 
 /* ---------------- Setup Screen ---------------- */
 
-function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapTheme }) {
+function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapTheme, isFocused }) {
   function set(patch) {
     onChange({ ...subject, ...patch });
   }
@@ -956,7 +963,13 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
     set({ weekdays: next });
   }
   return (
-    <div style={styles.subjCard}>
+    <div
+      id={`subject-card-${subject.id}`}
+      style={{
+        ...styles.subjCard,
+        ...(isFocused ? { boxShadow: "0 0 0 3px #F4C95D, 0 0 20px rgba(244,201,93,0.6)", borderColor: "#F4C95D" } : {}),
+      }}
+    >
       <div style={styles.subjCardTop}>
         <input
           value={subject.name}
@@ -1141,7 +1154,7 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
   );
 }
 
-function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }) {
+function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, focusSubjectId }) {
   const [title, setTitle] = useState(initial.title || "");
   const [theme, setTheme] = useState(initial.theme || "girl");
   const [startDate, setStartDate] = useState(initial.startDate || todayStr());
@@ -1156,10 +1169,19 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
   const palette = getTheme(theme).palette;
   const themeObj = getTheme(theme);
 
+  useEffect(() => {
+    if (!focusSubjectId) return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(`subject-card-${focusSubjectId}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [focusSubjectId]);
+
   const [profileId, setProfileId] = useState(initial.profileId || "");
   const [profileName, setProfileName] = useState("");
   const [linkName, setLinkName] = useState("");
-  const [linkBirthdate, setLinkBirthdate] = useState("");
+  const [linkBirthdate, setLinkBirthdate] = useState("2015-01-01");
   const [linkStatus, setLinkStatus] = useState("idle"); // idle | searching | notfound
 
   useEffect(() => {
@@ -1349,6 +1371,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete }
               canRemove={subjects.length > 1}
               palette={palette}
               isMapTheme={themeObj.isMapTheme}
+              isFocused={s.id === focusSubjectId}
             />
           ))}
         </div>
@@ -1390,6 +1413,7 @@ function MainScreen({
   funStampFor,
   missedBacklog,
   onOpenSettings,
+  onEditSubject,
   onRequestDelete,
   stats,
   todayStats,
@@ -1452,7 +1476,8 @@ function MainScreen({
       {theme.isMapTheme && <MapDoodles />}
       <CornerArt theme={theme.key} pct={pct} />
       {linkedProfile && (
-        <div
+        <a
+          href={`${window.location.pathname}?profile=${config.profileId}`}
           style={{
             position: "absolute",
             top: theme.isMapTheme ? 246 : 236,
@@ -1463,11 +1488,14 @@ function MainScreen({
             padding: "8px 12px",
             textAlign: "center",
             maxWidth: 130,
+            textDecoration: "none",
+            cursor: "pointer",
+            display: "block",
           }}
         >
           <div style={{ fontSize: 11, fontWeight: 800, color: "#fff" }}>🌟 {linkedProfile.name || "スタンプ帳"}</div>
           <div style={{ fontSize: 18, fontWeight: 900, color: "#FFD966" }}>⭐️ {linkedProfile.totalStamps}</div>
-        </div>
+        </a>
       )}
       <header style={styles.header}>
         <div style={styles.headerTop}>
@@ -1609,7 +1637,18 @@ function MainScreen({
         {subjects.map((s, idx) => {
           const backlog = missedBacklog(s);
           return (
-            <div key={s.id} style={{ ...styles.subjectSpotlight, background: `linear-gradient(135deg, ${s.color}, #ffffff)` }}>
+            <button
+              key={s.id}
+              onClick={() => onEditSubject(s.id)}
+              style={{
+                ...styles.subjectSpotlight,
+                background: `linear-gradient(135deg, ${s.color}, #ffffff)`,
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                textAlign: "left",
+              }}
+            >
               <div style={{ ...styles.subjectSpotlightIcon, background: s.color }}>
                 <StampIcon
                   index={taskIconIndex(idx, theme.isMapTheme, theme.shapes.length)}
@@ -1627,7 +1666,7 @@ function MainScreen({
                 <div style={styles.subjectSpotlightFreq}>📅 {describeFrequency(s)}</div>
               </div>
               {backlog > 0 && <span style={styles.backlogBadgeBig}>🔁 残り{backlog}</span>}
-            </div>
+            </button>
           );
         })}
       </div>

@@ -233,6 +233,26 @@ export default function ProfileRoot() {
           {profile.birthdate && <div style={{ color: "#EAF7FB", fontSize: 13, marginTop: 2 }}>生年月日：{profile.birthdate}</div>}
         </div>
 
+        <SectionTitle>📅 つながっているスケジュール</SectionTitle>
+        <div style={{ marginBottom: 18 }}>
+          {schedules.length === 0 ? (
+            <div style={emptyCardStyle}>まだスケジュールがありません。下のボタンから作ってみましょう。</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {schedules.map((s) => (
+                <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
+                  <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
+                    <span style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14.5 }}>
+                      {s.theme === "boy" ? "🐉" : "🎀"} {s.title || "無題のスケジュール"}
+                    </span>
+                    <span style={{ color: "#B5651D", fontWeight: 800, fontSize: 13.5 }}>⭐️ {s.stamps}</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div style={{ background: "#fff", borderRadius: 22, padding: "22px 20px", textAlign: "center", boxShadow: "0 16px 34px rgba(11,61,98,0.3)", marginBottom: 16 }}>
           <div style={{ fontSize: 14, color: "#7c98aa", fontWeight: 700 }}>今もっているスタンプ</div>
           <div style={{ fontSize: 48, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif" }}>⭐️ {available}</div>
@@ -287,26 +307,6 @@ export default function ProfileRoot() {
         <button onClick={() => requestParentGate("rewards")} style={{ ...linkBtnStyle, marginBottom: 22 }}>
           ✏️ 景品を編集する（保護者のみ）
         </button>
-
-        <SectionTitle>📅 つながっているスケジュール</SectionTitle>
-        <div style={{ marginBottom: 10 }}>
-          {schedules.length === 0 ? (
-            <div style={emptyCardStyle}>まだスケジュールがありません。下のボタンから作ってみましょう。</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {schedules.map((s) => (
-                <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
-                  <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
-                    <span style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14.5 }}>
-                      {s.theme === "boy" ? "🐉" : "🎀"} {s.title || "無題のスケジュール"}
-                    </span>
-                    <span style={{ color: "#B5651D", fontWeight: 800, fontSize: 13.5 }}>⭐️ {s.stamps}</span>
-                  </div>
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
           <button onClick={() => handleCreateSchedule("girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
@@ -529,11 +529,16 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
   return (
     <div style={{ minHeight: "100vh", background: bg, padding: "28px 16px", display: "flex", justifyContent: "center" }}>
       <div style={{ background: "linear-gradient(180deg,#FFFBF3,#FFF7EC)", borderRadius: 24, padding: 26, maxWidth: 420, width: "100%", height: "fit-content", boxShadow: "0 20px 50px rgba(11,61,98,0.35)" }}>
-        {onCancel && (
-          <button onClick={onCancel} style={{ background: "none", border: "none", color: "#14588C", fontWeight: 700, marginBottom: 10, cursor: "pointer", fontSize: 15, fontFamily: "inherit" }}>
-            ← もどる
-          </button>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+          <a href={window.location.pathname} style={{ textDecoration: "none", color: "#14588C", fontWeight: 700, fontSize: 15 }}>
+            🏠 トップへ
+          </a>
+          {onCancel && (
+            <button onClick={onCancel} style={{ background: "none", border: "none", color: "#14588C", fontWeight: 700, cursor: "pointer", fontSize: 15, fontFamily: "inherit" }}>
+              ← もどる
+            </button>
+          )}
+        </div>
         <h1 style={{ fontFamily: "'Kaisei Decol', serif", fontSize: 26, color: "#0B3D62", margin: "0 0 6px" }}>
           {isNew ? "スタンプ帳をつくろう" : "プロフィールを編集する"}
         </h1>

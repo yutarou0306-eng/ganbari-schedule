@@ -32,10 +32,10 @@ export default function TopPage() {
   const [copiedId, setCopiedId] = useState(null);
   const [appCopied, setAppCopied] = useState(false);
   const [findName, setFindName] = useState("");
-  const [findBirthdate, setFindBirthdate] = useState("");
+  const [findBirthdate, setFindBirthdate] = useState("2015-01-01");
   const [findStatus, setFindStatus] = useState("idle"); // idle | searching | notfound
   const [findSchedName, setFindSchedName] = useState("");
-  const [findSchedBirthdate, setFindSchedBirthdate] = useState("");
+  const [findSchedBirthdate, setFindSchedBirthdate] = useState("2015-01-01");
   const [findSchedStatus, setFindSchedStatus] = useState("idle"); // idle | searching | notfound | found
   const [foundSchedules, setFoundSchedules] = useState([]);
 
