@@ -1518,7 +1518,8 @@ function MainScreen({
                   <span style={styles.dashMark}>ー</span>
                 ) : (
                   <div style={styles.dayStampsRow}>
-                    {dayReq.map((s, idx) => {
+                    {dayReq.map((s) => {
+                      const stableIdx = subjects.findIndex((x) => x.id === s.id);
                       const count = countFor(dKey, s.id);
                       const achv = achievements[dKey] && achievements[dKey][s.id];
                       const achvLabel = theme.isMapTheme && achv ? formatAchvShort(achv) : "";
@@ -1528,7 +1529,7 @@ function MainScreen({
                             <StampCell
                               count={count}
                               color={s.color}
-                              iconIndex={idx}
+                              iconIndex={stableIdx}
                               label={s.name}
                               shapes={theme.shapes}
                               withFace={theme.withFace}
@@ -1547,7 +1548,7 @@ function MainScreen({
                           <HistoryCell
                             count={count}
                             color={s.color}
-                            iconIndex={idx}
+                            iconIndex={stableIdx}
                             label={s.name}
                             missed={isPastMiss}
                             fun={funStampFor(dKey, s.id)}
@@ -1578,12 +1579,12 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
   const icon = useDragonStamp ? (
     <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
   ) : (
-    <StampIcon index={iconIndex} color={color} size="62%" shapes={shapes} withFace={withFace} />
+    <StampIcon index={iconIndex} color={color} size="76%" shapes={shapes} withFace={withFace} />
   );
   const hintIdx = hintIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1);
   const hintIcon = (
     <span style={styles.stampHintIcon}>
-      <StampIcon index={hintIdx} color={color} size="34%" shapes={shapes} withFace={false} />
+      <StampIcon index={hintIdx} color={color} size="52%" shapes={shapes} withFace={false} />
     </span>
   );
 
@@ -1655,7 +1656,7 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
         useDragonStamp ? (
           <img src="/dragon-stamp.png" alt="" style={{ ...styles.dragonStampImg, opacity: 0.55 }} />
         ) : (
-          <StampIcon index={iconIndex} color={color} size="60%" shapes={shapes} withFace={false} />
+          <StampIcon index={iconIndex} color={color} size="72%" shapes={shapes} withFace={false} />
         )
       ) : (
         hintIcon
@@ -1749,7 +1750,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, wit
             {useDragonStamp ? (
               <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
             ) : (
-              <StampIcon index={iconIndex} color={color} size="65%" shapes={shapes} withFace={withFace} />
+              <StampIcon index={iconIndex} color={color} size="78%" shapes={shapes} withFace={withFace} />
             )}
           </span>
         ) : (
@@ -1757,7 +1758,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, wit
             <StampIcon
               index={hintIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1)}
               color={color}
-              size="34%"
+              size="52%"
               shapes={shapes}
               withFace={false}
             />
