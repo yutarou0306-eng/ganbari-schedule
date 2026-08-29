@@ -1579,7 +1579,12 @@ function MainScreen({
               />
             )
           )}
-          <span style={{ ...styles.pearlPct, color: theme.headerTextColor }}>{pct}%（期間全体）</span>
+          <div style={{ marginLeft: "auto", textAlign: "right" }}>
+            <div style={{ ...styles.pearlPct, marginLeft: 0, color: theme.headerTextColor }}>{pct}%（期間全体）</div>
+            <div style={{ ...styles.pearlCount, color: theme.headerTextColor }}>
+              {stats.done}／{stats.need}個
+            </div>
+          </div>
         </div>
 
         {config.reward && (
@@ -2511,9 +2516,10 @@ const styles = {
   todayBarTrack: { marginTop: 6, height: 13, borderRadius: 999, background: "rgba(255,255,255,0.3)", overflow: "hidden", maxWidth: 300 },
   todayBarFill: { height: "100%", borderRadius: 999, background: "linear-gradient(90deg,#FFD6E0,#F4C95D)", transition: "width 0.5s ease" },
 
-  necklaceRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "rgba(255,255,255,0.15)", padding: "12px 14px", borderRadius: 999, backdropFilter: "blur(4px)" },
+  necklaceRow: { display: "flex", alignItems: "center", gap: 6, marginTop: 14, background: "rgba(255,255,255,0.15)", padding: "12px 14px", borderRadius: 20, backdropFilter: "blur(4px)", flexWrap: "wrap", rowGap: 4 },
   pearl: { width: 20, height: 20, borderRadius: "50%", flexShrink: 0, transition: "all 0.4s" },
   pearlPct: { marginLeft: "auto", color: "#fff", fontWeight: 900, fontSize: 17 },
+  pearlCount: { color: "#fff", fontWeight: 700, fontSize: 12.5, opacity: 0.9, marginTop: 1 },
   rewardPreview: { marginTop: 8, background: "rgba(255,255,255,0.18)", borderRadius: 12, padding: "8px 14px", color: "#fff", fontSize: 16, fontWeight: 700, backdropFilter: "blur(4px)", textAlign: "center" },
 
   subjectSummaryRow: { position: "relative", zIndex: 2, display: "flex", flexWrap: "wrap", gap: 10, padding: "0 18px", marginTop: 8, justifyContent: "center" },
