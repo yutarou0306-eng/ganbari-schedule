@@ -1577,6 +1577,22 @@ function MainScreen({
           >
             🗑 削除する
           </button>
+          {linkedProfile && (
+            <a
+              href={`${window.location.pathname}?profile=${config.profileId}`}
+              style={{
+                ...styles.editBtnSmall,
+                background: theme.overlayBg,
+                borderColor: "#F4C95D",
+                color: theme.headerTextColor,
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              🌟 スタンプ帳へ
+            </a>
+          )}
         </div>
         <div style={{ ...styles.lockNote, color: theme.headerTextColor }}>
           {locked
@@ -1653,31 +1669,6 @@ function MainScreen({
               {stats.done}／{stats.need}個
             </span>
           </div>
-        )}
-
-        {linkedProfile && (
-          <a
-            href={`${window.location.pathname}?profile=${config.profileId}`}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 8,
-              marginTop: 12,
-              background: theme.overlayBg,
-              border: theme.isMapTheme ? "2px solid #C89B3C" : "2px solid rgba(255,255,255,0.7)",
-              borderRadius: 999,
-              padding: "9px 16px",
-              textDecoration: "none",
-              cursor: "pointer",
-            }}
-          >
-            <span style={{ fontSize: 13, fontWeight: 800, color: theme.headerTextColor }}>
-              🌟 {linkedProfile.name || "スタンプ帳"}
-            </span>
-            <span style={{ fontSize: 15, fontWeight: 900, color: "#FFD966" }}>⭐️ {linkedProfile.totalStamps}</span>
-            <span style={{ fontSize: 11, fontWeight: 800, color: theme.headerTextColor, opacity: 0.85 }}>を開く ▶</span>
-          </a>
         )}
       </header>
 
