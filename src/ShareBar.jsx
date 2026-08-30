@@ -51,7 +51,7 @@ export default function ShareBar() {
         </button>
       </div>
 
-      <div style={{ position: "fixed", top: 8, right: 8, zIndex: 999, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "70%" }}>
+      <div style={{ position: "absolute", top: 8, right: 8, zIndex: 5, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "70%" }}>
         {typeof navigator !== "undefined" && navigator.share && (
           <button onClick={handleNativeShare} style={{ ...pillStyle, background: "#5A4FCF", color: "#fff" }}>
             📤 共有（AirDropなど）
