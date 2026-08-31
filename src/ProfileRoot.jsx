@@ -4,6 +4,7 @@ import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
 import { getVariant, finalFormImage } from "./mascots.js";
+import { todayPendingSubjects } from "./progress.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
 // Backup PIN — always accepted alongside whatever PIN the parent set, in case
@@ -145,6 +146,7 @@ export default function ProfileRoot() {
           theme: row.blob.config.theme || "girl",
           stamps: countStampsInBlob(row.blob),
           awardedCard: row.blob.config.awardedCard || null,
+          pendingToday: todayPendingSubjects(row.blob.config, row.blob.completions),
         }));
       setSchedules(list);
     } catch (e) {}
@@ -201,6 +203,10 @@ export default function ProfileRoot() {
   }
 
   const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
+
+  // Schedules that still have at least one of today's stamps un-pressed —
+  // surfaced at the top of the page as a reminder.
+  const pendingSchedules = schedules.filter((s) => s.pendingToday && s.pendingToday.length > 0);
 
   // Cards earned across every schedule linked to this stamp book, grouped
   // by theme+color so getting the same dragon/pegasus twice shows as
@@ -325,6 +331,43 @@ export default function ProfileRoot() {
           </div>
           {profile.birthdate && <div style={{ color: "#EAF7FB", fontSize: 13, marginTop: 2 }}>生年月日：{profile.birthdate}</div>}
         </div>
+
+        {pendingSchedules.length > 0 && (
+          <>
+            <SectionTitle>✨ まだ押していないスタンプ／今日のスタンプ</SectionTitle>
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {pendingSchedules.map((s) => (
+                  <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
+                    <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
+                      <div style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14, marginBottom: 6 }}>
+                        {s.theme === "boy" ? "🐉" : "🎀"} {s.title || "無題のスケジュール"}
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {s.pendingToday.map((subj) => (
+                          <span
+                            key={subj.id}
+                            style={{
+                              padding: "4px 10px",
+                              borderRadius: 999,
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              border: `1.5px solid ${subj.color}`,
+                              color: "#0B3D62",
+                              background: subj.color + "18",
+                            }}
+                          >
+                            {subj.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
 
         <SectionTitle>📅 つながっているスケジュール</SectionTitle>
         <div style={{ marginBottom: 18 }}>
