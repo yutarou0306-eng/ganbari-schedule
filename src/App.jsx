@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { pickRandomVariant, getVariant, finalFormImage } from "./mascots.js";
+import { computeOverallStats } from "./progress.js";
 import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 import { supabase } from "./db.js";
 
@@ -661,7 +662,7 @@ export default function KidsScheduleApp() {
         });
         if (scheduleAllDone) {
           setTimeout(() => setCelebrateSchedule(true), 700);
-          awardCardIfNeeded();
+          awardCardIfNeeded(computeOverallStats(config, updated).need);
         }
       }
       return updated;
@@ -747,7 +748,7 @@ export default function KidsScheduleApp() {
       });
       if (scheduleAllDone) {
         setTimeout(() => setCelebrateSchedule(true), 400);
-        awardCardIfNeeded();
+        awardCardIfNeeded(computeOverallStats(config, updated).need);
       }
 
       return updated;
@@ -755,10 +756,15 @@ export default function KidsScheduleApp() {
   }
 
   // Hands out the growth-mascot card the first time a schedule reaches
-  // 100%. Idempotent (checks config.awardedCard) so re-triggering the
+  // 100% — but only for schedules substantial enough to matter: at least
+  // 30 days long AND at least 50 total stamps required. Short schedules
+  // reaching 100% don't earn a card, so cards can't be farmed with tiny
+  // schedules. Idempotent (checks config.awardedCard) so re-triggering the
   // "all done" check (e.g. toggling a past stamp back and forth) never
   // hands out a second card for the same schedule.
-  function awardCardIfNeeded() {
+  function awardCardIfNeeded(totalStamps) {
+    const scheduleDays = Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
+    if (scheduleDays < 30 || totalStamps < 50) return;
     setConfig((prev) => {
       if (prev.awardedCard) return prev;
       return {
@@ -1030,6 +1036,7 @@ export default function KidsScheduleApp() {
           reward={config.reward}
           theme={config.theme}
           variantKey={config.mascotVariant}
+          awarded={!!config.awardedCard}
         />
       )}
       {toast && <div style={styles.toast}>{toast}</div>}
@@ -2321,7 +2328,7 @@ function DayCelebration({ onClose, theme }) {
   );
 }
 
-function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey }) {
+function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey, awarded }) {
   const variant = getVariant(theme, variantKey);
   return (
     <div style={styles.weekCelebrateOverlay}>
@@ -2334,26 +2341,27 @@ function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey
         )}
         <h2 style={styles.weekCelebrateTitle}>全部達成！！</h2>
         <p style={styles.weekCelebrateSub}>{title} 最後まで、本当によく頑張ったね！</p>
-        <div style={styles.cardGetBox}>
-          <div style={styles.cardGetLabel}>🎴 カードげっと！</div>
-          <div
-            style={{
-              ...styles.cardGetImgWrap,
-              background: variant.cardBg,
-            }}
-          >
-            <img
-              src={finalFormImage(theme)}
-              alt={variant.name}
+        {awarded && (
+          <div style={styles.cardGetBox}>
+            <div style={styles.cardGetLabel}>🎴 カードげっと！</div>
+            <div
               style={{
-                ...styles.cardGetImg,
-                filter: variant.filter === "none" ? "none" : variant.filter,
+                ...styles.cardGetImgWrap,
+                background: variant.cardBg,
               }}
-            />
+            >
+              <img
+                src={finalFormImage(theme)}
+                alt={variant.name}
+                style={{
+                  ...styles.cardGetImg,
+                  filter: variant.filter === "none" ? "none" : variant.filter,
+                }}
+              />
+            </div>
+            <div style={styles.cardGetName}>{variant.name}</div>
           </div>
-          <div style={styles.cardGetName}>{variant.name}</div>
-        </div>
-        {reward ? (
+        )}
           <div style={styles.rewardCard}>
             <div style={styles.rewardLabel}>🎁 ご褒美</div>
             <div style={styles.rewardText}>{reward}</div>
