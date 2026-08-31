@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { pickRandomVariant, getVariant, finalFormImage } from "./mascots.js";
+import { pickRandomVariant, getVariant, finalFormImage, stageImage } from "./mascots.js";
 import { computeOverallStats } from "./progress.js";
 import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 import { supabase } from "./db.js";
@@ -2351,7 +2351,7 @@ function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey
               }}
             >
               <img
-                src={finalFormImage(theme)}
+                src={finalFormImage(theme, variantKey)}
                 alt={variant.name}
                 style={{
                   ...styles.cardGetImg,
@@ -2407,22 +2407,15 @@ function Confetti() {
   );
 }
 
-function unicornStageImage(pct) {
-  if (pct >= 90) return "/unicorn-100.png";
-  if (pct >= 70) return "/unicorn-80.png";
-  if (pct >= 50) return "/unicorn-60.png";
-  if (pct >= 30) return "/unicorn-40.png";
-  if (pct >= 10) return "/unicorn-20.png";
-  return "/unicorn-0.png";
-}
-
 function CornerArt({ theme, pct, variantKey }) {
   if (theme === "boy") return <DragonCornerArt pct={pct} variantKey={variantKey} />;
-  const colorFilter = getVariant("girl", variantKey).filter;
+  const variant = getVariant("girl", variantKey);
+  const colorFilter = variant.filter;
   return (
     <>
-      {/* growth-stage pegasus — grows through stages with progress, sits in
-          the open space below the トップへ button */}
+      {/* growth-stage mascot (pegasus / fairy / magical cat depending on
+          the schedule's rolled variant) — grows through stages with
+          progress, sits in the open space below the トップへ button */}
       <div
         style={{
           position: "absolute",
@@ -2435,7 +2428,7 @@ function CornerArt({ theme, pct, variantKey }) {
         }}
       >
         <img
-          src={unicornStageImage(pct)}
+          src={stageImage(variant.species, pct)}
           alt=""
           style={{
             width: "100%",

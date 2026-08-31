@@ -424,7 +424,7 @@ export default function ProfileRoot() {
                     }}
                   >
                     <img
-                      src={finalFormImage(g.theme)}
+                      src={finalFormImage(g.theme, g.variant.key)}
                       alt={g.variant.name}
                       style={{
                         width: "100%",
