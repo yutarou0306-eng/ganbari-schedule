@@ -95,13 +95,14 @@ const HUNTER_SHAPES = [
       <path d="M10 17.3c1 .8 3 .8 4 0" stroke="#1c1c1c" strokeWidth="1" fill="none" strokeLinecap="round" />
     </>
   ),
-  // sword
+  // sword — sharp diagonal blade + crossguard + grip + pommel, angled the
+  // same way as the other diagonal icons (hammer, feather) in this set
   (c) => (
     <>
-      <path d="M12 2l1.6 1.6-7 7-2-2z" fill={c} />
-      <rect x="5.2" y="9.6" width="2.4" height="2.4" transform="rotate(45 6.4 10.8)" fill={c} />
-      <path d="M4 12.5l-2.3 2.3 1.4 1.4L5.4 14zM6.7 15.2l-2 4.6 1.7 1.7 4.6-2z" fill={c} />
-      <circle cx="4.7" cy="13.7" r="1.15" fill={c} />
+      <path d="M17.3 1.8 L9.35 11.29 L7.55 9.42 Z" fill={c} />
+      <rect x="5.15" y="9.55" width="6.6" height="1.6" rx="0.7" transform="rotate(46.1 8.45 10.35)" fill={c} />
+      <rect x="3.87" y="10.21" width="1.9" height="4.6" rx="0.95" transform="rotate(136.1 6.22 12.51)" fill={c} />
+      <circle cx="3.41" cy="15.22" r="1.4" fill={c} />
     </>
   ),
   // flame
