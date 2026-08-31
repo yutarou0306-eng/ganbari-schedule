@@ -719,19 +719,41 @@ export default function KidsScheduleApp() {
   }
 
   // Lets an unlocked (parent-confirmed) view mark or unmark a genuine
-  // completion on a PAST day — for backfilling a forgotten stamp. Only
-  // ever called while unlocked; never touches today (that uses the normal
-  // flow) or future days.
+  // completion on a PAST day — for backfilling a forgotten stamp. Mirrors
+  // today's tap cycle: 1st tap marks the day done, a 2nd tap on the same
+  // day recovers one missed day from this subject's backlog (same pool
+  // handleTapStamp draws from) and shows the "×2" badge, and tapping again
+  // clears it back to empty. Only ever called while unlocked; never
+  // touches today (that uses the normal flow) or future days.
   function handleTogglePastStamp(date, subjId) {
     if (locked) return;
     const dKey = dateKey(date);
     if (dKey >= todayKey) return;
+    const subject = config.subjects.find((s) => s.id === subjId);
+    if (!subject) return;
+    const cur = countFor(dKey, subjId);
+
+    let next;
+    let recoveryDelta = 0;
+    if (cur === 0) {
+      next = 1;
+    } else if (cur === 1) {
+      const backlog = missedBacklog(subject);
+      if (backlog <= 0) {
+        next = 0;
+      } else {
+        next = 2;
+        recoveryDelta = 1;
+      }
+    } else {
+      next = 0;
+      recoveryDelta = -1;
+    }
 
     setCompletions((prev) => {
       const day = { ...(prev[dKey] || {}) };
-      const cur = day[subjId] || 0;
-      if (cur >= 1) delete day[subjId];
-      else day[subjId] = 1;
+      if (next === 0) delete day[subjId];
+      else day[subjId] = next;
       const updated = { ...prev, [dKey]: day };
 
       const need = daySubjectsFor(date).map((s) => s.id);
@@ -753,6 +775,33 @@ export default function KidsScheduleApp() {
 
       return updated;
     });
+
+    if (recoveryDelta !== 0) {
+      setRecoveries((prev) => ({ ...prev, [subjId]: Math.max(0, (prev[subjId] || 0) + recoveryDelta) }));
+    }
+    if (next === 2) showToast("すごい！2日分取り戻したね！");
+  }
+
+  // The explicit "×" undo for a past-day mark, mirroring handleClearStamp.
+  // Separate from the tap cycle above so a mis-tap can always be corrected
+  // directly instead of having to cycle all the way back around to 0.
+  function handleClearPastStamp(date, subjId) {
+    if (locked) return;
+    const dKey = dateKey(date);
+    if (dKey >= todayKey) return;
+    const cur = countFor(dKey, subjId);
+    if (cur === 0) return;
+    const recoveryDelta = cur === 2 ? -1 : 0;
+
+    setCompletions((prev) => {
+      const day = { ...(prev[dKey] || {}) };
+      delete day[subjId];
+      return { ...prev, [dKey]: day };
+    });
+
+    if (recoveryDelta !== 0) {
+      setRecoveries((prev) => ({ ...prev, [subjId]: Math.max(0, (prev[subjId] || 0) + recoveryDelta) }));
+    }
   }
 
   // Hands out the growth-mascot card the first time a schedule reaches
@@ -954,6 +1003,7 @@ export default function KidsScheduleApp() {
           onClearStamp={handleClearStamp}
           onToggleFunStamp={handleToggleFunStamp}
           onTogglePastStamp={handleTogglePastStamp}
+          onClearPastStamp={handleClearPastStamp}
           notes={notes}
           achievements={achievements}
           onOpenNote={handleOpenNote}
@@ -1500,6 +1550,7 @@ function MainScreen({
   onClearStamp,
   onToggleFunStamp,
   onTogglePastStamp,
+  onClearPastStamp,
   daySubjectsFor,
   isStamped,
   countFor,
@@ -1870,6 +1921,7 @@ function MainScreen({
                             onToggleFun={() => onToggleFunStamp(d, s.id)}
                             locked={locked || isFuture}
                             onTogglePast={() => onTogglePastStamp(d, s.id)}
+                            onClearPast={() => onClearPastStamp(d, s.id)}
                           />
                           {achvLabel && <div style={styles.achvMiniLabel}>{achvLabel}</div>}
                         </div>
@@ -1886,7 +1938,28 @@ function MainScreen({
   );
 }
 
-function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun, onTogglePast, locked, shapes, withFace, useDragonStamp }) {
+function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun, onTogglePast, onClearPast, locked, shapes, withFace, useDragonStamp }) {
+  // Parent has unlocked this past day: reuse the exact same tap-cycle UI as
+  // today's stamp (StampCell) — tap to mark done, tap again to recover a
+  // missed earlier day of this subject (shows the "×2" badge), and an
+  // explicit "×" to undo a mark. Covers both the "already recorded" and
+  // "not recorded yet" cases, since StampCell already branches on count.
+  if (!locked) {
+    return (
+      <StampCell
+        count={count}
+        color={color}
+        iconIndex={iconIndex}
+        label={label}
+        shapes={shapes}
+        withFace={withFace}
+        useDragonStamp={useDragonStamp}
+        onTap={onTogglePast}
+        onClear={onClearPast}
+      />
+    );
+  }
+
   const real = count >= 1;
   const icon = useDragonStamp ? (
     <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
@@ -1901,21 +1974,6 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
   );
 
   if (real) {
-    if (!locked) {
-      // Parent has unlocked: this real stamp (even a backfilled one) can be undone.
-      return (
-        <div style={styles.stampCellWrap}>
-          <button
-            onClick={onTogglePast}
-            style={{ ...styles.stampCircle, borderColor: color, borderStyle: "solid", background: color + "22" }}
-            aria-label={`${label} の記録を取り消す`}
-          >
-            {icon}
-            {count === 2 && <span style={styles.x2Badge}>×2</span>}
-          </button>
-        </div>
-      );
-    }
     // Locked (everyday/kid view) — a genuine past completion, shown vivid, not editable.
     return (
       <div
@@ -1930,23 +1988,6 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
         {icon}
         {count === 2 && <span style={styles.x2Badge}>×2</span>}
       </div>
-    );
-  }
-
-  if (!locked) {
-    // Parent has unlocked this past day: tap to backfill a forgotten stamp.
-    return (
-      <button
-        onClick={onTogglePast}
-        style={{
-          ...styles.stampCircle,
-          borderColor: missed ? "#F4C95D" : "#dbe8ee",
-          background: "#fff",
-        }}
-        aria-label={`${label} を記録する（押し忘れの記録）`}
-      >
-        {hintIcon}
-      </button>
     );
   }
 
