@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import { pickRandomVariant, getVariant, finalFormImage } from "./mascots.js";
 import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 import { supabase } from "./db.js";
 
@@ -459,11 +460,17 @@ export default function KidsScheduleApp() {
         const params = new URLSearchParams(window.location.search);
         const t = params.get("theme");
         const p = params.get("profileId");
-        setConfig((prev) => ({
-          ...prev,
-          ...(t === "girl" || t === "boy" ? { theme: t } : {}),
-          ...(p ? { profileId: p } : {}),
-        }));
+        setConfig((prev) => {
+          const nextTheme = t === "girl" || t === "boy" ? t : prev.theme;
+          return {
+            ...prev,
+            ...(t === "girl" || t === "boy" ? { theme: t } : {}),
+            ...(p ? { profileId: p } : {}),
+            // New schedule (this only runs when nothing was loaded from
+            // storage yet) — roll which color egg this schedule will grow.
+            ...(!prev.mascotVariant ? { mascotVariant: pickRandomVariant(nextTheme) } : {}),
+          };
+        });
       } catch (e) {}
     }
   }, []);
@@ -489,13 +496,20 @@ export default function KidsScheduleApp() {
   // iOS home-screen apps often get suspended instead of fully closed, and
   // reopening them can show whatever was last in memory instead of fetching
   // fresh data. Re-fetch whenever the app becomes visible again — but only
-  // while on the main calendar (never mid-edit), so this can't wipe out
-  // anything the person is in the middle of typing on the setup screen.
+  // while on the main calendar and not mid-memo, so this can't wipe out
+  // anything the person is in the middle of typing. Also throttled so it
+  // can't fire more than once every 20 seconds even if focus/visibility
+  // events fire in quick succession (e.g. the keyboard showing/hiding).
+  const lastRefreshRef = useRef(0);
   useEffect(() => {
     if (!loaded) return;
     function refresh() {
       if (view !== "main") return;
+      if (noteModalDate) return;
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      const now = Date.now();
+      if (now - lastRefreshRef.current < 20000) return;
+      lastRefreshRef.current = now;
       (async () => {
         try {
           const res = await window.storage.get(STORAGE_KEY, false);
@@ -521,7 +535,7 @@ export default function KidsScheduleApp() {
       window.removeEventListener("focus", refresh);
       window.removeEventListener("pageshow", refresh);
     };
-  }, [loaded, view]);
+  }, [loaded, view, noteModalDate]);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -645,7 +659,10 @@ export default function KidsScheduleApp() {
           const rec = updated[dateKey(d)] || {};
           return req.every((id) => (rec[id] || 0) >= 1);
         });
-        if (scheduleAllDone) setTimeout(() => setCelebrateSchedule(true), 700);
+        if (scheduleAllDone) {
+          setTimeout(() => setCelebrateSchedule(true), 700);
+          awardCardIfNeeded();
+        }
       }
       return updated;
     });
@@ -728,9 +745,30 @@ export default function KidsScheduleApp() {
         const rec = updated[dateKey(d)] || {};
         return req.every((id) => (rec[id] || 0) >= 1);
       });
-      if (scheduleAllDone) setTimeout(() => setCelebrateSchedule(true), 400);
+      if (scheduleAllDone) {
+        setTimeout(() => setCelebrateSchedule(true), 400);
+        awardCardIfNeeded();
+      }
 
       return updated;
+    });
+  }
+
+  // Hands out the growth-mascot card the first time a schedule reaches
+  // 100%. Idempotent (checks config.awardedCard) so re-triggering the
+  // "all done" check (e.g. toggling a past stamp back and forth) never
+  // hands out a second card for the same schedule.
+  function awardCardIfNeeded() {
+    setConfig((prev) => {
+      if (prev.awardedCard) return prev;
+      return {
+        ...prev,
+        awardedCard: {
+          theme: prev.theme,
+          variant: prev.mascotVariant || pickRandomVariant(prev.theme),
+          earnedAt: todayStr(),
+        },
+      };
     });
   }
 
@@ -991,6 +1029,7 @@ export default function KidsScheduleApp() {
           title={config.title}
           reward={config.reward}
           theme={config.theme}
+          variantKey={config.mascotVariant}
         />
       )}
       {toast && <div style={styles.toast}>{toast}</div>}
@@ -1298,6 +1337,8 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       ed = endDate;
     if (parseDate(ed) < parseDate(sd)) ed = sd;
     onSave({
+      ...(initial.mascotVariant ? { mascotVariant: initial.mascotVariant } : {}),
+      ...(initial.awardedCard ? { awardedCard: initial.awardedCard } : {}),
       title: t,
       theme,
       startDate: sd,
@@ -1519,7 +1560,7 @@ function MainScreen({
       }}
     >
       {theme.isMapTheme && <MapDoodles />}
-      <CornerArt theme={theme.key} pct={pct} />
+      <CornerArt theme={theme.key} pct={pct} variantKey={config.mascotVariant} />
       <header style={styles.header}>
         <div style={styles.headerTop}>
           <div style={styles.titleBanner}>
@@ -2280,7 +2321,8 @@ function DayCelebration({ onClose, theme }) {
   );
 }
 
-function ScheduleCompleteCelebration({ onClose, title, reward, theme }) {
+function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey }) {
+  const variant = getVariant(theme, variantKey);
   return (
     <div style={styles.weekCelebrateOverlay}>
       <Confetti />
@@ -2292,6 +2334,25 @@ function ScheduleCompleteCelebration({ onClose, title, reward, theme }) {
         )}
         <h2 style={styles.weekCelebrateTitle}>全部達成！！</h2>
         <p style={styles.weekCelebrateSub}>{title} 最後まで、本当によく頑張ったね！</p>
+        <div style={styles.cardGetBox}>
+          <div style={styles.cardGetLabel}>🎴 カードげっと！</div>
+          <div
+            style={{
+              ...styles.cardGetImgWrap,
+              background: variant.cardBg,
+            }}
+          >
+            <img
+              src={finalFormImage(theme)}
+              alt={variant.name}
+              style={{
+                ...styles.cardGetImg,
+                filter: variant.filter === "none" ? "none" : variant.filter,
+              }}
+            />
+          </div>
+          <div style={styles.cardGetName}>{variant.name}</div>
+        </div>
         {reward ? (
           <div style={styles.rewardCard}>
             <div style={styles.rewardLabel}>🎁 ご褒美</div>
@@ -2347,11 +2408,12 @@ function unicornStageImage(pct) {
   return "/unicorn-0.png";
 }
 
-function CornerArt({ theme, pct }) {
-  if (theme === "boy") return <DragonCornerArt pct={pct} />;
+function CornerArt({ theme, pct, variantKey }) {
+  if (theme === "boy") return <DragonCornerArt pct={pct} variantKey={variantKey} />;
+  const colorFilter = getVariant("girl", variantKey).filter;
   return (
     <>
-      {/* growth-stage unicorn — grows through stages with progress, sits in
+      {/* growth-stage pegasus — grows through stages with progress, sits in
           the open space below the トップへ button */}
       <div
         style={{
@@ -2372,7 +2434,10 @@ function CornerArt({ theme, pct }) {
             height: "100%",
             objectFit: "contain",
             objectPosition: "center top",
-            filter: "drop-shadow(0 4px 8px rgba(11,61,98,0.3))",
+            filter:
+              colorFilter === "none"
+                ? "drop-shadow(0 4px 8px rgba(11,61,98,0.3))"
+                : `${colorFilter} drop-shadow(0 4px 8px rgba(11,61,98,0.3))`,
           }}
         />
       </div>
@@ -2434,7 +2499,9 @@ function dragonStageImage(pct) {
   return "/egg.png";
 }
 
-function DragonCornerArt({ pct }) {
+function DragonCornerArt({ pct, variantKey }) {
+  const colorFilter = getVariant("boy", variantKey).filter;
+  const shadow = "drop-shadow(0 4px 8px rgba(0,0,0,0.35))";
   return (
     <>
       {/* dragon illustration — grows through stages with progress. Sits in
@@ -2461,7 +2528,7 @@ function DragonCornerArt({ pct }) {
             objectFit: "contain",
             objectPosition: "center top",
             opacity: 0.9,
-            filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.35))",
+            filter: colorFilter === "none" ? shadow : `${colorFilter} ${shadow}`,
           }}
         />
       </div>
@@ -2717,6 +2784,20 @@ const styles = {
   weekCelebrateTitle: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 27, margin: "4px 0" },
   weekCelebrateSub: { fontSize: 17, color: "#5a7d94", marginBottom: 16, lineHeight: 1.6 },
   bigStamp: { display: "inline-block", border: "4px solid #FF8FA3", color: "#FF8FA3", fontWeight: 900, fontSize: 26, padding: "10px 26px", borderRadius: 14, transform: "rotate(-8deg)", marginBottom: 18, fontFamily: "'Kaisei Decol', serif" },
+  cardGetBox: { display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 16 },
+  cardGetLabel: { fontSize: 14, fontWeight: 900, color: "#B5651D", marginBottom: 8 },
+  cardGetImgWrap: {
+    width: 112,
+    height: 112,
+    borderRadius: 18,
+    padding: 10,
+    boxShadow: "0 8px 18px rgba(0,0,0,0.25), inset 0 0 0 3px rgba(255,255,255,0.6)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardGetImg: { width: "100%", height: "100%", objectFit: "contain" },
+  cardGetName: { marginTop: 8, fontSize: 16, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif" },
   rewardCard: { background: "linear-gradient(135deg,#FFF3B0,#FFD6E0)", borderRadius: 16, padding: "16px 22px", marginBottom: 18, boxShadow: "0 6px 16px rgba(0,0,0,0.15)" },
   rewardLabel: { fontSize: 15, fontWeight: 900, color: "#B5651D", marginBottom: 4 },
   rewardText: { fontSize: 21, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif", lineHeight: 1.4 },

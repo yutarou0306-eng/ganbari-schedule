@@ -3,6 +3,7 @@ import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
+import { getVariant, finalFormImage } from "./mascots.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
 // Backup PIN — always accepted alongside whatever PIN the parent set, in case
@@ -129,6 +130,7 @@ export default function ProfileRoot() {
           title: row.blob.config.title,
           theme: row.blob.config.theme || "girl",
           stamps: countStampsInBlob(row.blob),
+          awardedCard: row.blob.config.awardedCard || null,
         }));
       setSchedules(list);
     } catch (e) {}
@@ -185,6 +187,23 @@ export default function ProfileRoot() {
   }
 
   const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
+
+  // Cards earned across every schedule linked to this stamp book, grouped
+  // by theme+color so getting the same dragon/pegasus twice shows as
+  // "ブルードラゴン ×2" instead of two separate entries.
+  const cardGroups = (() => {
+    const map = new Map();
+    schedules.forEach((s) => {
+      if (!s.awardedCard) return;
+      const cardTheme = s.awardedCard.theme || s.theme || "girl";
+      const variant = getVariant(cardTheme, s.awardedCard.variant);
+      const groupKey = `${cardTheme}:${variant.key}`;
+      const existing = map.get(groupKey);
+      if (existing) existing.count += 1;
+      else map.set(groupKey, { theme: cardTheme, variant, count: 1 });
+    });
+    return Array.from(map.values());
+  })();
   const totalSpent = (profile.redemptions || []).reduce((sum, r) => sum + r.cost, 0);
   const available = totalEarned - totalSpent;
 
@@ -308,6 +327,66 @@ export default function ProfileRoot() {
                     <span style={{ color: "#B5651D", fontWeight: 800, fontSize: 13.5 }}>⭐️ {s.stamps}</span>
                   </div>
                 </a>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <SectionTitle>🎴 集めたカード</SectionTitle>
+        <div style={{ marginBottom: 18 }}>
+          {cardGroups.length === 0 ? (
+            <div style={emptyCardStyle}>まだカードがありません。スケジュールを最後まで達成するとカードがもらえます。</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 10 }}>
+              {cardGroups.map((g) => (
+                <div key={`${g.theme}:${g.variant.key}`} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <div
+                    style={{
+                      width: "100%",
+                      aspectRatio: "1 / 1",
+                      borderRadius: 14,
+                      background: g.variant.cardBg,
+                      boxShadow: "0 6px 14px rgba(11,61,98,0.25), inset 0 0 0 2px rgba(255,255,255,0.6)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 8,
+                      position: "relative",
+                    }}
+                  >
+                    <img
+                      src={finalFormImage(g.theme)}
+                      alt={g.variant.name}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "contain",
+                        filter: g.variant.filter === "none" ? "none" : g.variant.filter,
+                      }}
+                    />
+                    {g.count > 1 && (
+                      <span
+                        style={{
+                          position: "absolute",
+                          top: 4,
+                          right: 4,
+                          background: "rgba(11,61,98,0.85)",
+                          color: "#fff",
+                          fontSize: 11,
+                          fontWeight: 900,
+                          borderRadius: 999,
+                          padding: "2px 6px",
+                        }}
+                      >
+                        ×{g.count}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.4)", marginTop: 4, textAlign: "center" }}>
+                    {g.variant.name}
+                    {g.count > 1 ? ` ×${g.count}` : ""}
+                  </div>
+                </div>
               ))}
             </div>
           )}
