@@ -65,3 +65,17 @@ export function computeOverallStats(config, completions) {
   const pct = need > 0 ? Math.round((done / need) * 100) : 0;
   return { done, need, pct };
 }
+
+// This schedule's subjects that are due TODAY but haven't been stamped yet
+// — used by the stamp book (ProfileRoot) to show a "today's not-yet-done
+// stamps" reminder across every linked schedule.
+export function todayPendingSubjects(config, completions) {
+  if (!config || !config.subjects || !config.startDate || !config.endDate) return [];
+  const start = parseDate(config.startDate);
+  const end = parseDate(config.endDate);
+  if (!start || !end) return [];
+  const today = addDays(new Date(), 0);
+  if (!isBetween(today, start, end)) return [];
+  const rec = (completions && completions[dateKey(today)]) || {};
+  return config.subjects.filter((s) => subjectApplies(s, today, start, end) && (rec[s.id] || 0) < 1);
+}
