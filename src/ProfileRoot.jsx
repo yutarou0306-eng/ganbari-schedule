@@ -332,6 +332,61 @@ export default function ProfileRoot() {
           )}
         </div>
 
+        <div style={{ background: "#fff", borderRadius: 22, padding: "22px 20px", textAlign: "center", boxShadow: "0 16px 34px rgba(11,61,98,0.3)", marginBottom: 16 }}>
+          <div style={{ fontSize: 14, color: "#7c98aa", fontWeight: 700 }}>今もっているスタンプ</div>
+          <div style={{ fontSize: 48, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif" }}>⭐️ {available}</div>
+          <div style={{ fontSize: 12.5, color: "#a8bcc9" }}>
+            これまでに獲得 {totalEarned} － 交換した分 {totalSpent}
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          <button onClick={handleShare} style={{ ...actionBtnStyle, background: "#5A4FCF" }}>
+            {copied ? "✅ コピーしました！" : "📤 プロフィールを共有"}
+          </button>
+        </div>
+
+        <SectionTitle>🎁 景品と交換</SectionTitle>
+        <div style={{ marginBottom: 8 }}>
+          {(profile.rewards || []).length === 0 ? (
+            <div style={emptyCardStyle}>まだ景品が登録されていません。⚙️の「景品を編集する」から追加できます。</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {(profile.rewards || []).map((r) => {
+                const can = available >= r.cost;
+                return (
+                  <div key={r.id} style={{ background: "#fff", borderRadius: 16, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 6px 14px rgba(11,61,98,0.2)" }}>
+                    <div>
+                      <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 16 }}>{r.name}</div>
+                      <div style={{ fontSize: 13, color: "#7c98aa", fontWeight: 700 }}>⭐️ {r.cost}個</div>
+                    </div>
+                    <button
+                      onClick={() => setRedeemTarget(r)}
+                      disabled={!can}
+                      style={{
+                        border: "none",
+                        borderRadius: 999,
+                        padding: "9px 16px",
+                        fontWeight: 900,
+                        fontSize: 13.5,
+                        cursor: can ? "pointer" : "default",
+                        background: can ? "linear-gradient(135deg,#FFB6C9,#F4C95D)" : "#e5edf1",
+                        color: can ? "#fff" : "#aab8c0",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      交換する
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <button onClick={() => requestParentGate("rewards")} style={{ ...linkBtnStyle, marginBottom: 22 }}>
+          ✏️ 景品を編集する（保護者のみ）
+        </button>
+
         <SectionTitle>🎴 集めたカード</SectionTitle>
         <div style={{ marginBottom: 18 }}>
           {cardGroups.length === 0 ? (
@@ -391,61 +446,6 @@ export default function ProfileRoot() {
             </div>
           )}
         </div>
-
-        <div style={{ background: "#fff", borderRadius: 22, padding: "22px 20px", textAlign: "center", boxShadow: "0 16px 34px rgba(11,61,98,0.3)", marginBottom: 16 }}>
-          <div style={{ fontSize: 14, color: "#7c98aa", fontWeight: 700 }}>今もっているスタンプ</div>
-          <div style={{ fontSize: 48, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif" }}>⭐️ {available}</div>
-          <div style={{ fontSize: 12.5, color: "#a8bcc9" }}>
-            これまでに獲得 {totalEarned} － 交換した分 {totalSpent}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-          <button onClick={handleShare} style={{ ...actionBtnStyle, background: "#5A4FCF" }}>
-            {copied ? "✅ コピーしました！" : "📤 プロフィールを共有"}
-          </button>
-        </div>
-
-        <SectionTitle>🎁 景品と交換</SectionTitle>
-        <div style={{ marginBottom: 8 }}>
-          {(profile.rewards || []).length === 0 ? (
-            <div style={emptyCardStyle}>まだ景品が登録されていません。⚙️の「景品を編集する」から追加できます。</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              {(profile.rewards || []).map((r) => {
-                const can = available >= r.cost;
-                return (
-                  <div key={r.id} style={{ background: "#fff", borderRadius: 16, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: "0 6px 14px rgba(11,61,98,0.2)" }}>
-                    <div>
-                      <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 16 }}>{r.name}</div>
-                      <div style={{ fontSize: 13, color: "#7c98aa", fontWeight: 700 }}>⭐️ {r.cost}個</div>
-                    </div>
-                    <button
-                      onClick={() => setRedeemTarget(r)}
-                      disabled={!can}
-                      style={{
-                        border: "none",
-                        borderRadius: 999,
-                        padding: "9px 16px",
-                        fontWeight: 900,
-                        fontSize: 13.5,
-                        cursor: can ? "pointer" : "default",
-                        background: can ? "linear-gradient(135deg,#FFB6C9,#F4C95D)" : "#e5edf1",
-                        color: can ? "#fff" : "#aab8c0",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      交換する
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        <button onClick={() => requestParentGate("rewards")} style={{ ...linkBtnStyle, marginBottom: 22 }}>
-          ✏️ 景品を編集する（保護者のみ）
-        </button>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
           <button onClick={() => handleCreateSchedule("girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
