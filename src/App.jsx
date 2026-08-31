@@ -1896,7 +1896,7 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
   const hintIdx = taskIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1);
   const hintIcon = (
     <span style={styles.stampHintIcon}>
-      <StampIcon index={hintIdx} color={color} size="52%" shapes={shapes} withFace={false} />
+      <StampIcon index={hintIdx} color={color} size="72%" shapes={shapes} withFace={false} />
     </span>
   );
 
@@ -2070,7 +2070,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, wit
             <StampIcon
               index={taskIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1)}
               color={color}
-              size="52%"
+              size="72%"
               shapes={shapes}
               withFace={false}
             />
