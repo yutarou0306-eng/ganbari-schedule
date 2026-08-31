@@ -42,15 +42,29 @@ const dateSelectYearStyle = { ...dateSelectStyle, flex: 1.6, minWidth: 70, paddi
 // Year / month / day as three drum-roll <select> wheels instead of a native
 // date input — some browsers only let year+month scroll and make day a
 // separate calendar tap, so this keeps all three consistently quick.
+//
+// Keeps its own y/m/d state (seeded once from `value`) instead of deriving
+// it fresh from `value` on every render. Deriving from `value` meant that
+// picking just the year (with month/day still unset) sent onChange("") to
+// the parent — which fed back in as an empty `value` and wiped the just
+// -picked year right back out, so nothing seemed to "stick" until all
+// three happened to be chosen in the same tick.
 function BirthdateSelects({ value, onChange }) {
-  const [y, m, d] = (value || "").split("-");
+  const [iy, im, id] = (value || "").split("-");
+  const [y, setY] = useState(iy || "");
+  const [m, setM] = useState(im ? Number(im) : "");
+  const [d, setD] = useState(id ? Number(id) : "");
+
   function update(ny, nm, nd) {
+    setY(ny);
+    setM(nm);
+    setD(nd);
     if (ny && nm && nd) onChange(`${ny}-${String(nm).padStart(2, "0")}-${String(nd).padStart(2, "0")}`);
     else onChange("");
   }
   return (
     <div style={{ display: "flex", gap: 6 }}>
-      <select value={y || ""} onChange={(e) => update(e.target.value, m, d)} style={dateSelectYearStyle}>
+      <select value={y} onChange={(e) => update(e.target.value, m, d)} style={dateSelectYearStyle}>
         <option value="">年</option>
         {BIRTH_YEAR_OPTIONS.map((yy) => (
           <option key={yy} value={yy}>
@@ -58,7 +72,7 @@ function BirthdateSelects({ value, onChange }) {
           </option>
         ))}
       </select>
-      <select value={m ? Number(m) : ""} onChange={(e) => update(y, e.target.value, d)} style={dateSelectStyle}>
+      <select value={m} onChange={(e) => update(y, e.target.value ? Number(e.target.value) : "", d)} style={dateSelectStyle}>
         <option value="">月</option>
         {BIRTH_MONTH_OPTIONS.map((mm) => (
           <option key={mm} value={mm}>
@@ -66,7 +80,7 @@ function BirthdateSelects({ value, onChange }) {
           </option>
         ))}
       </select>
-      <select value={d ? Number(d) : ""} onChange={(e) => update(y, m, e.target.value)} style={dateSelectStyle}>
+      <select value={d} onChange={(e) => update(y, m, e.target.value ? Number(e.target.value) : "")} style={dateSelectStyle}>
         <option value="">日</option>
         {BIRTH_DAY_OPTIONS.map((dd) => (
           <option key={dd} value={dd}>
