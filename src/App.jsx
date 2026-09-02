@@ -1689,7 +1689,7 @@ function MainScreen({
       }}
     >
       {theme.isMapTheme && <MapDoodles />}
-      <CornerArt theme={theme.key} pct={pct} variantKey={config.mascotVariant} mascotName={config.mascotName} />
+      <CornerDecor theme={theme.key} />
       <header style={styles.header}>
         <div style={styles.headerTop}>
           <div style={styles.titleBanner}>
@@ -1799,6 +1799,7 @@ function MainScreen({
               </div>
             )}
           </div>
+          <GrowthMascotArt theme={theme.key} pct={pct} variantKey={config.mascotVariant} mascotName={config.mascotName} />
         </div>
 
         <div style={{ ...styles.necklaceRow, background: theme.overlayBg }}>
@@ -2600,44 +2601,57 @@ function Confetti() {
   );
 }
 
-function CornerArt({ theme, pct, variantKey, mascotName }) {
-  if (theme === "boy") return <DragonCornerArt pct={pct} variantKey={variantKey} mascotName={mascotName} />;
-  const variant = getVariant("girl", variantKey);
-  const colorFilter = variant.filter;
+// Purely decorative background flourishes (waves/shells/sparkles for the
+// girl theme; compass/embers/claw-marks for the boy theme) — kept as
+// absolute, non-interactive background art. The growth-mascot image and
+// its name live in GrowthMascotArt instead, laid out inline in the flex
+// row next to the mascot icon/speech bubble (see styles.mascotRow) rather
+// than pinned to a fixed pixel offset — that fixed offset used to assume
+// how many lines the header buttons above would wrap onto, and on
+// narrower devices where they wrap onto more lines it could end up
+// overlapping them.
+function CornerDecor({ theme }) {
+  if (theme === "boy") {
+    return (
+      <>
+        {/* compass rose, top right */}
+        <svg style={{ position: "absolute", top: 10, right: 8, opacity: 0.55 }} width="70" height="70" viewBox="0 0 70 70">
+          <circle cx="35" cy="35" r="26" fill="none" stroke="#C89B3C" strokeWidth="2" />
+          <path d="M35 12l5 20-5 3-5-3zM35 58l5-20-5-3-5 3z" fill="#C89B3C" />
+          <path d="M12 35l20-5 3 5-3 5zM58 35l-20-5-3 5 3 5z" fill="#C89B3C" opacity="0.8" />
+        </svg>
+        {/* rising embers, bottom right */}
+        <svg style={{ position: "absolute", bottom: 6, right: -4, opacity: 0.7 }} width="110" height="110" viewBox="0 0 110 110">
+          <path d="M55 30c5 10-8 12-8 22a8 8 0 0016 0c0-3-1-5-3-7 6 4 12 12 12 22a17 17 0 01-34 0c0-14 11-20 11-30 0-3 2-5 6-7z" fill="#B4432F" />
+        </svg>
+        {/* claw marks, left */}
+        <svg style={{ position: "absolute", top: "58%", left: -10, opacity: 0.35 }} width="90" height="90" viewBox="0 0 90 90">
+          <path d="M10 8c14 12 14 40 4 56M24 4c14 12 14 44 4 60M38 8c14 12 14 40 4 56" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" />
+        </svg>
+        {/* scattered sparkles */}
+        {[
+          [18, 55], [50, 15], [78, 62], [10, 18], [60, 85], [88, 25],
+        ].map(([x, y], i) => (
+          <span
+            key={i}
+            style={{
+              position: "absolute",
+              top: `${y}%`,
+              left: i % 2 === 0 ? `${x}%` : "auto",
+              right: i % 2 === 1 ? `${100 - x}%` : "auto",
+              width: 5,
+              height: 5,
+              borderRadius: "50%",
+              background: "#F4C95D",
+              opacity: 0.6,
+            }}
+          />
+        ))}
+      </>
+    );
+  }
   return (
     <>
-      {/* growth-stage mascot (pegasus / fairy / magical cat depending on
-          the schedule's rolled variant) — grows through stages with
-          progress, sits in the open space below the トップへ button */}
-      <div
-        style={{
-          position: "absolute",
-          top: 108,
-          right: 14,
-          width: 120,
-          height: 120,
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      >
-        <img
-          src={stageImage(variant.species, pct)}
-          alt=""
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-            objectPosition: "center top",
-            filter:
-              colorFilter === "none"
-                ? "drop-shadow(0 4px 8px rgba(11,61,98,0.3))"
-                : `${colorFilter} drop-shadow(0 4px 8px rgba(11,61,98,0.3))`,
-          }}
-        />
-      </div>
-      {mascotName && (
-        <div style={{ ...styles.mascotNameLabel, top: 108 + 120 + 2, right: 14, width: 120 }}>{mascotName}</div>
-      )}
       <svg style={{ position: "absolute", top: 6, right: -10, opacity: 0.5 }} width="150" height="90" viewBox="0 0 150 90">
         <path d="M10 45c20-30 60-38 100-25 15 5 25 13 30 22-8 6-20 10-32 8 3 6 3 12 0 17-10-2-18-8-22-16-20 10-52 8-76-6z" fill="#EAF7FB" />
         <circle cx="45" cy="42" r="2.4" fill="#0B3D62" />
@@ -2654,6 +2668,50 @@ function CornerArt({ theme, pct, variantKey, mascotName }) {
         <path d="M35 0c15 20 15 40 0 60s-15 40 0 60" stroke="#fff" strokeWidth="3" fill="none" />
       </svg>
     </>
+  );
+}
+
+// The growth-mascot image + its name, sized responsively with clamp() and
+// laid out as a flex item (an "invisible table cell") in styles.mascotRow
+// — always the same row and right edge as the mascot icon/speech bubble,
+// on every device, instead of a fixed-pixel absolute box.
+function GrowthMascotArt({ theme, pct, variantKey, mascotName }) {
+  const isBoy = theme === "boy";
+  const variant = getVariant(isBoy ? "boy" : "girl", variantKey);
+  const src = isBoy ? dragonStageImage(pct) : stageImage(variant.species, pct);
+  const colorFilter = variant.filter;
+  const shadow = isBoy ? "drop-shadow(0 4px 8px rgba(0,0,0,0.35))" : "drop-shadow(0 4px 8px rgba(11,61,98,0.3))";
+  return (
+    <div style={styles.growthMascotWrap}>
+      <div style={styles.growthMascotImgBox}>
+        <img
+          src={src}
+          alt=""
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            objectPosition: "center top",
+            opacity: isBoy ? 0.9 : 1,
+            filter: colorFilter === "none" ? shadow : `${colorFilter} ${shadow}`,
+          }}
+        />
+      </div>
+      {mascotName && (
+        <div
+          style={{
+            ...styles.mascotNameLabel,
+            position: "static",
+            width: "100%",
+            marginTop: 2,
+            color: isBoy ? "#3E2415" : "#fff",
+            textShadow: isBoy ? "0 1px 3px rgba(255,255,255,0.6)" : "0 1px 3px rgba(0,0,0,0.45)",
+          }}
+        >
+          {mascotName}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -2696,80 +2754,6 @@ function dragonStageImage(pct) {
   return "/egg.png";
 }
 
-function DragonCornerArt({ pct, variantKey, mascotName }) {
-  const colorFilter = getVariant("boy", variantKey).filter;
-  const shadow = "drop-shadow(0 4px 8px rgba(0,0,0,0.35))";
-  return (
-    <>
-      {/* dragon illustration — grows through stages with progress. Sits in
-          the open space on the right, below the LINE/コピー buttons.
-          Fixed-size box + object-fit keeps every stage (even the taller egg)
-          the same footprint. */}
-      <div
-        style={{
-          position: "absolute",
-          top: 108,
-          right: 14,
-          width: 130,
-          height: 130,
-          pointerEvents: "none",
-          zIndex: 0,
-        }}
-      >
-        <img
-          src={dragonStageImage(pct)}
-          alt=""
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "contain",
-            objectPosition: "center top",
-            opacity: 0.9,
-            filter: colorFilter === "none" ? shadow : `${colorFilter} ${shadow}`,
-          }}
-        />
-      </div>
-      {mascotName && (
-        <div style={{ ...styles.mascotNameLabel, top: 108 + 130 + 2, right: 14, width: 130, color: "#3E2415", textShadow: "0 1px 3px rgba(255,255,255,0.6)" }}>
-          {mascotName}
-        </div>
-      )}
-      {/* compass rose, top right */}
-      <svg style={{ position: "absolute", top: 10, right: 8, opacity: 0.55 }} width="70" height="70" viewBox="0 0 70 70">
-        <circle cx="35" cy="35" r="26" fill="none" stroke="#C89B3C" strokeWidth="2" />
-        <path d="M35 12l5 20-5 3-5-3zM35 58l5-20-5-3-5 3z" fill="#C89B3C" />
-        <path d="M12 35l20-5 3 5-3 5zM58 35l-20-5-3 5 3 5z" fill="#C89B3C" opacity="0.8" />
-      </svg>
-      {/* rising embers, bottom right */}
-      <svg style={{ position: "absolute", bottom: 6, right: -4, opacity: 0.7 }} width="110" height="110" viewBox="0 0 110 110">
-        <path d="M55 30c5 10-8 12-8 22a8 8 0 0016 0c0-3-1-5-3-7 6 4 12 12 12 22a17 17 0 01-34 0c0-14 11-20 11-30 0-3 2-5 6-7z" fill="#B4432F" />
-      </svg>
-      {/* claw marks, left */}
-      <svg style={{ position: "absolute", top: "58%", left: -10, opacity: 0.35 }} width="90" height="90" viewBox="0 0 90 90">
-        <path d="M10 8c14 12 14 40 4 56M24 4c14 12 14 44 4 60M38 8c14 12 14 40 4 56" stroke="#fff" strokeWidth="3" fill="none" strokeLinecap="round" />
-      </svg>
-      {/* scattered sparkles */}
-      {[
-        [18, 55], [50, 15], [78, 62], [10, 18], [60, 85], [88, 25],
-      ].map(([x, y], i) => (
-        <span
-          key={i}
-          style={{
-            position: "absolute",
-            top: `${y}%`,
-            left: i % 2 === 0 ? `${x}%` : "auto",
-            right: i % 2 === 1 ? `${100 - x}%` : "auto",
-            width: 5,
-            height: 5,
-            borderRadius: "50%",
-            background: "#F4C95D",
-            opacity: 0.6,
-          }}
-        />
-      ))}
-    </>
-  );
-}
 
 function GlobalStyle() {
   return (
@@ -2884,6 +2868,14 @@ const styles = {
   lockNote: { color: "#EAF7FB", fontSize: 16, marginTop: 10, fontWeight: 700, textAlign: "center" },
 
   mascotRow: { display: "flex", alignItems: "flex-start", gap: 10, marginTop: 14 },
+  growthMascotWrap: {
+    flexShrink: 0,
+    width: "clamp(56px, 20vw, 92px)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  },
+  growthMascotImgBox: { width: "100%", aspectRatio: "1" },
   mascotFace: { width: 68, height: 68, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 6px 14px rgba(11,61,98,0.3)", animation: "bob 2.4s ease-in-out infinite" },
   mascotBubbleWrap: { flex: 1, minWidth: 0 },
   mascotBubble: { background: "#fff", borderRadius: 14, padding: "10px 15px", fontSize: 17, fontWeight: 800, color: "#0B3D62", display: "inline-block", boxShadow: "0 6px 14px rgba(11,61,98,0.25)" },
