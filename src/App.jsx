@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { pickRandomVariant, getVariant, finalFormImage, stageImage } from "./mascots.js";
+import { pickRandomVariant, getVariant, finalFormImage, stageImage, stageIndex } from "./mascots.js";
 import { computeOverallStats } from "./progress.js";
 import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 import { supabase } from "./db.js";
@@ -363,10 +363,14 @@ function BirthdateSelects({ value, onChange, style }) {
   );
 }
 
-function defaultEndDate() {
-  const d = new Date();
-  d.setDate(d.getDate() + 27);
-  return dateKey(d);
+// Default schedule length: one month from the start date, inclusive — e.g.
+// starting 9/1 defaults to ending 9/30, starting 9/10 defaults to 10/9.
+function defaultEndDateFor(startStr) {
+  const d = parseDate(startStr) || new Date();
+  const nd = new Date(d);
+  nd.setMonth(nd.getMonth() + 1);
+  nd.setDate(nd.getDate() - 1);
+  return dateKey(nd);
 }
 
 const DEFAULT_SUBJECT = (palette) => ({
@@ -390,7 +394,7 @@ function freshConfig() {
     title: "",
     theme: "girl",
     startDate: todayStr(),
-    endDate: defaultEndDate(),
+    endDate: defaultEndDateFor(todayStr()),
     subjects: [DEFAULT_SUBJECT()],
     pin: "",
     reward: "",
@@ -406,6 +410,7 @@ export default function KidsScheduleApp() {
   const [recoveries, setRecoveries] = useState({});
   const [funStamps, setFunStamps] = useState({});
   const [notes, setNotes] = useState({});
+  const [parentComments, setParentComments] = useState({});
   const [achievements, setAchievements] = useState({});
   const [noteModalDate, setNoteModalDate] = useState(null);
   const [linkedProfile, setLinkedProfile] = useState(null); // { name, totalStamps } | null
@@ -434,6 +439,7 @@ export default function KidsScheduleApp() {
             setRecoveries(data.recoveries || {});
             setFunStamps(data.funStamps || {});
             setNotes(data.notes || {});
+            setParentComments(data.parentComments || {});
             setAchievements(data.achievements || {});
             // A "?edit=1" URL flag (used by the top-page's edit button) jumps
             // straight into the setup/edit screen instead of the main view.
@@ -487,13 +493,13 @@ export default function KidsScheduleApp() {
       try {
         await window.storage.set(
           STORAGE_KEY,
-          JSON.stringify({ config, completions, recoveries, funStamps, notes, achievements }),
+          JSON.stringify({ config, completions, recoveries, funStamps, notes, parentComments, achievements }),
           false
         );
       } catch (e) {}
     }, 350);
     return () => clearTimeout(t);
-  }, [config, completions, recoveries, funStamps, notes, achievements, loaded]);
+  }, [config, completions, recoveries, funStamps, notes, parentComments, achievements, loaded]);
 
   // iOS home-screen apps often get suspended instead of fully closed, and
   // reopening them can show whatever was last in memory instead of fetching
@@ -524,6 +530,7 @@ export default function KidsScheduleApp() {
             setRecoveries(data.recoveries || {});
             setFunStamps(data.funStamps || {});
             setNotes(data.notes || {});
+            setParentComments(data.parentComments || {});
             setAchievements(data.achievements || {});
           }
         } catch (e) {}
@@ -538,6 +545,24 @@ export default function KidsScheduleApp() {
       window.removeEventListener("pageshow", refresh);
     };
   }, [loaded, view, noteModalDate]);
+
+  // Names the egg once it hatches (growth stage moves past "still an egg").
+  // Fires once per schedule — guarded by config.mascotHatchPrompted so it
+  // never re-shows after the parent/kid has already named (or skipped
+  // naming) this schedule's mascot.
+  const [showHatchNaming, setShowHatchNaming] = useState(false);
+  const [hatchDefaultName, setHatchDefaultName] = useState("");
+  useEffect(() => {
+    if (!loaded || view !== "main") return;
+    if (!config.subjects || config.subjects.length === 0) return;
+    if (config.mascotHatchPrompted) return;
+    const variant = getVariant(config.theme, config.mascotVariant);
+    const overall = computeOverallStats(config, completions);
+    const overallPct = overall.need > 0 ? Math.round((overall.done / overall.need) * 100) : 0;
+    if (stageIndex(variant.species, overallPct) < 1) return;
+    setHatchDefaultName(variant.name);
+    setShowHatchNaming(true);
+  }, [loaded, view, config, completions]);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -833,10 +858,11 @@ export default function KidsScheduleApp() {
     for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) {
       const dKey = dateKey(d);
       const note = notes[dKey];
+      const parentComment = parentComments[dKey];
       const achv = achievements[dKey];
       const hasAchv = achv && Object.keys(achv).length > 0;
-      if (note || hasAchv) {
-        entries.push({ date: new Date(d), dKey, note, achv: hasAchv ? achv : null });
+      if (note || parentComment || hasAchv) {
+        entries.push({ date: new Date(d), dKey, note, parentComment, achv: hasAchv ? achv : null });
       }
     }
     entries.sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -851,7 +877,7 @@ export default function KidsScheduleApp() {
     setNoteModalDate(null);
   }
 
-  function handleSaveNote(text, achv) {
+  function handleSaveNote(text, achv, parentComment) {
     if (!noteModalDate) return;
     const dKey = dateKey(noteModalDate);
     setNotes((prev) => {
@@ -860,6 +886,16 @@ export default function KidsScheduleApp() {
       else delete next[dKey];
       return next;
     });
+    if (!locked) {
+      // Only a parent (unlocked) can write/edit this — a kid re-saving their
+      // own note while locked must never touch the parent's comment.
+      setParentComments((prev) => {
+        const next = { ...prev };
+        if ((parentComment || "").trim()) next[dKey] = parentComment;
+        else delete next[dKey];
+        return next;
+      });
+    }
     if (achv && Object.keys(achv).length > 0) {
       setAchievements((prev) => {
         // drop subjects whose fields are all empty so we don't store clutter
@@ -1064,6 +1100,8 @@ export default function KidsScheduleApp() {
           date={noteModalDate}
           initialText={notes[dateKey(noteModalDate)] || ""}
           initialAchievements={achievements[dateKey(noteModalDate)] || {}}
+          initialParentComment={parentComments[dateKey(noteModalDate)] || ""}
+          locked={locked}
           subjects={config.subjects}
           isMapTheme={getTheme(config.theme).isMapTheme}
           onSave={handleSaveNote}
@@ -1088,6 +1126,21 @@ export default function KidsScheduleApp() {
           theme={config.theme}
           variantKey={config.mascotVariant}
           awarded={!!config.awardedCard}
+        />
+      )}
+      {showHatchNaming && (
+        <HatchNamingModal
+          theme={config.theme}
+          variantKey={config.mascotVariant}
+          defaultName={hatchDefaultName}
+          onSave={(name) => {
+            setConfig((prev) => ({
+              ...prev,
+              mascotName: (name || "").trim() || hatchDefaultName,
+              mascotHatchPrompted: true,
+            }));
+            setShowHatchNaming(false);
+          }}
         />
       )}
       {toast && <div style={styles.toast}>{toast}</div>}
@@ -1302,7 +1355,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
   const [title, setTitle] = useState(initial.title || "");
   const [theme, setTheme] = useState(initial.theme || "girl");
   const [startDate, setStartDate] = useState(initial.startDate || todayStr());
-  const [endDate, setEndDate] = useState(initial.endDate || defaultEndDate());
+  const [endDate, setEndDate] = useState(initial.endDate || defaultEndDateFor(initial.startDate || todayStr()));
   const [pin, setPin] = useState(initial.pin || "");
   const [reward, setReward] = useState(initial.reward || "");
   const initialPalette = getTheme(initial.theme || "girl").palette;
@@ -1478,10 +1531,27 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
 
         <label style={{ ...styles.label, marginTop: 20 }}>期間（いつから、いつまで）</label>
         <div style={styles.dateRow}>
-          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={styles.dateInput} />
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => {
+              const newStart = e.target.value;
+              setStartDate(newStart);
+              // Only for a brand-new schedule — editing an existing one
+              // shouldn't silently overwrite an end date someone already
+              // chose on purpose.
+              if (!hasExisting) setEndDate(defaultEndDateFor(newStart));
+            }}
+            style={styles.dateInput}
+          />
           <span style={{ color: "#4a6c85", fontWeight: 700 }}>〜</span>
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={styles.dateInput} />
         </div>
+        {!hasExisting && (
+          <div style={{ fontSize: 12, color: "#7c98aa", marginTop: -12, marginBottom: 4 }}>
+            ※終了日は開始日の1か月後の前日を自動で入れています。変えたい場合は直接選んでください。
+          </div>
+        )}
 
         <label style={{ ...styles.label, marginTop: 20 }}>保護者用 暗証番号（任意・数字4〜6桁）</label>
         <input
@@ -1619,7 +1689,7 @@ function MainScreen({
       }}
     >
       {theme.isMapTheme && <MapDoodles />}
-      <CornerArt theme={theme.key} pct={pct} variantKey={config.mascotVariant} />
+      <CornerArt theme={theme.key} pct={pct} variantKey={config.mascotVariant} mascotName={config.mascotName} />
       <header style={styles.header}>
         <div style={styles.headerTop}>
           <div style={styles.titleBanner}>
@@ -2216,9 +2286,10 @@ function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
   );
 }
 
-function NoteModal({ date, initialText, initialAchievements, subjects, isMapTheme, onSave, onClose }) {
+function NoteModal({ date, initialText, initialAchievements, initialParentComment, locked, subjects, isMapTheme, onSave, onClose }) {
   const [text, setText] = useState(initialText || "");
   const [achv, setAchv] = useState(initialAchievements || {});
+  const [parentComment, setParentComment] = useState(initialParentComment || "");
   const dLabel = `${date.getMonth() + 1}月${date.getDate()}日`;
 
   function setField(subjId, field, value) {
@@ -2296,11 +2367,34 @@ function NoteModal({ date, initialText, initialAchievements, subjects, isMapThem
           style={styles.noteTextarea}
           rows={4}
         />
+
+        {!locked ? (
+          // Parent has unlocked this schedule — they can write or edit their
+          // own comment here, kept separate from the kid's note above.
+          <>
+            <p style={{ ...styles.modalMsg, marginTop: 14 }}>💬 保護者からのコメント</p>
+            <textarea
+              value={parentComment}
+              onChange={(e) => setParentComment(e.target.value)}
+              placeholder="例）よく頑張ったね！次も応援してるよ。"
+              style={styles.noteTextarea}
+              rows={3}
+            />
+          </>
+        ) : (
+          parentComment && (
+            <div style={styles.parentCommentReadOnly}>
+              <div style={styles.parentCommentLabel}>💬 保護者より</div>
+              <div style={styles.parentCommentText}>{parentComment}</div>
+            </div>
+          )
+        )}
+
         <div style={styles.modalBtns}>
           <button style={styles.modalCancel} onClick={onClose}>
             とじる
           </button>
-          <button style={styles.modalConfirm} onClick={() => onSave(text, achv)}>
+          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, parentComment)}>
             保存する
           </button>
         </div>
@@ -2342,6 +2436,9 @@ function RecordsListModal({ entries, subjects, onClose }) {
                     </div>
                   ))}
                   {e.note && <div style={styles.recordEntryNote}>{e.note}</div>}
+                  {e.parentComment && (
+                    <div style={styles.recordEntryParentComment}>💬 保護者より：{e.parentComment}</div>
+                  )}
                 </div>
               );
             })}
@@ -2404,6 +2501,7 @@ function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey
             <div style={styles.cardGetName}>{variant.name}</div>
           </div>
         )}
+        {reward ? (
           <div style={styles.rewardCard}>
             <div style={styles.rewardLabel}>🎁 ご褒美</div>
             <div style={styles.rewardText}>{reward}</div>
@@ -2413,6 +2511,59 @@ function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey
         )}
         <button style={styles.weekCelebrateBtn} onClick={onClose}>
           とじる
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function HatchNamingModal({ theme, variantKey, defaultName, onSave }) {
+  const [name, setName] = useState(defaultName);
+  const variant = getVariant(theme, variantKey);
+  return (
+    <div style={styles.weekCelebrateOverlay}>
+      <Confetti />
+      <div style={styles.weekCelebrateCard}>
+        <h2 style={styles.weekCelebrateTitle}>たまごが かえったよ！</h2>
+        <p style={styles.weekCelebrateSub}>なまえを つけてあげよう</p>
+        <div style={styles.cardGetBox}>
+          <div
+            style={{
+              ...styles.cardGetImgWrap,
+              background: variant.cardBg,
+            }}
+          >
+            <img
+              src={stageImage(variant.species, 15)}
+              alt={variant.name}
+              style={{
+                ...styles.cardGetImg,
+                filter: variant.filter === "none" ? "none" : variant.filter,
+              }}
+            />
+          </div>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={20}
+            placeholder={defaultName}
+            style={{
+              marginTop: 12,
+              width: "100%",
+              boxSizing: "border-box",
+              textAlign: "center",
+              padding: "10px 12px",
+              borderRadius: 12,
+              border: "2px solid #BFE3F0",
+              fontSize: 17,
+              fontWeight: 800,
+              color: "#0B3D62",
+              fontFamily: "inherit",
+            }}
+          />
+        </div>
+        <button style={styles.weekCelebrateBtn} onClick={() => onSave(name)}>
+          きめる
         </button>
       </div>
     </div>
@@ -2449,8 +2600,8 @@ function Confetti() {
   );
 }
 
-function CornerArt({ theme, pct, variantKey }) {
-  if (theme === "boy") return <DragonCornerArt pct={pct} variantKey={variantKey} />;
+function CornerArt({ theme, pct, variantKey, mascotName }) {
+  if (theme === "boy") return <DragonCornerArt pct={pct} variantKey={variantKey} mascotName={mascotName} />;
   const variant = getVariant("girl", variantKey);
   const colorFilter = variant.filter;
   return (
@@ -2484,6 +2635,9 @@ function CornerArt({ theme, pct, variantKey }) {
           }}
         />
       </div>
+      {mascotName && (
+        <div style={{ ...styles.mascotNameLabel, top: 108 + 120 + 2, right: 14, width: 120 }}>{mascotName}</div>
+      )}
       <svg style={{ position: "absolute", top: 6, right: -10, opacity: 0.5 }} width="150" height="90" viewBox="0 0 150 90">
         <path d="M10 45c20-30 60-38 100-25 15 5 25 13 30 22-8 6-20 10-32 8 3 6 3 12 0 17-10-2-18-8-22-16-20 10-52 8-76-6z" fill="#EAF7FB" />
         <circle cx="45" cy="42" r="2.4" fill="#0B3D62" />
@@ -2542,7 +2696,7 @@ function dragonStageImage(pct) {
   return "/egg.png";
 }
 
-function DragonCornerArt({ pct, variantKey }) {
+function DragonCornerArt({ pct, variantKey, mascotName }) {
   const colorFilter = getVariant("boy", variantKey).filter;
   const shadow = "drop-shadow(0 4px 8px rgba(0,0,0,0.35))";
   return (
@@ -2575,6 +2729,11 @@ function DragonCornerArt({ pct, variantKey }) {
           }}
         />
       </div>
+      {mascotName && (
+        <div style={{ ...styles.mascotNameLabel, top: 108 + 130 + 2, right: 14, width: 130, color: "#3E2415", textShadow: "0 1px 3px rgba(255,255,255,0.6)" }}>
+          {mascotName}
+        </div>
+      )}
       {/* compass rose, top right */}
       <svg style={{ position: "absolute", top: 10, right: 8, opacity: 0.55 }} width="70" height="70" viewBox="0 0 70 70">
         <circle cx="35" cy="35" r="26" fill="none" stroke="#C89B3C" strokeWidth="2" />
@@ -2796,6 +2955,15 @@ const styles = {
   modalTitle: { margin: "0 0 8px", fontSize: 22, color: "#0B3D62" },
   modalMsg: { fontSize: 17, color: "#4a6c85", lineHeight: 1.6, marginBottom: 18 },
   noteTextarea: { width: "100%", padding: "12px 14px", borderRadius: 14, border: "2px solid #BFE3F0", fontSize: 16, fontFamily: "inherit", outline: "none", boxSizing: "border-box", background: "#fff", resize: "vertical", marginBottom: 18, color: "#0B3D62" },
+  parentCommentReadOnly: {
+    background: "#FFF7E0",
+    border: "2px solid #F4C95D",
+    borderRadius: 14,
+    padding: "12px 14px",
+    marginBottom: 18,
+  },
+  parentCommentLabel: { fontSize: 12.5, fontWeight: 800, color: "#B5651D", marginBottom: 4 },
+  parentCommentText: { fontSize: 15, color: "#5C3A21", whiteSpace: "pre-wrap", lineHeight: 1.5 },
   achievementSection: { textAlign: "left", background: "#FFF7EC", border: "2px solid #F0DBA6", borderRadius: 14, padding: 12, marginBottom: 16 },
   achievementSectionLabel: { fontSize: 13, fontWeight: 800, color: "#8B5E34", margin: "0 0 8px" },
   achievementSubjectRow: { marginBottom: 8 },
@@ -2809,6 +2977,7 @@ const styles = {
   recordEntryDate: { fontSize: 14, fontWeight: 900, color: "#8B5E34", marginBottom: 4 },
   recordEntryAchv: { fontSize: 13.5, fontWeight: 800, marginBottom: 2 },
   recordEntryNote: { fontSize: 14, color: "#4a6c85", lineHeight: 1.6, marginTop: 4, whiteSpace: "pre-wrap" },
+  recordEntryParentComment: { fontSize: 13.5, color: "#B5651D", lineHeight: 1.6, marginTop: 6, whiteSpace: "pre-wrap", background: "#FFF7E0", borderRadius: 10, padding: "6px 10px" },
   modalBtns: { display: "flex", gap: 10 },
   modalCancel: { flex: 1, padding: "12px 0", borderRadius: 12, border: "2px solid #d7ecf3", background: "#fff", color: "#5a7d94", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
   modalConfirm: { flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
@@ -2841,6 +3010,17 @@ const styles = {
   },
   cardGetImg: { width: "100%", height: "100%", objectFit: "contain" },
   cardGetName: { marginTop: 8, fontSize: 16, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif" },
+  mascotNameLabel: {
+    position: "absolute",
+    textAlign: "center",
+    fontSize: 12,
+    fontWeight: 800,
+    color: "#fff",
+    textShadow: "0 1px 3px rgba(0,0,0,0.45)",
+    pointerEvents: "none",
+    zIndex: 0,
+    fontFamily: "'Kaisei Decol', serif",
+  },
   rewardCard: { background: "linear-gradient(135deg,#FFF3B0,#FFD6E0)", borderRadius: 16, padding: "16px 22px", marginBottom: 18, boxShadow: "0 6px 16px rgba(0,0,0,0.15)" },
   rewardLabel: { fontSize: 15, fontWeight: 900, color: "#B5651D", marginBottom: 4 },
   rewardText: { fontSize: 21, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif", lineHeight: 1.4 },
