@@ -20,24 +20,32 @@ const STAGE_FILES = {
   cat: ["/cat-egg.png", "/cat-baby.png", "/cat-infant.png", "/cat-adult.png", "/cat-master.png"],
 };
 
-// Picks the right growth-stage image for a species at a given completion
-// percentage. 6-stage species use 20%-wide bands; 5-stage species use
-// slightly wider bands since they have one fewer stage in between.
-export function stageImage(species, pct) {
+// Picks the growth-stage index (0 = still an egg, higher = further grown)
+// for a species at a given completion percentage. 6-stage species use
+// 20%-wide bands; 5-stage species use slightly wider bands since they
+// have one fewer stage in between.
+export function stageIndex(species, pct) {
   const files = STAGE_FILES[species] || STAGE_FILES.pegasus;
   if (files.length >= 6) {
-    if (pct >= 90) return files[5];
-    if (pct >= 70) return files[4];
-    if (pct >= 50) return files[3];
-    if (pct >= 30) return files[2];
-    if (pct >= 10) return files[1];
-    return files[0];
+    if (pct >= 90) return 5;
+    if (pct >= 70) return 4;
+    if (pct >= 50) return 3;
+    if (pct >= 30) return 2;
+    if (pct >= 10) return 1;
+    return 0;
   }
-  if (pct >= 85) return files[4];
-  if (pct >= 60) return files[3];
-  if (pct >= 35) return files[2];
-  if (pct >= 15) return files[1];
-  return files[0];
+  if (pct >= 85) return 4;
+  if (pct >= 60) return 3;
+  if (pct >= 35) return 2;
+  if (pct >= 15) return 1;
+  return 0;
+}
+
+// Picks the right growth-stage image for a species at a given completion
+// percentage.
+export function stageImage(species, pct) {
+  const files = STAGE_FILES[species] || STAGE_FILES.pegasus;
+  return files[stageIndex(species, pct)];
 }
 
 export const DRAGON_VARIANTS = [
