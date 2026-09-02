@@ -128,9 +128,23 @@ export default function GuidePage() {
           ・スケジュールの内容を修正する
           <br />
           <br />
-          ※暗証番号を忘れたときの共通のマスター番号は「5963」です。
-          <br />
           ※「見る」一覧の🗑ボタンは、その端末の表示から外すだけです。スケジュール自体を完全に削除したい場合は、スケジュールを開いてその中の「🗑削除する」から行ってください。
+        </Section>
+
+        <Section emoji="📱" title="ホーム画面にアプリのように追加する">
+          ブラウザのブックマークではなく、アイコンをホーム画面に置いてアプリのように開けます。
+          <br />
+          <br />
+          <div style={{ fontWeight: 800, color: "#0B3D62", marginTop: 10, marginBottom: 4 }}>iPhone（Safari）の場合</div>
+          <Step n={1}>Safariでこのページ（またはスケジュール／スタンプ帳のリンク）を開きます。</Step>
+          <Step n={2}>下部の共有アイコン（□から上に矢印）をタップします。</Step>
+          <Step n={3}>「ホーム画面に追加」を選び、「追加」をタップします。</Step>
+          <div style={{ fontWeight: 800, color: "#0B3D62", marginTop: 14, marginBottom: 4 }}>Android（Chrome）の場合</div>
+          <Step n={1}>Chromeでこのページ（またはリンク）を開きます。</Step>
+          <Step n={2}>右上の「⋮」メニューをタップします。</Step>
+          <Step n={3}>「ホーム画面に追加」（または「アプリをインストール」）を選びます。</Step>
+          <br />
+          お子さんの端末には、そのお子さん用のスケジュールやスタンプ帳のリンクをホーム画面に追加しておくと、毎回リンクを探さずワンタップで開けて便利です。
         </Section>
 
         <a
