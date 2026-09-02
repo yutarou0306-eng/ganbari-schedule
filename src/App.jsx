@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { pickRandomVariant, getVariant, finalFormImage, stageImage, stageIndex } from "./mascots.js";
+import { pickRandomVariant, getVariant, finalFormImage, stageImage, stageIndex, stageImageAt, stageCount } from "./mascots.js";
 import { computeOverallStats } from "./progress.js";
 import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 import { supabase } from "./db.js";
@@ -565,6 +565,7 @@ export default function KidsScheduleApp() {
   // naming) this schedule's mascot.
   const [showHatchNaming, setShowHatchNaming] = useState(false);
   const [hatchDefaultName, setHatchDefaultName] = useState("");
+  const [hatchStageIdx, setHatchStageIdx] = useState(0);
   useEffect(() => {
     if (!loaded || view !== "main") return;
     if (!config.subjects || config.subjects.length === 0) return;
@@ -572,10 +573,54 @@ export default function KidsScheduleApp() {
     const variant = getVariant(config.theme, config.mascotVariant);
     const overall = computeOverallStats(config, completions);
     const overallPct = overall.need > 0 ? Math.round((overall.done / overall.need) * 100) : 0;
-    if (stageIndex(variant.species, overallPct) < 1) return;
+    const idx = stageIndex(variant.species, overallPct);
+    if (idx < 1) return;
     setHatchDefaultName(variant.name);
+    setHatchStageIdx(idx);
     setShowHatchNaming(true);
   }, [loaded, view, config, completions]);
+
+  // Plays a Pokémon-style evolution animation whenever the mascot's growth
+  // stage advances past the one last shown — silhouette shake, white
+  // flash, then the new stage bursts in with light rays. Guarded by
+  // config.mascotStageSeen so it only fires once per stage jump, and
+  // deliberately skips the very first stage (hatching), since
+  // HatchNamingModal above already gives that moment its own reveal.
+  const [evolution, setEvolution] = useState(null); // { fromSrc, toSrc, filter, cardBg, isFinal } | null
+  const [pendingEvolution, setPendingEvolution] = useState(null); // same shape + idx, awaiting 声をかける/放っておく
+  const [evolutionSnoozed, setEvolutionSnoozed] = useState(false); // "放っておく" was pressed this session
+  useEffect(() => {
+    if (!loaded || view !== "main") return;
+    if (!config.subjects || config.subjects.length === 0) return;
+    if (!config.mascotHatchPrompted) return; // hatching not handled yet — let that effect go first
+    if (pendingEvolution || evolution) return; // already showing something about this
+    if (evolutionSnoozed) return; // parent chose 放っておく — wait for next app open, not this session
+    const variant = getVariant(config.theme, config.mascotVariant);
+    const overall = computeOverallStats(config, completions);
+    const overallPct = overall.need > 0 ? Math.round((overall.done / overall.need) * 100) : 0;
+    const idx = stageIndex(variant.species, overallPct);
+
+    if (config.mascotStageSeen === undefined) {
+      // Backfill for schedules that hatched before this feature existed —
+      // just record the current stage as the baseline, no animation.
+      setConfig((prev) => (prev.mascotStageSeen === undefined ? { ...prev, mascotStageSeen: idx } : prev));
+      return;
+    }
+    if (idx > config.mascotStageSeen) {
+      // Don't jump straight to the animation — a parent unlocking the app
+      // to do something unrelated could stumble onto it before the kid
+      // ever sees it. Ask first; only commit mascotStageSeen (and actually
+      // play it) once someone chooses to watch now.
+      setPendingEvolution({
+        idx,
+        fromSrc: stageImageAt(variant.species, config.mascotStageSeen),
+        toSrc: stageImageAt(variant.species, idx),
+        filter: variant.filter,
+        cardBg: variant.cardBg,
+        isFinal: idx >= stageCount(variant.species) - 1,
+      });
+    }
+  }, [loaded, view, config, completions, pendingEvolution, evolution, evolutionSnoozed]);
 
   const showToast = useCallback((msg) => {
     setToast(msg);
@@ -1156,9 +1201,35 @@ export default function KidsScheduleApp() {
               ...prev,
               mascotName: (name || "").trim() || hatchDefaultName,
               mascotHatchPrompted: true,
+              mascotStageSeen: hatchStageIdx,
             }));
             setShowHatchNaming(false);
           }}
+        />
+      )}
+      {pendingEvolution && (
+        <EvolutionNoticeModal
+          mascotName={config.mascotName}
+          onTalk={() => {
+            setEvolution(pendingEvolution);
+            setConfig((prev) => ({ ...prev, mascotStageSeen: pendingEvolution.idx }));
+            setPendingEvolution(null);
+          }}
+          onLeave={() => {
+            setPendingEvolution(null);
+            setEvolutionSnoozed(true);
+          }}
+        />
+      )}
+      {evolution && (
+        <EvolutionCelebration
+          fromSrc={evolution.fromSrc}
+          toSrc={evolution.toSrc}
+          filter={evolution.filter}
+          cardBg={evolution.cardBg}
+          isFinal={evolution.isFinal}
+          mascotName={config.mascotName}
+          onClose={() => setEvolution(null)}
         />
       )}
       {toast && <div style={styles.toast}>{toast}</div>}
@@ -2496,7 +2567,7 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
           <input
             value={commenterName}
             onChange={(ev) => onCommenterNameChange(ev.target.value)}
-            placeholder="お名前（例：ママ、おばあちゃん、○○先生）"
+            placeholder="名前"
             maxLength={20}
             style={styles.replyNameInput}
           />
@@ -2645,6 +2716,77 @@ function HatchNamingModal({ theme, variantKey, defaultName, onSave }) {
   );
 }
 
+// Shown before the evolution animation itself — lets whoever opened the
+// app right now choose whether to watch it immediately ("声をかける") or
+// leave it for later ("放っておく"). Exists so a parent who unlocks the
+// app for something unrelated can't accidentally spoil the reveal before
+// the kid gets to see it: choosing "放っておく" doesn't record anything,
+// so the same prompt comes back next time the app is opened instead.
+function EvolutionNoticeModal({ mascotName, onTalk, onLeave }) {
+  return (
+    <div style={styles.weekCelebrateOverlay}>
+      <div style={styles.weekCelebrateCard}>
+        <h2 style={styles.weekCelebrateTitle}>{mascotName ? `${mascotName}の様子が…` : "なにかの様子が…"}</h2>
+        <p style={styles.weekCelebrateSub}>なんだか いつもと ちがうみたい…</p>
+        <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+          <button style={{ ...styles.weekCelebrateBtn, flex: 1, margin: 0, padding: "12px 8px", fontSize: 15, background: "#8B98A8" }} onClick={onLeave}>
+            放っておく
+          </button>
+          <button style={{ ...styles.weekCelebrateBtn, flex: 1, margin: 0, padding: "12px 8px", fontSize: 15 }} onClick={onTalk}>
+            声をかける
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Pokémon-style evolution reveal: the current stage's art shakes and
+// flashes white ("charging"), then bursts into the new stage with a
+// spinning ray-of-light burst and a bounce-in pop. Pure CSS animation on
+// the same stage art already used elsewhere — see the .evo* keyframes in
+// GlobalStyle — so it needs no extra art assets.
+function EvolutionCelebration({ fromSrc, toSrc, filter, cardBg, isFinal, mascotName, onClose }) {
+  const [phase, setPhase] = useState("charge"); // charge -> flash -> reveal
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase("flash"), 1300);
+    const t2 = setTimeout(() => setPhase("reveal"), 1620);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
+  const imgFilter = filter && filter !== "none" ? filter : undefined;
+  return (
+    <div style={styles.weekCelebrateOverlay}>
+      {phase === "reveal" && <Confetti />}
+      <div style={styles.weekCelebrateCard}>
+        <h2 style={styles.weekCelebrateTitle}>
+          {phase === "reveal" ? (isFinal ? "さいだい しんか！" : "しんか した！") : "・・・？"}
+        </h2>
+        {phase !== "reveal" && <p style={styles.weekCelebrateSub}>なにかが おきている…</p>}
+        <div style={{ ...styles.cardGetBox, marginBottom: phase === "reveal" ? 4 : 16 }}>
+          <div style={{ ...styles.cardGetImgWrap, background: cardBg, position: "relative", overflow: "hidden" }}>
+            {phase === "reveal" && <div className="evoRays" />}
+            {phase !== "reveal" ? (
+              <img key="from" src={fromSrc} alt="" className="evoCharge" style={{ ...styles.cardGetImg, filter: imgFilter }} />
+            ) : (
+              <img key="to" src={toSrc} alt="" className="evoReveal" style={{ ...styles.cardGetImg, filter: imgFilter, position: "relative", zIndex: 1 }} />
+            )}
+            {phase === "flash" && <div className="evoFlash" />}
+          </div>
+          {phase === "reveal" && mascotName && <div style={styles.cardGetName}>{mascotName}</div>}
+        </div>
+        {phase === "reveal" && (
+          <button style={styles.weekCelebrateBtn} onClick={onClose}>
+            とじる
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Confetti() {
   const pieces = Array.from({ length: 26 });
   return (
@@ -2752,7 +2894,7 @@ function CornerDecor({ theme }) {
 function GrowthMascotArt({ theme, pct, variantKey, mascotName }) {
   const isBoy = theme === "boy";
   const variant = getVariant(isBoy ? "boy" : "girl", variantKey);
-  const src = isBoy ? dragonStageImage(pct) : stageImage(variant.species, pct);
+  const src = stageImage(variant.species, pct);
   const colorFilter = variant.filter;
   const shadow = isBoy ? "drop-shadow(0 4px 8px rgba(0,0,0,0.35))" : "drop-shadow(0 4px 8px rgba(11,61,98,0.3))";
   return (
@@ -2837,14 +2979,6 @@ function MapDoodles() {
   );
 }
 
-function dragonStageImage(pct) {
-  if (pct >= 90) return "/master.png";
-  if (pct >= 70) return "/adult.png";
-  if (pct >= 50) return "/kids.png";
-  if (pct >= 30) return "/infant.png";
-  if (pct >= 10) return "/baby.png";
-  return "/egg.png";
-}
 
 
 function GlobalStyle() {
@@ -2863,6 +2997,53 @@ function GlobalStyle() {
       @keyframes bob {
         0%, 100% { transform: translateY(0); }
         50% { transform: translateY(-6px); }
+      }
+      @keyframes evoShake {
+        0%, 100% { transform: translateX(0) rotate(0deg); }
+        15% { transform: translateX(-3px) rotate(-3deg); }
+        30% { transform: translateX(3px) rotate(3deg); }
+        45% { transform: translateX(-3px) rotate(-3deg); }
+        60% { transform: translateX(3px) rotate(3deg); }
+        80% { transform: translateX(-1px) rotate(0deg); }
+      }
+      @keyframes evoPulseWhite {
+        0%, 100% { filter: brightness(1) saturate(1); }
+        50% { filter: brightness(2.4) saturate(0.25); }
+      }
+      .evoCharge {
+        animation: evoShake 0.45s ease-in-out infinite, evoPulseWhite 0.45s ease-in-out infinite;
+      }
+      @keyframes evoFlashPulse {
+        0% { opacity: 0; }
+        45% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+      .evoFlash {
+        position: absolute;
+        inset: 0;
+        background: #fff;
+        animation: evoFlashPulse 0.32s ease-out forwards;
+      }
+      @keyframes evoRevealPop {
+        0% { transform: scale(0.25); opacity: 0; }
+        60% { transform: scale(1.18); opacity: 1; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      .evoReveal {
+        animation: evoRevealPop 0.5s cubic-bezier(.34,1.56,.64,1) both;
+      }
+      @keyframes evoRaysSpin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      .evoRays {
+        position: absolute;
+        inset: -60%;
+        background: repeating-conic-gradient(from 0deg, rgba(255,255,255,0.6) 0deg 8deg, transparent 8deg 24deg);
+        animation: evoRaysSpin 3s linear infinite;
+        opacity: 0.75;
+        mix-blend-mode: screen;
+        pointer-events: none;
       }
       @keyframes stampPop {
         0% { transform: scale(0) rotate(-25deg); opacity: 0; }
