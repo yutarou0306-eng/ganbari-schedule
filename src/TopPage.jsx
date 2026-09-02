@@ -352,6 +352,12 @@ export default function TopPage() {
         </h1>
         <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 15, marginBottom: 22 }}>
           作る・見る・振り返る、全部ここから
+          <a
+            href={`${window.location.pathname}?guide=1`}
+            style={{ color: "#FFE9A8", textDecoration: "underline", marginLeft: 4 }}
+          >
+            （使い方ガイド）
+          </a>
         </p>
 
         <button
@@ -372,7 +378,7 @@ export default function TopPage() {
             boxShadow: "0 10px 20px rgba(0,0,0,0.25)",
           }}
         >
-          🌟 スタンプ帳をつくる（名前を登録してスタンプを貯める）
+          🌟 スタンプ帳をつくる
         </button>
 
         {profiles.length > 0 && (
