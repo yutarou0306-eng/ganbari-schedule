@@ -7,9 +7,6 @@ import { supabase } from "./db.js";
 import { computeOverallStats } from "./progress.js";
 
 const oceanBg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
-// Backup PIN — always accepted alongside whatever PIN the parent set, in case
-// they forget their own. Intentionally not a secret kept from the parent.
-const MASTER_PIN = "5963";
 
 function todayStr() {
   const d = new Date();
@@ -88,9 +85,6 @@ export default function TopPage() {
   const [profiles, setProfiles] = useState(getKnownProfiles());
   const [refreshing, setRefreshing] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, title } | null
-  const [deleting, setDeleting] = useState(false);
-  const [deletePin, setDeletePin] = useState("");
-  const [deleteError, setDeleteError] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const [appCopied, setAppCopied] = useState(false);
   const [findName, setFindName] = useState("");
@@ -247,35 +241,14 @@ export default function TopPage() {
     }
   }
 
-  async function handleConfirmDelete() {
+  function handleConfirmDelete() {
     if (!deleteTarget) return;
-    setDeleting(true);
-    setDeleteError(false);
-    try {
-      // Fetch the real PIN fresh from the server rather than trusting the
-      // local per-device registry cache (which doesn't store it at all) —
-      // this is the actual gate, so it has to check the source of truth.
-      const { data } = await supabase.from("schedules").select("blob").eq("id", deleteTarget.id).maybeSingle();
-      const correctPin = ((data && data.blob && data.blob.config && data.blob.config.pin) || "").trim();
-      const entered = deletePin.trim();
-      if (entered !== MASTER_PIN && (!correctPin || entered !== correctPin)) {
-        setDeleteError(true);
-        setDeletePin("");
-        setDeleting(false);
-        return;
-      }
-      await supabase.from("schedules").delete().eq("id", deleteTarget.id);
-    } catch (e) {
-      setDeleteError(true);
-      setDeleting(false);
-      return;
-    }
+    // This only removes the schedule from this device's "見る"/"完了"
+    // list — it does NOT delete the schedule itself. Actual deletion only
+    // happens from the delete button inside the schedule itself.
     removeKnownSchedule(deleteTarget.id);
     setSchedules(getKnownSchedules());
-    setDeleting(false);
     setDeleteTarget(null);
-    setDeletePin("");
-    setDeleteError(false);
   }
 
   const today = todayStr();
@@ -711,50 +684,14 @@ export default function TopPage() {
             }}
           >
             <h3 style={{ margin: "0 0 8px", fontSize: 20, color: "#0B3D62", fontFamily: "inherit" }}>
-              このスケジュールを削除しますか？
+              この一覧から削除しますか？
             </h3>
             <p style={{ fontSize: 15.5, color: "#4a6c85", lineHeight: 1.6, marginBottom: 20 }}>
-              「{deleteTarget.title || "無題のスケジュール"}」を削除します。これまでの記録もすべて消え、元に戻せません。
+              「{deleteTarget.title || "無題のスケジュール"}」をこの端末の「見る」「完了」の一覧から消します。スケジュール自体や記録は消えません。もう一度リンクを開けば元通り一覧に出てきます。
             </p>
-            <label style={{ display: "block", fontWeight: 700, fontSize: 13.5, marginBottom: 6, color: "#14588C", textAlign: "left" }}>
-              保護者用の暗証番号
-            </label>
-            <input
-              type="password"
-              inputMode="numeric"
-              autoComplete="off"
-              value={deletePin}
-              onChange={(e) => {
-                setDeletePin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6));
-                setDeleteError(false);
-              }}
-              placeholder="暗証番号を入力"
-              style={{
-                width: "100%",
-                padding: "11px 12px",
-                borderRadius: 12,
-                border: deleteError ? "2px solid #E0526B" : "2px solid #BFE3F0",
-                fontSize: 15,
-                fontFamily: "inherit",
-                marginBottom: deleteError ? 6 : 18,
-                boxSizing: "border-box",
-                textAlign: "center",
-                letterSpacing: 3,
-              }}
-            />
-            {deleteError && (
-              <p style={{ color: "#E0526B", fontSize: 13, fontWeight: 700, margin: "0 0 12px" }}>
-                暗証番号が違います。もう一度確認してください。
-              </p>
-            )}
             <div style={{ display: "flex", gap: 10 }}>
               <button
-                onClick={() => {
-                  setDeleteTarget(null);
-                  setDeletePin("");
-                  setDeleteError(false);
-                }}
-                disabled={deleting}
+                onClick={() => setDeleteTarget(null)}
                 style={{
                   flex: 1,
                   padding: "12px 0",
@@ -772,21 +709,20 @@ export default function TopPage() {
               </button>
               <button
                 onClick={handleConfirmDelete}
-                disabled={deleting || !deletePin.trim()}
                 style={{
                   flex: 1,
                   padding: "12px 0",
                   borderRadius: 12,
                   border: "none",
-                  background: deleting || !deletePin.trim() ? "#e9b3bc" : "#E0526B",
+                  background: "#E0526B",
                   color: "#fff",
                   fontWeight: 700,
-                  cursor: deleting || !deletePin.trim() ? "default" : "pointer",
+                  cursor: "pointer",
                   fontFamily: "inherit",
                   fontSize: 16,
                 }}
               >
-                {deleting ? "確認中…" : "削除する"}
+                削除する
               </button>
             </div>
           </div>
