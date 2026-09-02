@@ -48,6 +48,25 @@ export function stageImage(species, pct) {
   return files[stageIndex(species, pct)];
 }
 
+// Picks a growth-stage image by explicit stage index rather than a
+// percentage — used for the evolution animation, which needs the exact
+// "before" and "after" art for a stage jump it already knows the indices
+// of. Clamped so an out-of-range index degrades to the nearest real stage
+// instead of returning undefined.
+export function stageImageAt(species, index) {
+  const files = STAGE_FILES[species] || STAGE_FILES.pegasus;
+  const i = Math.max(0, Math.min(files.length - 1, index));
+  return files[i];
+}
+
+// How many growth stages a species has — the evolution effect uses this to
+// know it's showing the final (master) stage, where there's nothing further
+// to grow into.
+export function stageCount(species) {
+  const files = STAGE_FILES[species] || STAGE_FILES.pegasus;
+  return files.length;
+}
+
 export const DRAGON_VARIANTS = [
   {
     key: "blue",
