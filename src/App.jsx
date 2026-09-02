@@ -211,6 +211,19 @@ function uid() {
   return Math.random().toString(36).slice(2, 9);
 }
 
+// parentComments used to store one plain string per date (a single parent
+// comment). It's now a list per date, since a grandparent or tutor might
+// also want to leave one — this upgrades any old-format string found in
+// storage into a one-item list instead of breaking on it.
+function normalizeParentComments(raw) {
+  const out = {};
+  Object.entries(raw || {}).forEach(([k, v]) => {
+    if (Array.isArray(v)) out[k] = v;
+    else if (typeof v === "string" && v.trim()) out[k] = [{ id: uid(), name: "保護者", text: v }];
+  });
+  return out;
+}
+
 function parseDate(s) {
   if (!s) return null;
   const [y, m, d] = s.split("-").map(Number);
@@ -439,7 +452,7 @@ export default function KidsScheduleApp() {
             setRecoveries(data.recoveries || {});
             setFunStamps(data.funStamps || {});
             setNotes(data.notes || {});
-            setParentComments(data.parentComments || {});
+            setParentComments(normalizeParentComments(data.parentComments));
             setAchievements(data.achievements || {});
             // A "?edit=1" URL flag (used by the top-page's edit button) jumps
             // straight into the setup/edit screen instead of the main view.
@@ -530,7 +543,7 @@ export default function KidsScheduleApp() {
             setRecoveries(data.recoveries || {});
             setFunStamps(data.funStamps || {});
             setNotes(data.notes || {});
-            setParentComments(data.parentComments || {});
+            setParentComments(normalizeParentComments(data.parentComments));
             setAchievements(data.achievements || {});
           }
         } catch (e) {}
@@ -858,11 +871,11 @@ export default function KidsScheduleApp() {
     for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) {
       const dKey = dateKey(d);
       const note = notes[dKey];
-      const parentComment = parentComments[dKey];
+      const comments = parentComments[dKey] || [];
       const achv = achievements[dKey];
       const hasAchv = achv && Object.keys(achv).length > 0;
-      if (note || parentComment || hasAchv) {
-        entries.push({ date: new Date(d), dKey, note, parentComment, achv: hasAchv ? achv : null });
+      if (note || comments.length > 0 || hasAchv) {
+        entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null });
       }
     }
     entries.sort((a, b) => b.date.getTime() - a.date.getTime());
@@ -877,7 +890,22 @@ export default function KidsScheduleApp() {
     setNoteModalDate(null);
   }
 
-  function handleSaveNote(text, achv, parentComment) {
+  // Adds one comment to a day's record — from "記録を見る", not gated by
+  // the parent PIN, since grandparents/tutors reading via the share link
+  // won't have it. Each reply carries its own name, so multiple people can
+  // comment on the same day without overwriting each other.
+  function handleAddParentComment(dKey, name, text) {
+    const cleanText = (text || "").trim();
+    if (!cleanText) return;
+    const cleanName = (name || "").trim() || "コメント";
+    setParentComments((prev) => {
+      const list = prev[dKey] ? [...prev[dKey]] : [];
+      list.push({ id: uid(), name: cleanName, text: cleanText, createdAt: todayStr() });
+      return { ...prev, [dKey]: list };
+    });
+  }
+
+  function handleSaveNote(text, achv) {
     if (!noteModalDate) return;
     const dKey = dateKey(noteModalDate);
     setNotes((prev) => {
@@ -886,16 +914,6 @@ export default function KidsScheduleApp() {
       else delete next[dKey];
       return next;
     });
-    if (!locked) {
-      // Only a parent (unlocked) can write/edit this — a kid re-saving their
-      // own note while locked must never touch the parent's comment.
-      setParentComments((prev) => {
-        const next = { ...prev };
-        if ((parentComment || "").trim()) next[dKey] = parentComment;
-        else delete next[dKey];
-        return next;
-      });
-    }
     if (achv && Object.keys(achv).length > 0) {
       setAchievements((prev) => {
         // drop subjects whose fields are all empty so we don't store clutter
@@ -1100,8 +1118,7 @@ export default function KidsScheduleApp() {
           date={noteModalDate}
           initialText={notes[dateKey(noteModalDate)] || ""}
           initialAchievements={achievements[dateKey(noteModalDate)] || {}}
-          initialParentComment={parentComments[dateKey(noteModalDate)] || ""}
-          locked={locked}
+          comments={parentComments[dateKey(noteModalDate)] || []}
           subjects={config.subjects}
           isMapTheme={getTheme(config.theme).isMapTheme}
           onSave={handleSaveNote}
@@ -1113,6 +1130,7 @@ export default function KidsScheduleApp() {
         <RecordsListModal
           entries={buildRecordsList()}
           subjects={config.subjects}
+          onAddComment={handleAddParentComment}
           onClose={() => setShowRecordsList(false)}
         />
       )}
@@ -2287,10 +2305,9 @@ function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
   );
 }
 
-function NoteModal({ date, initialText, initialAchievements, initialParentComment, locked, subjects, isMapTheme, onSave, onClose }) {
+function NoteModal({ date, initialText, initialAchievements, comments, subjects, isMapTheme, onSave, onClose }) {
   const [text, setText] = useState(initialText || "");
   const [achv, setAchv] = useState(initialAchievements || {});
-  const [parentComment, setParentComment] = useState(initialParentComment || "");
   const dLabel = `${date.getMonth() + 1}月${date.getDate()}日`;
 
   function setField(subjId, field, value) {
@@ -2369,33 +2386,23 @@ function NoteModal({ date, initialText, initialAchievements, initialParentCommen
           rows={4}
         />
 
-        {!locked ? (
-          // Parent has unlocked this schedule — they can write or edit their
-          // own comment here, kept separate from the kid's note above.
-          <>
-            <p style={{ ...styles.modalMsg, marginTop: 14 }}>💬 保護者からのコメント</p>
-            <textarea
-              value={parentComment}
-              onChange={(e) => setParentComment(e.target.value)}
-              placeholder="例）よく頑張ったね！次も応援してるよ。"
-              style={styles.noteTextarea}
-              rows={3}
-            />
-          </>
-        ) : (
-          parentComment && (
-            <div style={styles.parentCommentReadOnly}>
-              <div style={styles.parentCommentLabel}>💬 保護者より</div>
-              <div style={styles.parentCommentText}>{parentComment}</div>
-            </div>
-          )
+        {comments && comments.length > 0 && (
+          <div style={{ marginBottom: 4 }}>
+            <p style={styles.modalMsg}>💬 みんなからのコメント</p>
+            {comments.map((c) => (
+              <div key={c.id} style={styles.parentCommentReadOnly}>
+                <div style={styles.parentCommentLabel}>{c.name}</div>
+                <div style={styles.parentCommentText}>{c.text}</div>
+              </div>
+            ))}
+          </div>
         )}
 
         <div style={styles.modalBtns}>
           <button style={styles.modalCancel} onClick={onClose}>
             とじる
           </button>
-          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, parentComment)}>
+          <button style={styles.modalConfirm} onClick={() => onSave(text, achv)}>
             保存する
           </button>
         </div>
@@ -2404,7 +2411,12 @@ function NoteModal({ date, initialText, initialAchievements, initialParentCommen
   );
 }
 
-function RecordsListModal({ entries, subjects, onClose }) {
+function RecordsListModal({ entries, subjects, onAddComment, onClose }) {
+  // Remembered across entries for this viewing session only, so someone
+  // replying to several days in a row doesn't have to retype their name
+  // each time. Not persisted — next time they open this, it starts blank.
+  const [commenterName, setCommenterName] = useState("");
+
   return (
     <div style={styles.modalOverlay}>
       <div style={styles.recordsListCard}>
@@ -2413,36 +2425,16 @@ function RecordsListModal({ entries, subjects, onClose }) {
           <p style={styles.modalMsg}>まだ記録がありません。日付の「📝メモ」から書いてみよう！</p>
         ) : (
           <div style={styles.recordsListScroll}>
-            {entries.map((e) => {
-              const achvParts = [];
-              if (e.achv) {
-                Object.entries(e.achv).forEach(([subjId, vals]) => {
-                  const s = subjects.find((x) => x.id === subjId);
-                  if (!s) return;
-                  const parts = [];
-                  if (vals.minutes) parts.push(`⏱${vals.minutes}分`);
-                  if (vals.pages) parts.push(`📖${vals.pages}ページ`);
-                  if (vals.problems) parts.push(`✏️${vals.problems}問`);
-                  if (parts.length > 0) achvParts.push({ name: s.name, color: s.color, text: parts.join(" ") });
-                });
-              }
-              return (
-                <div key={e.dKey} style={styles.recordEntryCard}>
-                  <div style={styles.recordEntryDate}>
-                    {e.date.getMonth() + 1}月{e.date.getDate()}日
-                  </div>
-                  {achvParts.map((a) => (
-                    <div key={a.name} style={{ ...styles.recordEntryAchv, color: a.color }}>
-                      {a.name}：{a.text}
-                    </div>
-                  ))}
-                  {e.note && <div style={styles.recordEntryNote}>{e.note}</div>}
-                  {e.parentComment && (
-                    <div style={styles.recordEntryParentComment}>💬 保護者より：{e.parentComment}</div>
-                  )}
-                </div>
-              );
-            })}
+            {entries.map((e) => (
+              <RecordEntryCard
+                key={e.dKey}
+                entry={e}
+                subjects={subjects}
+                commenterName={commenterName}
+                onCommenterNameChange={setCommenterName}
+                onAddComment={onAddComment}
+              />
+            ))}
           </div>
         )}
         <button style={{ ...styles.modalConfirm, width: "100%" }} onClick={onClose}>
@@ -2452,6 +2444,88 @@ function RecordsListModal({ entries, subjects, onClose }) {
     </div>
   );
 }
+
+function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameChange, onAddComment }) {
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState("");
+
+  const achvParts = [];
+  if (e.achv) {
+    Object.entries(e.achv).forEach(([subjId, vals]) => {
+      const s = subjects.find((x) => x.id === subjId);
+      if (!s) return;
+      const parts = [];
+      if (vals.minutes) parts.push(`⏱${vals.minutes}分`);
+      if (vals.pages) parts.push(`📖${vals.pages}ページ`);
+      if (vals.problems) parts.push(`✏️${vals.problems}問`);
+      if (parts.length > 0) achvParts.push({ name: s.name, color: s.color, text: parts.join(" ") });
+    });
+  }
+
+  function submitReply() {
+    if (!replyText.trim()) return;
+    onAddComment(e.dKey, commenterName, replyText);
+    setReplyText("");
+    setReplyOpen(false);
+  }
+
+  return (
+    <div style={styles.recordEntryCard}>
+      <div style={styles.recordEntryDate}>
+        {e.date.getMonth() + 1}月{e.date.getDate()}日
+      </div>
+      {achvParts.map((a) => (
+        <div key={a.name} style={{ ...styles.recordEntryAchv, color: a.color }}>
+          {a.name}：{a.text}
+        </div>
+      ))}
+      {e.note && <div style={styles.recordEntryNote}>{e.note}</div>}
+
+      {e.comments && e.comments.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          {e.comments.map((c) => (
+            <div key={c.id} style={styles.recordEntryParentComment}>
+              <span style={{ fontWeight: 800 }}>{c.name}</span>：{c.text}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {replyOpen ? (
+        <div style={styles.replyForm}>
+          <input
+            value={commenterName}
+            onChange={(ev) => onCommenterNameChange(ev.target.value)}
+            placeholder="お名前（例：ママ、おばあちゃん、○○先生）"
+            maxLength={20}
+            style={styles.replyNameInput}
+          />
+          <textarea
+            value={replyText}
+            onChange={(ev) => setReplyText(ev.target.value)}
+            placeholder="コメントを書く"
+            rows={2}
+            style={styles.replyTextarea}
+            autoFocus
+          />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button style={styles.replyCancelBtn} onClick={() => setReplyOpen(false)}>
+              やめる
+            </button>
+            <button style={styles.replySubmitBtn} onClick={submitReply}>
+              送信する
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button style={styles.replyOpenBtn} onClick={() => setReplyOpen(true)}>
+          💬 返信する
+        </button>
+      )}
+    </div>
+  );
+}
+
 
 function DayCelebration({ onClose, theme }) {
   useEffect(() => {
@@ -2706,6 +2780,10 @@ function GrowthMascotArt({ theme, pct, variantKey, mascotName }) {
             marginTop: 2,
             color: isBoy ? "#3E2415" : "#fff",
             textShadow: isBoy ? "0 1px 3px rgba(255,255,255,0.6)" : "0 1px 3px rgba(0,0,0,0.45)",
+            fontSize: mascotNameFontSize(mascotName),
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
           }}
         >
           {mascotName}
@@ -2713,6 +2791,20 @@ function GrowthMascotArt({ theme, pct, variantKey, mascotName }) {
       )}
     </div>
   );
+}
+
+// Keeps the mascot's name on one line at any length instead of wrapping —
+// shrinks the font size as the name gets longer rather than letting it
+// break onto a second line (which threw off the row height it shares with
+// the mascot icon/speech bubble).
+function mascotNameFontSize(name) {
+  const len = (name || "").length;
+  if (len <= 5) return 12;
+  if (len <= 7) return 11;
+  if (len <= 9) return 10;
+  if (len <= 12) return 9;
+  if (len <= 16) return 8;
+  return 7;
 }
 
 function MapDoodles() {
@@ -2970,6 +3062,43 @@ const styles = {
   recordEntryAchv: { fontSize: 13.5, fontWeight: 800, marginBottom: 2 },
   recordEntryNote: { fontSize: 14, color: "#4a6c85", lineHeight: 1.6, marginTop: 4, whiteSpace: "pre-wrap" },
   recordEntryParentComment: { fontSize: 13.5, color: "#B5651D", lineHeight: 1.6, marginTop: 6, whiteSpace: "pre-wrap", background: "#FFF7E0", borderRadius: 10, padding: "6px 10px" },
+  replyOpenBtn: {
+    marginTop: 10,
+    background: "none",
+    border: "none",
+    color: "#3E6FBF",
+    fontWeight: 800,
+    fontSize: 13.5,
+    padding: 0,
+    cursor: "pointer",
+    fontFamily: "inherit",
+  },
+  replyForm: { marginTop: 10, background: "#F5F9FB", borderRadius: 12, padding: 10 },
+  replyNameInput: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "8px 10px",
+    borderRadius: 10,
+    border: "2px solid #BFE3F0",
+    fontSize: 13.5,
+    fontFamily: "inherit",
+    marginBottom: 6,
+    color: "#0B3D62",
+  },
+  replyTextarea: {
+    width: "100%",
+    boxSizing: "border-box",
+    padding: "8px 10px",
+    borderRadius: 10,
+    border: "2px solid #BFE3F0",
+    fontSize: 14,
+    fontFamily: "inherit",
+    resize: "vertical",
+    marginBottom: 8,
+    color: "#0B3D62",
+  },
+  replyCancelBtn: { flex: 1, padding: "8px 0", borderRadius: 10, border: "none", background: "#E5EEF2", color: "#4a6c85", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 13.5 },
+  replySubmitBtn: { flex: 1, padding: "8px 0", borderRadius: 10, border: "none", background: "#3E6FBF", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 13.5 },
   modalBtns: { display: "flex", gap: 10 },
   modalCancel: { flex: 1, padding: "12px 0", borderRadius: 12, border: "2px solid #d7ecf3", background: "#fff", color: "#5a7d94", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
   modalConfirm: { flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
