@@ -615,7 +615,7 @@ export default function ProfileRoot() {
           {allCards.length === 0 ? (
             <div style={emptyCardStyle}>まだカードがありません。スケジュールを最後まで達成するとカードがもらえます。</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
               {allCards.map((c) => (
                 <CardTile
                   key={c.id}

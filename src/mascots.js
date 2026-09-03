@@ -173,7 +173,7 @@ const FAIRY_VARIANTS = [
     key: "fairy-green",
     species: "fairy",
     name: "グリーンフェアリー",
-    filter: "hue-rotate(90deg) saturate(1.6)",
+    filter: "hue-rotate(90deg) saturate(0.7) brightness(1.1)",
     cardBg: "linear-gradient(135deg,#B9F0A6,#2F8F3B)",
   },
 ];
