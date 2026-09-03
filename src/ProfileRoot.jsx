@@ -934,8 +934,10 @@ function CardTile({ card, selected, onToggle, onOpen }) {
 // changes and this view only shows the final numbers.
 function CardDetailModal({ card, onAllocate, onLock, onClose }) {
   const [confirming, setConfirming] = useState(false);
+  const [zoomedStage, setZoomedStage] = useState(null); // stage index currently shown large, or null
   const isSchedule = card.source === "schedule";
   const canEdit = isSchedule && !card.locked;
+  const heroSrc = isSchedule && card.variant ? stageImageAt(card.variant.species, stageCount(card.variant.species) - 1) : null;
 
   return (
     <div style={overlayStyle}>
@@ -944,22 +946,48 @@ function CardDetailModal({ card, onAllocate, onLock, onClose }) {
           <h3 style={{ margin: 0, fontSize: 19, color: "#0B3D62" }}>{card.label}</h3>
           <button
             onClick={onClose}
-            aria-label="とじる"
+            aria-label="閉じる"
             style={{ border: "none", background: "none", fontSize: 20, color: "#9db3c2", cursor: "pointer", padding: 0, lineHeight: 1 }}
           >
             ✕
           </button>
         </div>
 
+        <div
+          style={{
+            width: 168,
+            height: 168,
+            margin: "10px auto 14px",
+            borderRadius: 20,
+            background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 14,
+            boxShadow: "0 10px 24px rgba(11,61,98,0.3), inset 0 0 0 3px rgba(255,255,255,0.6)",
+          }}
+        >
+          {heroSrc ? (
+            <img
+              src={heroSrc}
+              alt={card.label}
+              style={{ width: "100%", height: "100%", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }}
+            />
+          ) : (
+            <span style={{ fontSize: 68 }}>⚗️</span>
+          )}
+        </div>
+
         {isSchedule && card.variant && (
           <>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", margin: "12px 0 6px" }}>成長のようす</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", margin: "12px 0 6px" }}>成長の様子（タップで拡大）</div>
             <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
               {Array.from({ length: stageCount(card.variant.species) }).map((_, i) => {
                 const isLast = i === stageCount(card.variant.species) - 1;
                 return (
                   <div
                     key={i}
+                    onClick={() => setZoomedStage(i)}
                     style={{
                       flex: 1,
                       aspectRatio: "1 / 1",
@@ -970,6 +998,7 @@ function CardDetailModal({ card, onAllocate, onLock, onClose }) {
                       justifyContent: "center",
                       padding: 3,
                       boxShadow: isLast ? "0 0 0 2px #FFE27A" : "none",
+                      cursor: "pointer",
                     }}
                   >
                     <img
@@ -987,13 +1016,13 @@ function CardDetailModal({ card, onAllocate, onLock, onClose }) {
         <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>ステータス</div>
         {confirming ? (
           <div style={{ background: "#FFF7E0", border: "2px solid #F4C95D", borderRadius: 12, padding: 14, marginBottom: 14, textAlign: "center" }}>
-            <p style={{ fontSize: 14.5, color: "#5C3A21", fontWeight: 700, margin: "0 0 12px" }}>これで よいですか？{"\n"}あとから 変えられません。</p>
+            <p style={{ fontSize: 14.5, color: "#5C3A21", fontWeight: 700, margin: "0 0 12px" }}>これでよいですか？あとから変更できません。</p>
             <div style={{ display: "flex", gap: 8 }}>
               <button
                 onClick={() => setConfirming(false)}
                 style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}
               >
-                いいえ、なおす
+                いいえ、直す
               </button>
               <button
                 onClick={() => {
@@ -1010,7 +1039,7 @@ function CardDetailModal({ card, onAllocate, onLock, onClose }) {
           <>
             {canEdit && (
               <p style={{ fontSize: 13, color: "#7c98aa", marginBottom: 8 }}>
-                のこり <span style={{ color: "#0B3D62", fontSize: 17, fontWeight: 900 }}>{card.remaining}</span> ポイント
+                残り <span style={{ color: "#0B3D62", fontSize: 17, fontWeight: 900 }}>{card.remaining}</span> ポイント
               </p>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
@@ -1049,10 +1078,10 @@ function CardDetailModal({ card, onAllocate, onLock, onClose }) {
                 onClick={() => setConfirming(true)}
                 style={{ ...modalBtnStyle, width: "100%", background: "linear-gradient(135deg,#F4C95D,#E0A83E)", color: "#5C3A21", border: "none", marginBottom: 16 }}
               >
-                けってい する
+                決定する
               </button>
             ) : isSchedule ? (
-              <div style={{ fontSize: 12, color: "#7c98aa", fontWeight: 700, marginBottom: 16 }}>⭐ 配点ずみ（変更できません）</div>
+              <div style={{ fontSize: 12, color: "#7c98aa", fontWeight: 700, marginBottom: 16 }}>⭐ 配点済み（変更できません）</div>
             ) : null}
           </>
         )}
@@ -1070,7 +1099,7 @@ function CardDetailModal({ card, onAllocate, onLock, onClose }) {
               <div>⭐ 獲得スタンプ：{card.stars}個</div>
               {card.achvTotals && (card.achvTotals.minutes > 0 || card.achvTotals.pages > 0 || card.achvTotals.problems > 0) && (
                 <div>
-                  やったこと：
+                  取り組んだ内容：
                   {card.achvTotals.minutes > 0 ? `⏱${card.achvTotals.minutes}分 ` : ""}
                   {card.achvTotals.pages > 0 ? `📖${card.achvTotals.pages}ページ ` : ""}
                   {card.achvTotals.problems > 0 ? `✏️${card.achvTotals.problems}問` : ""}
@@ -1083,12 +1112,26 @@ function CardDetailModal({ card, onAllocate, onLock, onClose }) {
           <>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>配合の記録</div>
             <div style={{ background: "#F5F9FB", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4a6c85", lineHeight: 1.8 }}>
-              <div>もとのカード：{card.fromTitle}</div>
+              <div>元のカード：{card.fromTitle}</div>
               {card.earnedAt && <div>配合した日：{card.earnedAt}</div>}
             </div>
           </>
         )}
       </div>
+
+      {isSchedule && card.variant && zoomedStage !== null && (
+        <div
+          onClick={() => setZoomedStage(null)}
+          style={{ position: "fixed", inset: 0, background: "rgba(11,61,98,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 30 }}
+        >
+          <img
+            src={stageImageAt(card.variant.species, zoomedStage)}
+            alt=""
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: "min(80vw, 320px)", height: "min(80vw, 320px)", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }}
+          />
+        </div>
+      )}
     </div>
   );
 }
