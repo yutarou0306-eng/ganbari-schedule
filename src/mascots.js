@@ -22,12 +22,18 @@ const STAGE_FILES = {
   dragon: ["/egg.png", "/baby.png", "/infant.png", "/adult.png", "/master.png"],
   pegasus: PEGASUS_STAGES,
   fairy: ["/fairy-egg.png", "/fairy-baby.png", "/fairy-infant.png", "/fairy-adult.png", "/fairy-master.png"],
+  // Pre-recolored art (skin protected from the tint, unlike the CSS
+  // hue-rotate used for fairy's other colors) — see the "green" variant
+  // below for why.
+  fairyGreen: ["/fairy-green-egg.png", "/fairy-green-baby.png", "/fairy-green-infant.png", "/fairy-green-adult.png", "/fairy-green-master.png"],
   cat: ["/cat-egg.png", "/cat-baby.png", "/cat-infant.png", "/cat-adult.png", "/cat-master.png"],
   tiger: ["/tiger-egg.png", "/tiger-baby.png", "/tiger-infant.png", "/tiger-adult.png", "/tiger-master.png"],
   phoenix: ["/phoenix-egg.png", "/phoenix-baby.png", "/phoenix-infant.png", "/phoenix-adult.png", "/phoenix-master.png"],
   fenrir: ["/fenrir-egg.png", "/fenrir-baby.png", "/fenrir-infant.png", "/fenrir-adult.png", "/fenrir-master.png"],
   griffon: ["/griffon-egg.png", "/griffon-baby.png", "/griffon-infant.png", "/griffon-adult.png", "/griffon-master.png"],
   swamp: ["/swamp-egg.png", "/swamp-baby.png", "/swamp-infant.png", "/swamp-adult.png", "/swamp-master.png"],
+  // Same idea as fairyGreen — pre-recolored, skin left alone.
+  swampGreen: ["/swamp-green-egg.png", "/swamp-green-baby.png", "/swamp-green-infant.png", "/swamp-green-adult.png", "/swamp-green-master.png"],
   mermaid: ["/mermaid-egg.png", "/mermaid-baby.png", "/mermaid-infant.png", "/mermaid-adult.png", "/mermaid-master.png"],
 };
 
@@ -171,9 +177,9 @@ const FAIRY_VARIANTS = [
   },
   {
     key: "fairy-green",
-    species: "fairy",
+    species: "fairyGreen",
     name: "グリーンフェアリー",
-    filter: "hue-rotate(90deg) saturate(0.7) brightness(1.1)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#B9F0A6,#2F8F3B)",
   },
 ];
@@ -315,9 +321,9 @@ const SWAMP_VARIANTS = [
   },
   {
     key: "swamp-green",
-    species: "swamp",
+    species: "swampGreen",
     name: "グリーンスワンプリンセス",
-    filter: "hue-rotate(87deg) saturate(1.6)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#C1F0B0,#2F8F3B)",
   },
 ];
@@ -346,20 +352,12 @@ const MERMAID_VARIANTS = [
   },
 ];
 
-export const GIRL_VARIANTS = [
-  ...PEGASUS_VARIANTS,
-  ...FAIRY_VARIANTS,
-  ...CAT_VARIANTS,
-  ...TIGER_VARIANTS,
-  ...PHOENIX_VARIANTS,
-  ...FENRIR_VARIANTS,
-  ...GRIFFON_VARIANTS,
-  ...SWAMP_VARIANTS,
-  ...MERMAID_VARIANTS,
-];
+export const BOY_VARIANTS = [...DRAGON_VARIANTS, ...TIGER_VARIANTS, ...PHOENIX_VARIANTS, ...FENRIR_VARIANTS, ...GRIFFON_VARIANTS];
+
+export const GIRL_VARIANTS = [...PEGASUS_VARIANTS, ...FAIRY_VARIANTS, ...CAT_VARIANTS, ...SWAMP_VARIANTS, ...MERMAID_VARIANTS];
 
 export function variantsForTheme(themeKey) {
-  return themeKey === "boy" ? DRAGON_VARIANTS : GIRL_VARIANTS;
+  return themeKey === "boy" ? BOY_VARIANTS : GIRL_VARIANTS;
 }
 
 export function pickRandomVariant(themeKey) {
@@ -444,6 +442,10 @@ export const SPECIES_BASE_STATS = {
   fairy: { hp: HP_MID + 5, mp: HP_MID + 5, power: ST_AVG, defense: ST_AVG, speed: ST_AVG, wisdom: ST_AVG }, // 平均型
   cat: { hp: HP_MID + 5, mp: HP_MID + 5, power: ST_AVG, defense: ST_AVG, speed: ST_AVG, wisdom: ST_AVG }, // 平均型
 };
+// fairyGreen/swampGreen are pre-recolored art variants of fairy/swamp (see
+// STAGE_FILES) — same creature, same stat archetype, just different asset.
+SPECIES_BASE_STATS.fairyGreen = SPECIES_BASE_STATS.fairy;
+SPECIES_BASE_STATS.swampGreen = SPECIES_BASE_STATS.swamp;
 
 function capFor(statKey) {
   return statKey === "hp" || statKey === "mp" ? STAT_MAX.hp : STAT_MAX.power;

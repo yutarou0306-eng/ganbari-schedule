@@ -2812,7 +2812,7 @@ function EvolutionCelebration({ fromSrc, toSrc, filter, cardBg, isFinal, mascotN
       clearTimeout(t2);
     };
   }, []);
-  const imgFilter = filter && filter !== "none" ? filter : undefined;
+  const imgFilter = filter && filter !== "none" ? filter : "none";
   return (
     <div style={styles.weekCelebrateOverlay}>
       {phase === "reveal" && <Confetti />}
@@ -2822,13 +2822,22 @@ function EvolutionCelebration({ fromSrc, toSrc, filter, cardBg, isFinal, mascotN
         </h2>
         {phase !== "reveal" && <p style={styles.weekCelebrateSub}>なにかが おきている…</p>}
         <div style={{ ...styles.cardGetBox, marginBottom: phase === "reveal" ? 4 : 16 }}>
-          <div style={{ ...styles.cardGetImgWrap, background: cardBg, position: "relative", overflow: "hidden" }}>
+          <div style={{ ...styles.cardGetImgWrap, width: 220, height: 220, borderRadius: 28, background: cardBg, position: "relative", overflow: "hidden" }}>
             {phase === "reveal" && <div className="evoRays" />}
-            {phase !== "reveal" ? (
-              <img key="from" src={fromSrc} alt="" className="evoCharge" style={{ ...styles.cardGetImg, filter: imgFilter }} />
-            ) : (
-              <img key="to" src={toSrc} alt="" className="evoReveal" style={{ ...styles.cardGetImg, filter: imgFilter, position: "relative", zIndex: 1 }} />
-            )}
+            {/* The color filter (hue-rotate for the mascot's variant) lives
+                on this wrapper, separate from the shake/pulse/pop
+                animation on the <img> itself — animating `filter` on the
+                same element as a *different* inline filter would let the
+                keyframes silently overwrite the color for the animation's
+                duration, which is why every color used to flash back to
+                the base one during this scene. */}
+            <div style={{ width: "100%", height: "100%", filter: imgFilter }}>
+              {phase !== "reveal" ? (
+                <img key="from" src={fromSrc} alt="" className="evoCharge" style={styles.cardGetImg} />
+              ) : (
+                <img key="to" src={toSrc} alt="" className="evoReveal" style={{ ...styles.cardGetImg, position: "relative", zIndex: 1 }} />
+              )}
+            </div>
             {phase === "flash" && <div className="evoFlash" />}
           </div>
           {phase === "reveal" && mascotName && <div style={styles.cardGetName}>{mascotName}</div>}
