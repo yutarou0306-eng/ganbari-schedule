@@ -4,7 +4,7 @@ import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
 import { getVariant, finalFormImage } from "./mascots.js";
-import { todayPendingSubjects } from "./progress.js";
+import { todayPendingSubjects, computeOverallStats } from "./progress.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
 // Backup PIN — always accepted alongside whatever PIN the parent set, in case
@@ -20,6 +20,23 @@ function countStampsInBlob(blob) {
     });
   });
   return n;
+}
+
+// Sums up every day's achv entries (minutes/pages/problems) for a
+// schedule, across every subject — used to show a "what they actually did"
+// total on a completed schedule (e.g. ⏱120分 📖45ページ ✏️80問).
+function totalAchievementsInBlob(blob) {
+  const achievements = (blob && blob.achievements) || {};
+  const totals = { minutes: 0, pages: 0, problems: 0 };
+  Object.values(achievements).forEach((day) => {
+    Object.values(day || {}).forEach((vals) => {
+      if (!vals) return;
+      totals.minutes += Number(vals.minutes) || 0;
+      totals.pages += Number(vals.pages) || 0;
+      totals.problems += Number(vals.problems) || 0;
+    });
+  });
+  return totals;
 }
 
 const BIRTH_YEAR_OPTIONS = Array.from({ length: 57 }, (_, i) => 2026 - i); // 2026 down to 1970
@@ -140,14 +157,19 @@ export default function ProfileRoot() {
         .eq("blob->config->>profileId", profileId);
       const list = (data || [])
         .filter((row) => row.blob && row.blob.config)
-        .map((row) => ({
-          id: row.id,
-          title: row.blob.config.title,
-          theme: row.blob.config.theme || "girl",
-          stamps: countStampsInBlob(row.blob),
-          awardedCard: row.blob.config.awardedCard || null,
-          pendingToday: todayPendingSubjects(row.blob.config, row.blob.completions),
-        }));
+        .map((row) => {
+          const stats = computeOverallStats(row.blob.config, row.blob.completions);
+          return {
+            id: row.id,
+            title: row.blob.config.title,
+            theme: row.blob.config.theme || "girl",
+            stamps: countStampsInBlob(row.blob),
+            awardedCard: row.blob.config.awardedCard || null,
+            pendingToday: todayPendingSubjects(row.blob.config, row.blob.completions),
+            completed: stats.need > 0 && stats.done >= stats.need,
+            achvTotals: totalAchievementsInBlob(row.blob),
+          };
+        });
       setSchedules(list);
     } catch (e) {}
   }
@@ -207,6 +229,10 @@ export default function ProfileRoot() {
   // Schedules that still have at least one of today's stamps un-pressed —
   // surfaced at the top of the page as a reminder.
   const pendingSchedules = schedules.filter((s) => s.pendingToday && s.pendingToday.length > 0);
+
+  // Schedules that reached 100% — shown as a small trophy list with what
+  // was actually earned/done on each one.
+  const completedSchedules = schedules.filter((s) => s.completed);
 
   // Cards earned across every schedule linked to this stamp book, grouped
   // by theme+color so getting the same dragon/pegasus twice shows as
@@ -364,6 +390,36 @@ export default function ProfileRoot() {
                     </div>
                   </a>
                 ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {completedSchedules.length > 0 && (
+          <>
+            <SectionTitle>✅ 完了したスケジュール</SectionTitle>
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {completedSchedules.map((s) => {
+                  const t = s.achvTotals;
+                  const achvParts = [];
+                  if (t.minutes > 0) achvParts.push(`⏱${t.minutes}分`);
+                  if (t.pages > 0) achvParts.push(`📖${t.pages}ページ`);
+                  if (t.problems > 0) achvParts.push(`✏️${t.problems}問`);
+                  return (
+                    <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
+                      <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
+                        <div style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14, marginBottom: 4 }}>
+                          🏆 {s.title || "無題のスケジュール"}
+                        </div>
+                        <div style={{ fontSize: 12.5, color: "#7c98aa", fontWeight: 700 }}>
+                          ⭐ 獲得スタンプ {s.stamps}個
+                          {achvParts.length > 0 ? `　${achvParts.join(" ")}` : ""}
+                        </div>
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             </div>
           </>
