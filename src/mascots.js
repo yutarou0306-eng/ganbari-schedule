@@ -382,12 +382,13 @@ export function finalFormImage(themeKey, variantKey) {
 
 /* ---------------- RPG-style stats ---------------- */
 // Every collected card has 6 stats. HP/MP cap at 999; the rest cap at 255.
-// Each species leans toward 1-3 stats (its "high" tier); the others start
-// modest, so a card's strengths and weaknesses are visible from the very
-// first egg — and so combining (配合) two cards for their summed stats
-// actually means something. Base values sit around 1/15-1/20 of the max
-// for a species' high stats, on purpose: there's plenty of room to grow
-// both from stars earned and from combining cards.
+// Each species leans toward 1-3 stats (its "high" tier) via its base
+// values — the others start modest, so a card's strengths and weaknesses
+// are visible from the very first egg. Base values sit around 1/15-1/20
+// of the max for a species' high stats, on purpose: there's room for the
+// kid to grow them further by spending earned stars (1 star = 1 point,
+// freely assignable to whichever stat they like — see ProfileRoot's
+// allocation UI) and by combining (配合) cards for their summed stats.
 export const STAT_MAX = { hp: 999, mp: 999, power: 255, defense: 255, speed: 255, wisdom: 255 };
 export const STAT_LABELS = { hp: "HP", mp: "MP", power: "ちから", defense: "しゅび", speed: "はやさ", wisdom: "かしこさ" };
 export const STAT_KEYS = ["hp", "mp", "power", "defense", "speed", "wisdom"];
@@ -418,24 +419,30 @@ function capFor(statKey) {
   return statKey === "hp" || statKey === "mp" ? STAT_MAX.hp : STAT_MAX.power;
 }
 
-// A star earned grows a card's stats a little — proportionally to that
-// stat's base, so a species' strong stats also grow faster with use, the
-// way its weak stats stay relatively weak. HP/MP grow off a bigger divisor
-// since their base numbers (and cap) are already much larger than the
-// other four stats.
-export function computeCardStats(species, stars) {
+// A card's stats = its species' base, plus whatever the kid has manually
+// put their earned stars into. Every star earned is 1 point they can
+// freely choose where to spend (see the allocation UI in ProfileRoot) —
+// there's no automatic growth here, `allocations` is a partial
+// {statKey: points} map of what's already been spent.
+export function computeCardStats(species, allocations) {
   const base = SPECIES_BASE_STATS[species] || SPECIES_BASE_STATS.fairy;
-  const n = Math.max(0, stars || 0);
   const out = {};
   STAT_KEYS.forEach((k) => {
-    const divisor = k === "hp" || k === "mp" ? 300 : 150;
-    const grown = base[k] + Math.floor((n * base[k]) / divisor);
-    out[k] = Math.min(capFor(k), grown);
+    const bonus = Math.max(0, (allocations && allocations[k]) || 0);
+    out[k] = Math.min(capFor(k), base[k] + bonus);
   });
   return out;
 }
 
-// Combining (配合) two cards sums their stats, capped at each stat's max.
+// Points already spent across all 6 stats — compare against a card's star
+// count to find how many points it still has unspent.
+export function totalAllocated(allocations) {
+  if (!allocations) return 0;
+  return STAT_KEYS.reduce((sum, k) => sum + Math.max(0, allocations[k] || 0), 0);
+}
+
+// Combining (配合) two cards sums their (base + spent points) stats,
+// capped at each stat's max.
 export function combineStats(statsA, statsB) {
   const out = {};
   STAT_KEYS.forEach((k) => {

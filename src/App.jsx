@@ -909,9 +909,9 @@ export default function KidsScheduleApp() {
           theme: prev.theme,
           variant: prev.mascotVariant || pickRandomVariant(prev.theme),
           earnedAt: todayStr(),
-          // Stars this card was earned with — the stat system (mascots.js
-          // computeCardStats) grows the card's stats off this number, so
-          // it needs to be locked in at award time.
+          // Stars this card was earned with — the stamp book lets the kid
+          // spend these as points on whichever stats they like, so this
+          // needs to be locked in at award time as their point budget.
           stars: totalStamps,
         },
       };
@@ -2655,7 +2655,9 @@ function DayCelebration({ onClose, theme }) {
 
 function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey, awarded, stars }) {
   const variant = getVariant(theme, variantKey);
-  const cardStats = awarded ? computeCardStats(variant.species, stars) : null;
+  // Just-awarded card hasn't had any of its stars spent yet — show base
+  // stats only (the kid allocates points later, from the stamp book).
+  const cardStats = awarded ? computeCardStats(variant.species, {}) : null;
   return (
     <div style={styles.weekCelebrateOverlay}>
       <Confetti />

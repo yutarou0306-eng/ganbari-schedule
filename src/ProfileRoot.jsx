@@ -3,7 +3,7 @@ import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
-import { getVariant, finalFormImage, computeCardStats, combineStats, STAT_LABELS, STAT_KEYS } from "./mascots.js";
+import { getVariant, finalFormImage, computeCardStats, combineStats, totalAllocated, STAT_LABELS, STAT_KEYS, STAT_MAX } from "./mascots.js";
 import { todayPendingSubjects, computeOverallStats } from "./progress.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
@@ -122,6 +122,7 @@ export default function ProfileRoot() {
   const [schedules, setSchedules] = useState([]); // [{id, title, theme, stamps}]
   const [selectedCardIds, setSelectedCardIds] = useState([]); // up to 2, for 配合 (breeding)
   const [showBreedModal, setShowBreedModal] = useState(false);
+  const [allocatingCardId, setAllocatingCardId] = useState(null); // card.id currently open in the ⭐ allocation modal
   const [view, setView] = useState("main"); // main | editProfile | rewards
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
   const [copied, setCopied] = useState(false);
@@ -250,6 +251,12 @@ export default function ProfileRoot() {
       const cardTheme = s.awardedCard.theme || s.theme || "girl";
       const variant = getVariant(cardTheme, s.awardedCard.variant);
       const stars = typeof s.awardedCard.stars === "number" ? s.awardedCard.stars : s.stamps;
+      // Points the kid has already spent on this card, stored on the
+      // profile (keyed by schedule id) rather than the schedule itself —
+      // this is their stamp book's own record of how they chose to spend
+      // the stars, editable from here.
+      const allocations = (profile.cardAllocations && profile.cardAllocations[s.id]) || {};
+      const spent = totalAllocated(allocations);
       return {
         id: `sched:${s.id}`,
         source: "schedule",
@@ -257,7 +264,9 @@ export default function ProfileRoot() {
         theme: cardTheme,
         variant,
         stars,
-        stats: computeCardStats(variant.species, stars),
+        allocations,
+        remaining: Math.max(0, stars - spent),
+        stats: computeCardStats(variant.species, allocations),
         label: variant.name,
         fromTitle: s.title,
       };
@@ -305,6 +314,27 @@ export default function ProfileRoot() {
       if (prev.length >= 2) return [prev[1], id]; // swap out the older pick
       return [...prev, id];
     });
+  }
+
+  // +1 / -1 a point on one stat for one card. Guarded so a "+" can't spend
+  // more points than the card has earned in stars, and can't push a stat
+  // past its cap; a "−" can't go below zero.
+  async function handleAllocate(card, statKey, delta) {
+    if (card.source !== "schedule") return;
+    const current = (profile.cardAllocations && profile.cardAllocations[card.scheduleId]) || {};
+    const bonus = Math.max(0, current[statKey] || 0);
+    if (delta > 0) {
+      if (card.remaining <= 0) return;
+      const cap = statKey === "hp" || statKey === "mp" ? STAT_MAX.hp : STAT_MAX.power;
+      if (card.stats[statKey] >= cap) return;
+    }
+    if (delta < 0 && bonus <= 0) return;
+    const next = { ...current, [statKey]: Math.max(0, bonus + delta) };
+    const nextProfile = {
+      ...profile,
+      cardAllocations: { ...(profile.cardAllocations || {}), [card.scheduleId]: next },
+    };
+    await saveProfile(nextProfile);
   }
 
   async function handleRedeem(reward) {
@@ -566,6 +596,7 @@ export default function ProfileRoot() {
                   card={c}
                   selected={selectedCardIds.includes(c.id)}
                   onToggle={() => toggleCardSelect(c.id)}
+                  onAllocate={() => setAllocatingCardId(c.id)}
                 />
               ))}
             </div>
@@ -674,6 +705,19 @@ export default function ProfileRoot() {
           onClose={() => setShowBreedModal(false)}
         />
       )}
+
+      {allocatingCardId &&
+        (() => {
+          const card = allCards.find((c) => c.id === allocatingCardId);
+          if (!card) return null;
+          return (
+            <AllocateStatsModal
+              card={card}
+              onAllocate={(statKey, delta) => handleAllocate(card, statKey, delta)}
+              onClose={() => setAllocatingCardId(null)}
+            />
+          );
+        })()}
     </div>
   );
 }
@@ -764,7 +808,7 @@ function SectionTitle({ children }) {
 // card (has art) or a 配合 (bred) card (stats only, no unique art since
 // there's no dedicated hybrid illustration). Tappable to select for
 // breeding; shows a highlighted ring + order badge while selected.
-function CardTile({ card, selected, onToggle }) {
+function CardTile({ card, selected, onToggle, onAllocate }) {
   const selectedIndex = selected ? "✓" : null;
   return (
     <div
@@ -834,9 +878,94 @@ function CardTile({ card, selected, onToggle }) {
           </div>
         ))}
       </div>
+      {card.source === "schedule" && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onAllocate();
+          }}
+          style={{
+            marginTop: 4,
+            width: "100%",
+            padding: "4px 0",
+            borderRadius: 8,
+            border: "none",
+            background: card.remaining > 0 ? "#FFE27A" : "rgba(255,255,255,0.25)",
+            color: card.remaining > 0 ? "#5C3A21" : "#fff",
+            fontSize: 10.5,
+            fontWeight: 800,
+            cursor: "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          ⭐配点{card.remaining > 0 ? `（あと${card.remaining}）` : ""}
+        </button>
+      )}
     </div>
   );
 }
+
+// Lets the kid freely spend a card's earned stars (1 star = 1 point) on
+// whichever of the 6 stats they like. "+"/"-" per stat, guarded against
+// spending more points than the card has earned or pushing a stat past
+// its cap.
+function AllocateStatsModal({ card, onAllocate, onClose }) {
+  return (
+    <div style={overlayStyle}>
+      <div style={modalCardStyle}>
+        <h3 style={{ margin: "0 0 4px", fontSize: 20, color: "#0B3D62" }}>⭐ ステータスに振り分ける</h3>
+        <p style={{ fontSize: 14, color: "#4a6c85", marginBottom: 6 }}>{card.label}</p>
+        <p style={{ fontSize: 13, color: "#7c98aa", marginBottom: 14 }}>
+          のこり <span style={{ color: "#0B3D62", fontSize: 17, fontWeight: 900 }}>{card.remaining}</span> ポイント
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+          {STAT_KEYS.map((k) => {
+            const bonus = Math.max(0, card.allocations[k] || 0);
+            const cap = k === "hp" || k === "mp" ? STAT_MAX.hp : STAT_MAX.power;
+            const atCap = card.stats[k] >= cap;
+            return (
+              <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F5F9FB", borderRadius: 10, padding: "8px 10px" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#0B3D62", width: 66, textAlign: "left" }}>{STAT_LABELS[k]}</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: "#0B3D62", flex: 1, textAlign: "center" }}>{card.stats[k]}</div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={() => onAllocate(k, -1)}
+                    disabled={bonus <= 0}
+                    style={{ ...allocBtnStyle, opacity: bonus <= 0 ? 0.35 : 1, cursor: bonus <= 0 ? "default" : "pointer" }}
+                  >
+                    −
+                  </button>
+                  <button
+                    onClick={() => onAllocate(k, 1)}
+                    disabled={card.remaining <= 0 || atCap}
+                    style={{ ...allocBtnStyle, opacity: card.remaining <= 0 || atCap ? 0.35 : 1, cursor: card.remaining <= 0 || atCap ? "default" : "pointer" }}
+                  >
+                    ＋
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <button onClick={onClose} style={{ ...modalBtnStyle, width: "100%", background: "#14588C", color: "#fff", border: "none" }}>
+          とじる
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const allocBtnStyle = {
+  width: 30,
+  height: 30,
+  borderRadius: "50%",
+  border: "none",
+  background: "#3E6FBF",
+  color: "#fff",
+  fontSize: 16,
+  fontWeight: 900,
+  fontFamily: "inherit",
+};
 
 // Preview + confirm for combining two selected cards (配合). Stats sum,
 // capped per-stat by mascots.js — no unique art for the result, so this
