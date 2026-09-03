@@ -926,14 +926,21 @@ function CardTile({ card, selected, onToggle, onOpen }) {
 // derived automatically from progress/Level, no manual editing), and
 // which schedule earned it.
 function CardDetailModal({ card, onClose }) {
-  const [zoomedStage, setZoomedStage] = useState(null); // stage index currently shown large, or null
+  const [previewStage, setPreviewStage] = useState(null); // stage index shown in the hero box, or null = current stage
   const isSchedule = card.source === "schedule";
   const isGrowing = card.source === "growing";
-  const heroSrc = card.imgSrc || (isSchedule && card.variant ? stageImageAt(card.variant.species, stageCount(card.variant.species) - 1) : null);
   const currentStageIdx = isGrowing && card.variant ? stageIndex(card.variant.species, card.currentPct) : null;
+  const lastStageIdx = card.variant ? stageCount(card.variant.species) - 1 : null;
+  const defaultHeroSrc = card.imgSrc || (isSchedule && card.variant ? stageImageAt(card.variant.species, lastStageIdx) : null);
+  // Tapping a growth-stage thumbnail swaps the hero preview to that stage,
+  // right in place — no separate overlay popup.
+  const heroSrc = previewStage !== null && card.variant ? stageImageAt(card.variant.species, previewStage) : defaultHeroSrc;
   // Only show the growth-stages row once there's actually a growth story
   // to show — a still-unhatched egg (stage 0) has nothing to look back on.
   const showEvolutionRow = (isSchedule || (isGrowing && currentStageIdx > 0)) && card.variant;
+  // A still-growing card only shows stages it has actually reached — no
+  // spoiling what it grows into next.
+  const stagesToShow = isGrowing ? currentStageIdx + 1 : (lastStageIdx || 0) + 1;
 
   return (
     <div style={overlayStyle}>
@@ -950,6 +957,7 @@ function CardDetailModal({ card, onClose }) {
         </div>
 
         <div
+          onClick={() => setPreviewStage(null)}
           style={{
             width: "100%",
             maxWidth: 300,
@@ -962,6 +970,7 @@ function CardDetailModal({ card, onClose }) {
             justifyContent: "center",
             padding: 16,
             boxShadow: "0 10px 24px rgba(11,61,98,0.3), inset 0 0 0 3px rgba(255,255,255,0.6)",
+            cursor: previewStage !== null ? "pointer" : "default",
           }}
         >
           {heroSrc ? (
@@ -974,20 +983,24 @@ function CardDetailModal({ card, onClose }) {
             <span style={{ fontSize: 100 }}>⚗️</span>
           )}
         </div>
+        {previewStage !== null && (
+          <div style={{ textAlign: "center", fontSize: 11.5, color: "#7c98aa", marginBottom: 6 }}>タップで今の姿にもどる</div>
+        )}
         <div style={{ textAlign: "center", fontSize: 15, fontWeight: 900, color: card.isMaster ? "#E0A83E" : "#0B3D62", marginBottom: 14 }}>
           Lv.{card.lv} {card.isMaster ? "（Master）" : ""}
         </div>
 
         {showEvolutionRow && (
           <>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", margin: "12px 0 6px" }}>成長の様子（タップで拡大）</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", margin: "12px 0 6px" }}>成長の様子（タップで上に表示）</div>
             <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-              {Array.from({ length: stageCount(card.variant.species) }).map((_, i) => {
-                const isCurrent = isGrowing ? i === currentStageIdx : i === stageCount(card.variant.species) - 1;
+              {Array.from({ length: stagesToShow }).map((_, i) => {
+                const isCurrent = isGrowing ? i === currentStageIdx : i === lastStageIdx;
+                const isPreviewed = previewStage === i;
                 return (
                   <div
                     key={i}
-                    onClick={() => setZoomedStage(i)}
+                    onClick={() => setPreviewStage(isPreviewed ? null : i)}
                     style={{
                       flex: 1,
                       aspectRatio: "1 / 1",
@@ -997,7 +1010,7 @@ function CardDetailModal({ card, onClose }) {
                       alignItems: "center",
                       justifyContent: "center",
                       padding: 3,
-                      boxShadow: isCurrent ? "0 0 0 2px #FFE27A" : "none",
+                      boxShadow: isPreviewed ? "0 0 0 2px #3E6FBF" : isCurrent ? "0 0 0 2px #FFE27A" : "none",
                       cursor: "pointer",
                     }}
                   >
@@ -1069,20 +1082,6 @@ function CardDetailModal({ card, onClose }) {
           </>
         )}
       </div>
-
-      {showEvolutionRow && zoomedStage !== null && (
-        <div
-          onClick={() => setZoomedStage(null)}
-          style={{ position: "fixed", inset: 0, background: "rgba(11,61,98,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 30 }}
-        >
-          <img
-            src={stageImageAt(card.variant.species, zoomedStage)}
-            alt=""
-            onClick={(e) => e.stopPropagation()}
-            style={{ width: "min(80vw, 320px)", height: "min(80vw, 320px)", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }}
-          />
-        </div>
-      )}
     </div>
   );
 }
