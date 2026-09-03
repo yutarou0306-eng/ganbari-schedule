@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { pickRandomVariant, getVariant, finalFormImage, stageImage, stageIndex, stageImageAt, stageCount, computeCardStats, STAT_LABELS, STAT_KEYS } from "./mascots.js";
+import { pickRandomVariant, getVariant, finalFormImage, stageImage, stageIndex, stageImageAt, stageCount, computeCardStats, STAT_LABELS, STAT_KEYS, MASTER_LEVEL } from "./mascots.js";
 import { computeOverallStats } from "./progress.js";
 import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 import { supabase } from "./db.js";
@@ -2649,9 +2649,8 @@ function DayCelebration({ onClose, theme }) {
 
 function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey, awarded, stars }) {
   const variant = getVariant(theme, variantKey);
-  // Just-awarded card hasn't had any of its stars spent yet — show base
-  // stats only (the kid allocates points later, from the stamp book).
-  const cardStats = awarded ? computeCardStats(variant.species, {}) : null;
+  // A schedule that just reached 100% is Master — Lv.20.
+  const cardStats = awarded ? computeCardStats(variant.species, MASTER_LEVEL) : null;
   return (
     <div style={styles.weekCelebrateOverlay}>
       <Confetti />

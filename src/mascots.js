@@ -380,18 +380,21 @@ export function finalFormImage(themeKey, variantKey) {
   return files[files.length - 1];
 }
 
-/* ---------------- RPG-style stats ---------------- */
-// Every collected card has 6 stats. HP/MP cap at 999; the rest cap at 255.
-// Each species leans toward 1-3 stats (its "high" tier) via its base
-// values — the others start modest, so a card's strengths and weaknesses
-// are visible from the very first egg. Base values sit around 1/15-1/20
-// of the max for a species' high stats, on purpose: there's room for the
-// kid to grow them further by spending earned stars (1 star = 1 point,
-// freely assignable to whichever stat they like — see ProfileRoot's
-// allocation UI) and by combining (配合) cards for their summed stats.
+/* ---------------- RPG-style stats (LV-based) ---------------- */
+// Every collected card has a Level and 6 stats. A schedule's own progress
+// maps straight onto Level — 100% complete (Master) = Lv.20 — and each
+// stat is the species' Master-level base stat scaled by that Level (i.e.
+// base × Lv/20, rounded to a whole number), so a card visibly grows
+// alongside the schedule instead of the level being a separate thing to
+// manage. HP/MP cap at 999; the rest cap at 255. Levels themselves cap at
+// 999 — a single schedule can only reach Lv.20 on its own, but combining
+// (配合) two Master (Lv.20+) cards sums their Levels (and stats) into one
+// stronger card, which is how higher levels happen.
 export const STAT_MAX = { hp: 999, mp: 999, power: 255, defense: 255, speed: 255, wisdom: 255 };
 export const STAT_LABELS = { hp: "HP", mp: "MP", power: "ちから", defense: "しゅび", speed: "はやさ", wisdom: "かしこさ" };
 export const STAT_KEYS = ["hp", "mp", "power", "defense", "speed", "wisdom"];
+export const LEVEL_MAX = 999;
+export const MASTER_LEVEL = 20; // 100%進捗 = Lv.20 = 一枚のカード単体で到達できる最大レベル
 
 const HP_HIGH = 60,
   HP_MID = 25;
@@ -399,9 +402,10 @@ const ST_HIGH = 15,
   ST_MID = 6,
   ST_AVG = 9;
 
-// species key -> base stats. "pegasus" carries the ユニコーン archetype
-// (treated as the same creature — see mascots feature notes), and the
-// original flavor-only fairy/cat get a flat, unfavored spread.
+// species key -> Master-level (Lv.20) base stats. "pegasus" carries the
+// ユニコーン archetype (treated as the same creature — see mascots
+// feature notes), and the original flavor-only fairy/cat get a flat,
+// unfavored spread.
 export const SPECIES_BASE_STATS = {
   dragon: { hp: HP_HIGH, mp: HP_MID, power: ST_HIGH, defense: ST_MID, speed: ST_MID, wisdom: ST_MID }, // HP・ちから高め
   tiger: { hp: HP_HIGH, mp: HP_MID, power: ST_HIGH, defense: ST_MID, speed: ST_HIGH, wisdom: ST_MID }, // HP・ちから・はやさ高め
@@ -419,34 +423,36 @@ function capFor(statKey) {
   return statKey === "hp" || statKey === "mp" ? STAT_MAX.hp : STAT_MAX.power;
 }
 
-// A card's stats = its species' base, plus whatever the kid has manually
-// put their earned stars into. Every star earned is 1 point they can
-// freely choose where to spend (see the allocation UI in ProfileRoot) —
-// there's no automatic growth here, `allocations` is a partial
-// {statKey: points} map of what's already been spent.
-export function computeCardStats(species, allocations) {
+// Level from a schedule's completion percentage — 100% (Master) = Lv.20,
+// 0% (still an egg) = Lv.0, straight-line in between.
+export function levelFromPct(pct) {
+  const clamped = Math.max(0, Math.min(100, pct || 0));
+  return Math.round((clamped / 100) * MASTER_LEVEL);
+}
+
+// A card's stats at a given Level — its species' Master-level (Lv.20)
+// base stat scaled by Lv/20, rounded to a whole number, capped per stat.
+// A bred card (no single species) doesn't use this — see combineStats.
+export function computeCardStats(species, lv) {
   const base = SPECIES_BASE_STATS[species] || SPECIES_BASE_STATS.fairy;
+  const clampedLv = Math.max(0, Math.min(LEVEL_MAX, lv || 0));
   const out = {};
   STAT_KEYS.forEach((k) => {
-    const bonus = Math.max(0, (allocations && allocations[k]) || 0);
-    out[k] = Math.min(capFor(k), base[k] + bonus);
+    out[k] = Math.min(capFor(k), Math.round((base[k] * clampedLv) / MASTER_LEVEL));
   });
   return out;
 }
 
-// Points already spent across all 6 stats — compare against a card's star
-// count to find how many points it still has unspent.
-export function totalAllocated(allocations) {
-  if (!allocations) return 0;
-  return STAT_KEYS.reduce((sum, k) => sum + Math.max(0, allocations[k] || 0), 0);
-}
-
-// Combining (配合) two cards sums their (base + spent points) stats,
-// capped at each stat's max.
+// Combining (配合) two cards sums their stats, capped at each stat's max.
 export function combineStats(statsA, statsB) {
   const out = {};
   STAT_KEYS.forEach((k) => {
     out[k] = Math.min(capFor(k), (statsA[k] || 0) + (statsB[k] || 0));
   });
   return out;
+}
+
+// Combining (配合) two cards sums their Levels too, capped at LEVEL_MAX.
+export function combineLevel(lvA, lvB) {
+  return Math.min(LEVEL_MAX, Math.max(0, lvA || 0) + Math.max(0, lvB || 0));
 }
