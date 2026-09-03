@@ -600,7 +600,7 @@ export default function ProfileRoot() {
           {allCards.length === 0 ? (
             <div style={emptyCardStyle}>まだカードがありません。スケジュールを最後まで達成するとカードがもらえます。</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
               {allCards.map((c) => (
                 <CardTile
                   key={c.id}
@@ -853,7 +853,7 @@ function CardTile({ card, selected, onToggle, onOpen }) {
             }}
           />
         ) : (
-          <span style={{ fontSize: 34 }}>⚗️</span>
+          <span style={{ fontSize: 48 }}>⚗️</span>
         )}
         <button
           onClick={(e) => {
@@ -863,15 +863,15 @@ function CardTile({ card, selected, onToggle, onOpen }) {
           aria-label="配合に選ぶ"
           style={{
             position: "absolute",
-            top: 4,
-            right: 4,
-            width: 22,
-            height: 22,
+            top: 6,
+            right: 6,
+            width: 26,
+            height: 26,
             borderRadius: "50%",
             border: selected ? "none" : "2px solid rgba(255,255,255,0.85)",
             background: selected ? "#FFE27A" : "rgba(11,61,98,0.35)",
             color: "#5C3A21",
-            fontSize: 12,
+            fontSize: 14,
             fontWeight: 900,
             display: "flex",
             alignItems: "center",
@@ -886,14 +886,14 @@ function CardTile({ card, selected, onToggle, onOpen }) {
           <span
             style={{
               position: "absolute",
-              bottom: 4,
-              left: 4,
+              bottom: 6,
+              left: 6,
               background: "#FFE27A",
               color: "#5C3A21",
-              fontSize: 10,
+              fontSize: 11.5,
               fontWeight: 900,
               borderRadius: 999,
-              padding: "1px 6px",
+              padding: "2px 8px",
             }}
           >
             ⭐{card.remaining}
@@ -902,7 +902,7 @@ function CardTile({ card, selected, onToggle, onOpen }) {
       </div>
       <div
         onClick={onOpen}
-        style={{ fontSize: 11, fontWeight: 800, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.4)", marginTop: 4, textAlign: "center", cursor: "pointer" }}
+        style={{ fontSize: 13, fontWeight: 800, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.4)", marginTop: 6, textAlign: "center", cursor: "pointer" }}
       >
         {card.label}
       </div>
