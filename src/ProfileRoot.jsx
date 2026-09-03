@@ -958,15 +958,16 @@ function CardDetailModal({ card, onFinalize, onClose }) {
 
         <div
           style={{
-            width: 168,
-            height: 168,
+            width: "100%",
+            maxWidth: 300,
+            aspectRatio: "1 / 1",
             margin: "10px auto 14px",
             borderRadius: 20,
             background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: 14,
+            padding: 16,
             boxShadow: "0 10px 24px rgba(11,61,98,0.3), inset 0 0 0 3px rgba(255,255,255,0.6)",
           }}
         >
@@ -977,14 +978,14 @@ function CardDetailModal({ card, onFinalize, onClose }) {
               style={{ width: "100%", height: "100%", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }}
             />
           ) : (
-            <span style={{ fontSize: 68 }}>⚗️</span>
+            <span style={{ fontSize: 100 }}>⚗️</span>
           )}
         </div>
 
         {isSchedule && card.variant && (
           <>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", margin: "12px 0 6px" }}>成長の様子（タップで拡大）</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
+            <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
               {Array.from({ length: stageCount(card.variant.species) }).map((_, i) => {
                 const isLast = i === stageCount(card.variant.species) - 1;
                 return (
@@ -992,14 +993,15 @@ function CardDetailModal({ card, onFinalize, onClose }) {
                     key={i}
                     onClick={() => setZoomedStage(i)}
                     style={{
+                      flex: 1,
                       aspectRatio: "1 / 1",
-                      borderRadius: 12,
+                      borderRadius: 8,
                       background: card.variant.cardBg,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      padding: 6,
-                      boxShadow: isLast ? "0 0 0 3px #FFE27A" : "none",
+                      padding: 3,
+                      boxShadow: isLast ? "0 0 0 2px #FFE27A" : "none",
                       cursor: "pointer",
                     }}
                   >
