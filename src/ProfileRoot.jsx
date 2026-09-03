@@ -507,36 +507,6 @@ export default function ProfileRoot() {
           </>
         )}
 
-        <SectionTitle>✅ 完了したスケジュール</SectionTitle>
-        <div style={{ marginBottom: 18 }}>
-          {completedSchedules.length === 0 ? (
-            <div style={emptyCardStyle}>まだ完了したスケジュールはありません。</div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {completedSchedules.map((s) => {
-                const t = s.achvTotals;
-                const achvParts = [];
-                if (t.minutes > 0) achvParts.push(`⏱${t.minutes}分`);
-                if (t.pages > 0) achvParts.push(`📖${t.pages}ページ`);
-                if (t.problems > 0) achvParts.push(`✏️${t.problems}問`);
-                return (
-                  <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
-                    <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
-                      <div style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14, marginBottom: 4 }}>
-                        🏆 {s.title || "無題のスケジュール"}
-                      </div>
-                      <div style={{ fontSize: 12.5, color: "#7c98aa", fontWeight: 700 }}>
-                        ⭐ 獲得スタンプ {s.stamps}個
-                        {achvParts.length > 0 ? `　${achvParts.join(" ")}` : ""}
-                      </div>
-                    </div>
-                  </a>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
         <SectionTitle>📅 つながっているスケジュール</SectionTitle>
         <div style={{ marginBottom: 18 }}>
           {schedules.length === 0 ? (
@@ -655,6 +625,36 @@ export default function ProfileRoot() {
             </button>
           </div>
         )}
+
+        <SectionTitle>✅ 完了したスケジュール</SectionTitle>
+        <div style={{ marginBottom: 18 }}>
+          {completedSchedules.length === 0 ? (
+            <div style={emptyCardStyle}>まだ完了したスケジュールはありません。</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {completedSchedules.map((s) => {
+                const t = s.achvTotals;
+                const achvParts = [];
+                if (t.minutes > 0) achvParts.push(`⏱${t.minutes}分`);
+                if (t.pages > 0) achvParts.push(`📖${t.pages}ページ`);
+                if (t.problems > 0) achvParts.push(`✏️${t.problems}問`);
+                return (
+                  <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
+                    <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
+                      <div style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14, marginBottom: 4 }}>
+                        🏆 {s.title || "無題のスケジュール"}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: "#7c98aa", fontWeight: 700 }}>
+                        ⭐ 獲得スタンプ {s.stamps}個
+                        {achvParts.length > 0 ? `　${achvParts.join(" ")}` : ""}
+                      </div>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
           <button onClick={() => handleCreateSchedule("girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
