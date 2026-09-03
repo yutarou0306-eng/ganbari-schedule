@@ -385,12 +385,14 @@ const SPECIES_SUFFIX = {
   dragon: "ドラゴン",
   pegasus: "ペガサス",
   fairy: "フェアリー",
+  fairyGreen: "フェアリー",
   cat: "マジカルキャット",
   tiger: "タイガー",
   phoenix: "フェニックス",
   fenrir: "フェンリル",
   griffon: "グリフォン",
   swamp: "スワンプリンセス",
+  swampGreen: "スワンプリンセス",
   mermaid: "マーメイド",
 };
 

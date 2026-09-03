@@ -589,7 +589,7 @@ export default function ProfileRoot() {
           {allCards.length === 0 ? (
             <div style={emptyCardStyle}>まだファミリアカードがありません。スケジュールを最後まで達成するとファミリアカードがもらえます。</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 20 }}>
               {allCards.map((c) => (
                 <CardTile key={c.id} card={c} onOpen={() => setOpenCardId(c.id)} />
               ))}
@@ -819,50 +819,61 @@ function CardTile({ card, selected, onOpen }) {
         onClick={onOpen}
         style={{
           width: "100%",
-          aspectRatio: "1 / 1",
-          borderRadius: 12,
-          background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
-          boxShadow: selected
-            ? "0 0 0 3px #FFE27A, 0 4px 10px rgba(11,61,98,0.35)"
-            : "0 4px 10px rgba(11,61,98,0.25), inset 0 0 0 2px rgba(255,255,255,0.6)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 6,
           position: "relative",
           cursor: "pointer",
-          opacity: card.source === "growing" ? 0.9 : 1,
         }}
       >
-        {card.imgSrc ? (
-          <img
-            src={card.imgSrc}
-            alt={card.label}
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "contain",
-              filter: card.variant.filter === "none" ? "none" : card.variant.filter,
-            }}
-          />
-        ) : (
-          <span style={{ fontSize: 30 }}>⚗️</span>
-        )}
-        <span
+        {/* Percentage top-padding forces a true 1:1 box in every browser
+            (including WebViews that don't honor CSS aspect-ratio),
+            regardless of the source art's own proportions. */}
+        <div style={{ paddingTop: "100%" }} />
+        <div
           style={{
             position: "absolute",
-            bottom: 3,
-            left: 3,
-            background: card.source === "growing" ? "rgba(11,61,98,0.75)" : "#FFE27A",
-            color: card.source === "growing" ? "#fff" : "#5C3A21",
-            fontSize: 9,
-            fontWeight: 900,
-            borderRadius: 999,
-            padding: "1px 5px",
+            inset: 0,
+            borderRadius: 12,
+            background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
+            boxShadow: selected
+              ? "0 0 0 3px #FFE27A, 0 4px 10px rgba(11,61,98,0.35)"
+              : "0 4px 10px rgba(11,61,98,0.25), inset 0 0 0 2px rgba(255,255,255,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 6,
+            boxSizing: "border-box",
+            opacity: card.source === "growing" ? 0.9 : 1,
           }}
         >
-          Lv.{card.lv}
-        </span>
+          {card.imgSrc ? (
+            <img
+              src={card.imgSrc}
+              alt={card.label}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+                filter: card.variant.filter === "none" ? "none" : card.variant.filter,
+              }}
+            />
+          ) : (
+            <span style={{ fontSize: 30 }}>⚗️</span>
+          )}
+          <span
+            style={{
+              position: "absolute",
+              bottom: 3,
+              left: 3,
+              background: card.source === "growing" ? "rgba(11,61,98,0.75)" : "#FFE27A",
+              color: card.source === "growing" ? "#fff" : "#5C3A21",
+              fontSize: 9,
+              fontWeight: 900,
+              borderRadius: 999,
+              padding: "1px 5px",
+            }}
+          >
+            Lv.{card.lv}
+          </span>
+        </div>
       </div>
       <div
         onClick={onOpen}
@@ -1155,7 +1166,7 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
         )}
 
         <div style={{ fontSize: 12, color: "#EAF7FB", fontWeight: 700, marginBottom: 8 }}>Masterのファミリアカード一覧</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18 }}>
           {masterCards.map((c) => (
             <CardTile key={c.id} card={c} selected={c.id === baseId || c.id === subId} onOpen={() => handleTap(c.id)} />
           ))}
