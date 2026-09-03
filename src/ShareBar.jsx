@@ -12,7 +12,7 @@ const pillStyle = {
   whiteSpace: "nowrap",
 };
 
-export default function ShareBar({ profileId }) {
+export default function ShareBar({ profileId, profileName }) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
@@ -56,7 +56,7 @@ export default function ShareBar({ profileId }) {
             href={`${window.location.pathname}?profile=${profileId}`}
             style={{ ...pillStyle, background: "rgba(197,144,29,0.9)", color: "#fff", textDecoration: "none", display: "inline-block" }}
           >
-            🌟 スタンプ帳へ
+            🌟 {profileName || "スタンプ帳"}へ
           </a>
         )}
       </div>

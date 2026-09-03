@@ -42,6 +42,13 @@ function subjectApplies(subject, date, startDate, endDate) {
 
 // Overall completion across the whole schedule period (not just one week),
 // used to show a "達成度" percentage on the top page's schedule lists.
+//
+// Counted by total stamp VALUE, not by how many individual days show at
+// least one stamp — a missed day can be caught up later by double-tapping
+// a different day (worth 2 toward the total instead of 1), so a day-by-day
+// "is every day marked" check would understate progress for anyone who
+// used that catch-up path. `done` can therefore exceed `need` if there
+// was more catching-up than there were gaps; pct is clamped at 100.
 export function computeOverallStats(config, completions) {
   if (!config || !config.subjects || !config.startDate || !config.endDate) {
     return { done: 0, need: 0, pct: 0 };
@@ -58,11 +65,11 @@ export function computeOverallStats(config, completions) {
     config.subjects.forEach((s) => {
       if (subjectApplies(s, d, start, end)) {
         need++;
-        if ((rec[s.id] || 0) >= 1) done++;
+        done += Math.min(2, Math.max(0, rec[s.id] || 0));
       }
     });
   }
-  const pct = need > 0 ? Math.round((done / need) * 100) : 0;
+  const pct = need > 0 ? Math.min(100, Math.round((done / need) * 100)) : 0;
   return { done, need, pct };
 }
 

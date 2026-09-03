@@ -649,7 +649,7 @@ export default function KidsScheduleApp() {
           const completions = (row.blob && row.blob.completions) || {};
           Object.values(completions).forEach((day) => {
             Object.values(day || {}).forEach((v) => {
-              if (v >= 1) total++;
+              total += Math.min(2, Math.max(0, v || 0));
             });
           });
         });
@@ -739,17 +739,17 @@ export default function KidsScheduleApp() {
       if (allDone) setTimeout(() => setCelebrateDay(dKey), 50);
 
       if (dateKey(today) === dateKey(endDate)) {
-        const allDays = [];
-        for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) allDays.push(d);
-        const scheduleAllDone = allDays.every((d) => {
-          const req = daySubjectsFor(d).map((s) => s.id);
-          if (req.length === 0) return true;
-          const rec = updated[dateKey(d)] || {};
-          return req.every((id) => (rec[id] || 0) >= 1);
-        });
+        // Whether the whole schedule counts as done — by total stamp value
+        // vs. total required (see computeOverallStats), not "is every day
+        // individually marked". A caught-up day (double-tap on a different
+        // day, worth 2) can cover a day that's still literally blank, so
+        // checking every day would miss schedules that were actually
+        // finished this way.
+        const overall = computeOverallStats(config, updated);
+        const scheduleAllDone = overall.need > 0 && overall.done >= overall.need;
         if (scheduleAllDone) {
           setTimeout(() => setCelebrateSchedule(true), 700);
-          awardCardIfNeeded(computeOverallStats(config, updated).need);
+          awardCardIfNeeded(overall.need);
         }
       }
       return updated;
@@ -847,17 +847,15 @@ export default function KidsScheduleApp() {
       const allDone = need.length > 0 && need.every((id) => (day[id] || 0) >= 1);
       if (allDone) setTimeout(() => setCelebrateDay(dKey), 50);
 
-      const allDays = [];
-      for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) allDays.push(d);
-      const scheduleAllDone = allDays.every((d) => {
-        const req = daySubjectsFor(d).map((s) => s.id);
-        if (req.length === 0) return true;
-        const rec = updated[dateKey(d)] || {};
-        return req.every((id) => (rec[id] || 0) >= 1);
-      });
+      // Whether the whole schedule counts as done — by total stamp value
+      // vs. total required (see computeOverallStats), not "is every day
+      // individually marked". A caught-up day can cover a day that's
+      // still literally blank in the data.
+      const overall = computeOverallStats(config, updated);
+      const scheduleAllDone = overall.need > 0 && overall.done >= overall.need;
       if (scheduleAllDone) {
         setTimeout(() => setCelebrateSchedule(true), 400);
-        awardCardIfNeeded(computeOverallStats(config, updated).need);
+        awardCardIfNeeded(overall.need);
       }
 
       return updated;
@@ -1018,16 +1016,12 @@ export default function KidsScheduleApp() {
     setLocked(true);
   }
 
+  // Delegates to progress.js so the schedule's own progress bar counts the
+  // same way as everywhere else (top page, stamp book): total stamp value
+  // vs. total required, not "is every day marked" — see the comment on
+  // computeOverallStats for why (the catch-up double-tap needs this).
   function totalStats() {
-    let done = 0,
-      need = 0;
-    for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) {
-      const req = daySubjectsFor(d).map((s) => s.id);
-      need += req.length;
-      const rec = completions[dateKey(d)] || {};
-      done += req.filter((id) => (rec[id] || 0) >= 1).length;
-    }
-    return { done, need };
+    return computeOverallStats(config, completions);
   }
 
   function todayStats() {
@@ -1069,7 +1063,7 @@ export default function KidsScheduleApp() {
   return (
     <div style={styles.appRoot}>
       <GlobalStyle />
-      <ShareBar profileId={config.profileId} />
+      <ShareBar profileId={config.profileId} profileName={linkedProfile ? linkedProfile.name : ""} />
       {view === "setup" && (
         <SetupScreen
           initial={config}
@@ -1768,9 +1762,9 @@ function MainScreen({
   onOpenRecords,
   linkedProfile,
 }) {
-  const pct = stats.need > 0 ? Math.round((stats.done / stats.need) * 100) : 0;
+  const pct = stats.need > 0 ? Math.min(100, Math.round((stats.done / stats.need) * 100)) : 0;
   const pearlCount = 10;
-  const filledPearls = stats.need > 0 ? Math.round((stats.done / stats.need) * pearlCount) : 0;
+  const filledPearls = stats.need > 0 ? Math.min(pearlCount, Math.round((stats.done / stats.need) * pearlCount)) : 0;
 
   const todayPct = todayStats.need > 0 ? Math.round((todayStats.done / todayStats.need) * 100) : 0;
   const mascotMsg =
@@ -1889,7 +1883,7 @@ function MainScreen({
                 alignItems: "center",
               }}
             >
-              🌟 スタンプ帳へ
+              🌟 {linkedProfile.name || "スタンプ帳"}へ
             </a>
           )}
         </div>

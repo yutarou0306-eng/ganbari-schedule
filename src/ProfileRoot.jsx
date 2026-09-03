@@ -3,7 +3,7 @@ import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
-import { getVariant, finalFormImage, computeCardStats, combineStats, totalAllocated, STAT_LABELS, STAT_KEYS, STAT_MAX } from "./mascots.js";
+import { getVariant, finalFormImage, computeCardStats, combineStats, totalAllocated, stageImageAt, stageCount, STAT_LABELS, STAT_KEYS, STAT_MAX } from "./mascots.js";
 import { todayPendingSubjects, computeOverallStats } from "./progress.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
@@ -11,12 +11,15 @@ const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFE
 // they forget their own. Intentionally not a secret kept from the parent.
 const MASTER_PIN = "5963";
 
+// Counts by total stamp VALUE, matching computeOverallStats in progress.js
+// — a "取り戻す" double-tap is worth 2, since it's covering a missed day
+// as well as today's, not just counted as one stamp slot filled.
 function countStampsInBlob(blob) {
   const completions = (blob && blob.completions) || {};
   let n = 0;
   Object.values(completions).forEach((day) => {
     Object.values(day || {}).forEach((v) => {
-      if (v >= 1) n++;
+      n += Math.min(2, Math.max(0, v || 0));
     });
   });
   return n;
@@ -122,7 +125,7 @@ export default function ProfileRoot() {
   const [schedules, setSchedules] = useState([]); // [{id, title, theme, stamps}]
   const [selectedCardIds, setSelectedCardIds] = useState([]); // up to 2, for 配合 (breeding)
   const [showBreedModal, setShowBreedModal] = useState(false);
-  const [allocatingCardId, setAllocatingCardId] = useState(null); // card.id currently open in the ⭐ allocation modal
+  const [openCardId, setOpenCardId] = useState(null); // card.id currently open in the detail view
   const [view, setView] = useState("main"); // main | editProfile | rewards
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
   const [copied, setCopied] = useState(false);
@@ -166,6 +169,8 @@ export default function ProfileRoot() {
             id: row.id,
             title: row.blob.config.title,
             theme: row.blob.config.theme || "girl",
+            startDate: row.blob.config.startDate || "",
+            endDate: row.blob.config.endDate || "",
             stamps: countStampsInBlob(row.blob),
             awardedCard: row.blob.config.awardedCard || null,
             pendingToday: todayPendingSubjects(row.blob.config, row.blob.completions),
@@ -254,9 +259,10 @@ export default function ProfileRoot() {
       // Points the kid has already spent on this card, stored on the
       // profile (keyed by schedule id) rather than the schedule itself —
       // this is their stamp book's own record of how they chose to spend
-      // the stars, editable from here.
+      // the stars, editable from here until locked in for good.
       const allocations = (profile.cardAllocations && profile.cardAllocations[s.id]) || {};
       const spent = totalAllocated(allocations);
+      const locked = !!allocations.locked;
       return {
         id: `sched:${s.id}`,
         source: "schedule",
@@ -265,10 +271,15 @@ export default function ProfileRoot() {
         variant,
         stars,
         allocations,
+        locked,
         remaining: Math.max(0, stars - spent),
         stats: computeCardStats(variant.species, allocations),
         label: variant.name,
         fromTitle: s.title,
+        earnedAt: s.awardedCard.earnedAt || "",
+        startDate: s.startDate,
+        endDate: s.endDate,
+        achvTotals: s.achvTotals,
       };
     });
 
@@ -283,6 +294,7 @@ export default function ProfileRoot() {
     stats: c.stats,
     label: c.name,
     fromTitle: c.parentLabel,
+    earnedAt: c.createdAt || "",
   }));
 
   const allCards = [...myCards, ...bredCards];
@@ -320,7 +332,7 @@ export default function ProfileRoot() {
   // more points than the card has earned in stars, and can't push a stat
   // past its cap; a "−" can't go below zero.
   async function handleAllocate(card, statKey, delta) {
-    if (card.source !== "schedule") return;
+    if (card.source !== "schedule" || card.locked) return;
     const current = (profile.cardAllocations && profile.cardAllocations[card.scheduleId]) || {};
     const bonus = Math.max(0, current[statKey] || 0);
     if (delta > 0) {
@@ -330,6 +342,20 @@ export default function ProfileRoot() {
     }
     if (delta < 0 && bonus <= 0) return;
     const next = { ...current, [statKey]: Math.max(0, bonus + delta) };
+    const nextProfile = {
+      ...profile,
+      cardAllocations: { ...(profile.cardAllocations || {}), [card.scheduleId]: next },
+    };
+    await saveProfile(nextProfile);
+  }
+
+  // Locks a card's stat allocation in for good — after this, handleAllocate
+  // refuses further changes. One-shot: the kid gets one allocation session
+  // per card, confirmed with "これでよいですか？" before it's final.
+  async function handleLockAllocation(card) {
+    if (card.source !== "schedule" || card.locked) return;
+    const current = (profile.cardAllocations && profile.cardAllocations[card.scheduleId]) || {};
+    const next = { ...current, locked: true };
     const nextProfile = {
       ...profile,
       cardAllocations: { ...(profile.cardAllocations || {}), [card.scheduleId]: next },
@@ -589,14 +615,14 @@ export default function ProfileRoot() {
           {allCards.length === 0 ? (
             <div style={emptyCardStyle}>まだカードがありません。スケジュールを最後まで達成するとカードがもらえます。</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 10 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))", gap: 10 }}>
               {allCards.map((c) => (
                 <CardTile
                   key={c.id}
                   card={c}
                   selected={selectedCardIds.includes(c.id)}
                   onToggle={() => toggleCardSelect(c.id)}
-                  onAllocate={() => setAllocatingCardId(c.id)}
+                  onOpen={() => setOpenCardId(c.id)}
                 />
               ))}
             </div>
@@ -605,7 +631,7 @@ export default function ProfileRoot() {
         {allCards.length >= 2 && (
           <div style={{ marginBottom: 18 }}>
             <div style={{ fontSize: 12, color: "#EAF7FB", marginBottom: 8 }}>
-              カードを2枚タップして選ぶと、ステータスを合計した新しいカードに配合できます。
+              カード右上の丸を2枚タップして選ぶと、ステータスを合計した新しいカードに配合できます。
             </div>
             <button
               onClick={() => setShowBreedModal(true)}
@@ -706,15 +732,16 @@ export default function ProfileRoot() {
         />
       )}
 
-      {allocatingCardId &&
+      {openCardId &&
         (() => {
-          const card = allCards.find((c) => c.id === allocatingCardId);
+          const card = allCards.find((c) => c.id === openCardId);
           if (!card) return null;
           return (
-            <AllocateStatsModal
+            <CardDetailModal
               card={card}
               onAllocate={(statKey, delta) => handleAllocate(card, statKey, delta)}
-              onClose={() => setAllocatingCardId(null)}
+              onLock={() => handleLockAllocation(card)}
+              onClose={() => setOpenCardId(null)}
             />
           );
         })()}
@@ -808,14 +835,12 @@ function SectionTitle({ children }) {
 // card (has art) or a 配合 (bred) card (stats only, no unique art since
 // there's no dedicated hybrid illustration). Tappable to select for
 // breeding; shows a highlighted ring + order badge while selected.
-function CardTile({ card, selected, onToggle, onAllocate }) {
-  const selectedIndex = selected ? "✓" : null;
+function CardTile({ card, selected, onToggle, onOpen }) {
+  const needsAttention = card.source === "schedule" && !card.locked && card.remaining > 0;
   return (
-    <div
-      onClick={onToggle}
-      style={{ display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer" }}
-    >
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div
+        onClick={onOpen}
         style={{
           width: "100%",
           aspectRatio: "1 / 1",
@@ -829,6 +854,7 @@ function CardTile({ card, selected, onToggle, onAllocate }) {
           justifyContent: "center",
           padding: 8,
           position: "relative",
+          cursor: "pointer",
         }}
       >
         {card.variant ? (
@@ -845,111 +871,223 @@ function CardTile({ card, selected, onToggle, onAllocate }) {
         ) : (
           <span style={{ fontSize: 34 }}>⚗️</span>
         )}
-        {selectedIndex && (
-          <span
-            style={{
-              position: "absolute",
-              top: 4,
-              right: 4,
-              width: 20,
-              height: 20,
-              borderRadius: "50%",
-              background: "#FFE27A",
-              color: "#5C3A21",
-              fontSize: 12,
-              fontWeight: 900,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {selectedIndex}
-          </span>
-        )}
-      </div>
-      <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.4)", marginTop: 4, textAlign: "center" }}>
-        {card.label}
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px 4px", marginTop: 3, width: "100%" }}>
-        {STAT_KEYS.map((k) => (
-          <div key={k} style={{ fontSize: 9.5, color: "#EAF7FB", display: "flex", justifyContent: "space-between" }}>
-            <span>{STAT_LABELS[k]}</span>
-            <span style={{ fontWeight: 800 }}>{card.stats[k]}</span>
-          </div>
-        ))}
-      </div>
-      {card.source === "schedule" && (
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onAllocate();
+            onToggle();
           }}
+          aria-label="配合に選ぶ"
           style={{
-            marginTop: 4,
-            width: "100%",
-            padding: "4px 0",
-            borderRadius: 8,
-            border: "none",
-            background: card.remaining > 0 ? "#FFE27A" : "rgba(255,255,255,0.25)",
-            color: card.remaining > 0 ? "#5C3A21" : "#fff",
-            fontSize: 10.5,
-            fontWeight: 800,
+            position: "absolute",
+            top: 4,
+            right: 4,
+            width: 22,
+            height: 22,
+            borderRadius: "50%",
+            border: selected ? "none" : "2px solid rgba(255,255,255,0.85)",
+            background: selected ? "#FFE27A" : "rgba(11,61,98,0.35)",
+            color: "#5C3A21",
+            fontSize: 12,
+            fontWeight: 900,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
             cursor: "pointer",
-            fontFamily: "inherit",
+            padding: 0,
           }}
         >
-          ⭐配点{card.remaining > 0 ? `（あと${card.remaining}）` : ""}
+          {selected ? "✓" : ""}
         </button>
-      )}
+        {needsAttention && (
+          <span
+            style={{
+              position: "absolute",
+              bottom: 4,
+              left: 4,
+              background: "#FFE27A",
+              color: "#5C3A21",
+              fontSize: 10,
+              fontWeight: 900,
+              borderRadius: 999,
+              padding: "1px 6px",
+            }}
+          >
+            ⭐{card.remaining}
+          </span>
+        )}
+      </div>
+      <div
+        onClick={onOpen}
+        style={{ fontSize: 11, fontWeight: 800, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.4)", marginTop: 4, textAlign: "center", cursor: "pointer" }}
+      >
+        {card.label}
+      </div>
     </div>
   );
 }
 
-// Lets the kid freely spend a card's earned stars (1 star = 1 point) on
-// whichever of the 6 stats they like. "+"/"-" per stat, guarded against
-// spending more points than the card has earned or pushing a stat past
-// its cap.
-function AllocateStatsModal({ card, onAllocate, onClose }) {
+// The card's full detail view — opened by tapping a card in the grid.
+// Shows the growth line (small thumbnails), the 6 stats (editable with
+// +/- until locked in), and which schedule earned it. Allocation is a
+// one-shot decision: pressing 決定する asks "これでよいですか？" before
+// actually locking it in — after that, handleAllocate refuses further
+// changes and this view only shows the final numbers.
+function CardDetailModal({ card, onAllocate, onLock, onClose }) {
+  const [confirming, setConfirming] = useState(false);
+  const isSchedule = card.source === "schedule";
+  const canEdit = isSchedule && !card.locked;
+
   return (
     <div style={overlayStyle}>
-      <div style={modalCardStyle}>
-        <h3 style={{ margin: "0 0 4px", fontSize: 20, color: "#0B3D62" }}>⭐ ステータスに振り分ける</h3>
-        <p style={{ fontSize: 14, color: "#4a6c85", marginBottom: 6 }}>{card.label}</p>
-        <p style={{ fontSize: 13, color: "#7c98aa", marginBottom: 14 }}>
-          のこり <span style={{ color: "#0B3D62", fontSize: 17, fontWeight: 900 }}>{card.remaining}</span> ポイント
-        </p>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
-          {STAT_KEYS.map((k) => {
-            const bonus = Math.max(0, card.allocations[k] || 0);
-            const cap = k === "hp" || k === "mp" ? STAT_MAX.hp : STAT_MAX.power;
-            const atCap = card.stats[k] >= cap;
-            return (
-              <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F5F9FB", borderRadius: 10, padding: "8px 10px" }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: "#0B3D62", width: 66, textAlign: "left" }}>{STAT_LABELS[k]}</div>
-                <div style={{ fontSize: 16, fontWeight: 900, color: "#0B3D62", flex: 1, textAlign: "center" }}>{card.stats[k]}</div>
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button
-                    onClick={() => onAllocate(k, -1)}
-                    disabled={bonus <= 0}
-                    style={{ ...allocBtnStyle, opacity: bonus <= 0 ? 0.35 : 1, cursor: bonus <= 0 ? "default" : "pointer" }}
-                  >
-                    −
-                  </button>
-                  <button
-                    onClick={() => onAllocate(k, 1)}
-                    disabled={card.remaining <= 0 || atCap}
-                    style={{ ...allocBtnStyle, opacity: card.remaining <= 0 || atCap ? 0.35 : 1, cursor: card.remaining <= 0 || atCap ? "default" : "pointer" }}
-                  >
-                    ＋
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+      <div style={{ ...modalCardStyle, maxWidth: 360, maxHeight: "85vh", overflowY: "auto", textAlign: "left" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
+          <h3 style={{ margin: 0, fontSize: 19, color: "#0B3D62" }}>{card.label}</h3>
+          <button
+            onClick={onClose}
+            aria-label="とじる"
+            style={{ border: "none", background: "none", fontSize: 20, color: "#9db3c2", cursor: "pointer", padding: 0, lineHeight: 1 }}
+          >
+            ✕
+          </button>
         </div>
-        <button onClick={onClose} style={{ ...modalBtnStyle, width: "100%", background: "#14588C", color: "#fff", border: "none" }}>
-          とじる
-        </button>
+
+        {isSchedule && card.variant && (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", margin: "12px 0 6px" }}>成長のようす</div>
+            <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+              {Array.from({ length: stageCount(card.variant.species) }).map((_, i) => {
+                const isLast = i === stageCount(card.variant.species) - 1;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      flex: 1,
+                      aspectRatio: "1 / 1",
+                      borderRadius: 8,
+                      background: card.variant.cardBg,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 3,
+                      boxShadow: isLast ? "0 0 0 2px #FFE27A" : "none",
+                    }}
+                  >
+                    <img
+                      src={stageImageAt(card.variant.species, i)}
+                      alt=""
+                      style={{ width: "100%", height: "100%", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>ステータス</div>
+        {confirming ? (
+          <div style={{ background: "#FFF7E0", border: "2px solid #F4C95D", borderRadius: 12, padding: 14, marginBottom: 14, textAlign: "center" }}>
+            <p style={{ fontSize: 14.5, color: "#5C3A21", fontWeight: 700, margin: "0 0 12px" }}>これで よいですか？{"\n"}あとから 変えられません。</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => setConfirming(false)}
+                style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}
+              >
+                いいえ、なおす
+              </button>
+              <button
+                onClick={() => {
+                  onLock();
+                  setConfirming(false);
+                }}
+                style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}
+              >
+                はい、これで決定
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {canEdit && (
+              <p style={{ fontSize: 13, color: "#7c98aa", marginBottom: 8 }}>
+                のこり <span style={{ color: "#0B3D62", fontSize: 17, fontWeight: 900 }}>{card.remaining}</span> ポイント
+              </p>
+            )}
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+              {STAT_KEYS.map((k) => {
+                const bonus = Math.max(0, (card.allocations && card.allocations[k]) || 0);
+                const cap = k === "hp" || k === "mp" ? STAT_MAX.hp : STAT_MAX.power;
+                const atCap = card.stats[k] >= cap;
+                return (
+                  <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F5F9FB", borderRadius: 10, padding: "8px 10px" }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0B3D62", width: 66, textAlign: "left" }}>{STAT_LABELS[k]}</div>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: "#0B3D62", flex: 1, textAlign: "center" }}>{card.stats[k]}</div>
+                    {canEdit && (
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          onClick={() => onAllocate(k, -1)}
+                          disabled={bonus <= 0}
+                          style={{ ...allocBtnStyle, opacity: bonus <= 0 ? 0.35 : 1, cursor: bonus <= 0 ? "default" : "pointer" }}
+                        >
+                          −
+                        </button>
+                        <button
+                          onClick={() => onAllocate(k, 1)}
+                          disabled={card.remaining <= 0 || atCap}
+                          style={{ ...allocBtnStyle, opacity: card.remaining <= 0 || atCap ? 0.35 : 1, cursor: card.remaining <= 0 || atCap ? "default" : "pointer" }}
+                        >
+                          ＋
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {canEdit ? (
+              <button
+                onClick={() => setConfirming(true)}
+                style={{ ...modalBtnStyle, width: "100%", background: "linear-gradient(135deg,#F4C95D,#E0A83E)", color: "#5C3A21", border: "none", marginBottom: 16 }}
+              >
+                けってい する
+              </button>
+            ) : isSchedule ? (
+              <div style={{ fontSize: 12, color: "#7c98aa", fontWeight: 700, marginBottom: 16 }}>⭐ 配点ずみ（変更できません）</div>
+            ) : null}
+          </>
+        )}
+
+        {isSchedule ? (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>獲得したスケジュール</div>
+            <div style={{ background: "#F5F9FB", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4a6c85", lineHeight: 1.8 }}>
+              <div style={{ fontWeight: 800, color: "#0B3D62" }}>{card.fromTitle || "無題のスケジュール"}</div>
+              {card.startDate && card.endDate && (
+                <div>
+                  期間：{card.startDate} 〜 {card.endDate}
+                </div>
+              )}
+              <div>⭐ 獲得スタンプ：{card.stars}個</div>
+              {card.achvTotals && (card.achvTotals.minutes > 0 || card.achvTotals.pages > 0 || card.achvTotals.problems > 0) && (
+                <div>
+                  やったこと：
+                  {card.achvTotals.minutes > 0 ? `⏱${card.achvTotals.minutes}分 ` : ""}
+                  {card.achvTotals.pages > 0 ? `📖${card.achvTotals.pages}ページ ` : ""}
+                  {card.achvTotals.problems > 0 ? `✏️${card.achvTotals.problems}問` : ""}
+                </div>
+              )}
+              {card.earnedAt && <div>達成日：{card.earnedAt}</div>}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>配合の記録</div>
+            <div style={{ background: "#F5F9FB", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4a6c85", lineHeight: 1.8 }}>
+              <div>もとのカード：{card.fromTitle}</div>
+              {card.earnedAt && <div>配合した日：{card.earnedAt}</div>}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
