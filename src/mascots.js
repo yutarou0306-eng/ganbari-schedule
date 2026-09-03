@@ -19,7 +19,7 @@
 const PEGASUS_STAGES = ["/pegasus-egg.png", "/pegasus-baby.png", "/pegasus-infant.png", "/pegasus-adult.png", "/pegasus-master.png"];
 
 const STAGE_FILES = {
-  dragon: ["/egg.png", "/baby.png", "/infant.png", "/kids.png", "/adult.png", "/master.png"],
+  dragon: ["/egg.png", "/baby.png", "/infant.png", "/adult.png", "/master.png"],
   pegasus: PEGASUS_STAGES,
   fairy: ["/fairy-egg.png", "/fairy-baby.png", "/fairy-infant.png", "/fairy-adult.png", "/fairy-master.png"],
   cat: ["/cat-egg.png", "/cat-baby.png", "/cat-infant.png", "/cat-adult.png", "/cat-master.png"],
