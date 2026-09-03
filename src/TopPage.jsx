@@ -454,6 +454,14 @@ export default function TopPage() {
           </div>
         </div>
 
+        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 12.5, marginBottom: 18, lineHeight: 1.7 }}>
+          ※表示されるスケジュールは、この端末で開いたことのあるものだけが表示されます。
+          <br />
+          ※共有リンクを開いたことがあるスケジュールも表示されます。
+          <br />
+          ※作成されたスケジュールをスタンプ帳に連携すると、スタンプ帳から確認できます。
+        </p>
+
         {tab === "create" && (
           <div
             style={{
@@ -658,12 +666,6 @@ export default function TopPage() {
             refreshing={refreshing}
           />
         )}
-
-        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 13, marginTop: 22, lineHeight: 1.7 }}>
-          ※「見る」「完了」の一覧は、この端末で開いたことのあるスケジュールだけが表示されます。
-          <br />
-          共有リンクを開いたことがあるスケジュールは、ここにも自動で並びます。
-        </p>
       </div>
 
       {deleteTarget && (
