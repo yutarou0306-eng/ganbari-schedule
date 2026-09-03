@@ -984,7 +984,7 @@ function CardDetailModal({ card, onFinalize, onClose }) {
         {isSchedule && card.variant && (
           <>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", margin: "12px 0 6px" }}>成長の様子（タップで拡大）</div>
-            <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, marginBottom: 14 }}>
               {Array.from({ length: stageCount(card.variant.species) }).map((_, i) => {
                 const isLast = i === stageCount(card.variant.species) - 1;
                 return (
@@ -992,15 +992,14 @@ function CardDetailModal({ card, onFinalize, onClose }) {
                     key={i}
                     onClick={() => setZoomedStage(i)}
                     style={{
-                      flex: 1,
                       aspectRatio: "1 / 1",
-                      borderRadius: 8,
+                      borderRadius: 12,
                       background: card.variant.cardBg,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      padding: 3,
-                      boxShadow: isLast ? "0 0 0 2px #FFE27A" : "none",
+                      padding: 6,
+                      boxShadow: isLast ? "0 0 0 3px #FFE27A" : "none",
                       cursor: "pointer",
                     }}
                   >
