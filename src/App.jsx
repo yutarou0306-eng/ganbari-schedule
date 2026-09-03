@@ -2814,15 +2814,39 @@ function EvolutionCelebration({ fromSrc, toSrc, filter, cardBg, isFinal, mascotN
   }, []);
   const imgFilter = filter && filter !== "none" ? filter : "none";
   return (
-    <div style={styles.weekCelebrateOverlay}>
+    <div style={{ ...styles.weekCelebrateOverlay, background: "rgba(11,61,98,0.94)" }}>
       {phase === "reveal" && <Confetti />}
-      <div style={styles.weekCelebrateCard}>
-        <h2 style={styles.weekCelebrateTitle}>
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px 20px",
+          boxSizing: "border-box",
+          animation: "popIn 0.35s ease-out",
+        }}
+      >
+        <h2 style={{ ...styles.weekCelebrateTitle, color: "#fff", textShadow: "0 2px 10px rgba(0,0,0,0.5)" }}>
           {phase === "reveal" ? (isFinal ? "さいだい しんか！" : "しんか した！") : "・・・？"}
         </h2>
-        {phase !== "reveal" && <p style={styles.weekCelebrateSub}>なにかが おきている…</p>}
-        <div style={{ ...styles.cardGetBox, marginBottom: phase === "reveal" ? 4 : 16 }}>
-          <div style={{ ...styles.cardGetImgWrap, width: 220, height: 220, borderRadius: 28, background: cardBg, position: "relative", overflow: "hidden" }}>
+        {phase !== "reveal" && <p style={{ ...styles.weekCelebrateSub, color: "#EAF7FB" }}>なにかが おきている…</p>}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: phase === "reveal" ? 8 : 20 }}>
+          <div
+            style={{
+              width: "min(78vw, 62vh, 440px)",
+              height: "min(78vw, 62vh, 440px)",
+              borderRadius: 32,
+              background: cardBg,
+              position: "relative",
+              overflow: "hidden",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.5), inset 0 0 0 4px rgba(255,255,255,0.6)",
+              padding: 18,
+              boxSizing: "border-box",
+            }}
+          >
             {phase === "reveal" && <div className="evoRays" />}
             {/* The color filter (hue-rotate for the mascot's variant) lives
                 on this wrapper, separate from the shake/pulse/pop
@@ -2840,7 +2864,9 @@ function EvolutionCelebration({ fromSrc, toSrc, filter, cardBg, isFinal, mascotN
             </div>
             {phase === "flash" && <div className="evoFlash" />}
           </div>
-          {phase === "reveal" && mascotName && <div style={styles.cardGetName}>{mascotName}</div>}
+          {phase === "reveal" && mascotName && (
+            <div style={{ ...styles.cardGetName, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)", fontSize: 20, marginTop: 14 }}>{mascotName}</div>
+          )}
         </div>
         {phase === "reveal" && (
           <button style={styles.weekCelebrateBtn} onClick={onClose}>
