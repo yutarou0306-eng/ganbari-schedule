@@ -16,7 +16,7 @@
 // Growth-stage art per species, ordered egg → fully grown. Dragon and
 // pegasus have 6 hand-drawn stages; everything else has 5 (no separate
 // "kids" stage between infant and adult).
-const PEGASUS_STAGES = ["/unicorn-0.png", "/unicorn-20.png", "/unicorn-40.png", "/unicorn-60.png", "/unicorn-80.png", "/unicorn-100.png"];
+const PEGASUS_STAGES = ["/pegasus-egg.png", "/pegasus-baby.png", "/pegasus-infant.png", "/pegasus-adult.png", "/pegasus-master.png"];
 
 const STAGE_FILES = {
   dragon: ["/egg.png", "/baby.png", "/infant.png", "/kids.png", "/adult.png", "/master.png"],
