@@ -3,7 +3,7 @@ import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
-import { getVariant, finalFormImage, stageImage, stageIndex, computeCardStats, combineStats, combineLevel, levelFromPct, stageImageAt, stageCount, STAT_LABELS, STAT_KEYS, STAT_MAX, MASTER_LEVEL } from "./mascots.js";
+import { getVariant, finalFormImage, stageImage, stageIndex, eggLabel, computeCardStats, combineStats, combineLevel, levelFromPct, stageImageAt, stageCount, STAT_LABELS, STAT_KEYS, STAT_MAX, MASTER_LEVEL } from "./mascots.js";
 import { todayPendingSubjects, computeOverallStats } from "./progress.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
@@ -294,6 +294,7 @@ export default function ProfileRoot() {
     .map((s) => {
       const variant = getVariant(s.theme, s.mascotVariant);
       const lv = levelFromPct(s.currentPct);
+      const hatched = stageIndex(variant.species, s.currentPct) > 0;
       return {
         id: `growing:${s.id}`,
         source: "growing",
@@ -301,7 +302,8 @@ export default function ProfileRoot() {
         theme: s.theme,
         variant,
         imgSrc: stageImage(variant.species, s.currentPct),
-        label: s.mascotName || variant.name,
+        // Still an egg — don't give away which species it'll hatch into.
+        label: hatched ? s.mascotName || variant.name : eggLabel(variant),
         fromTitle: s.title,
         startDate: s.startDate,
         endDate: s.endDate,

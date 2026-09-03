@@ -380,6 +380,32 @@ export function finalFormImage(themeKey, variantKey) {
   return files[files.length - 1];
 }
 
+// Japanese species word each variant's name ends with — used to split a
+// name like "ブルードラゴン" into its color ("ブルー") and species
+// ("ドラゴン") parts.
+const SPECIES_SUFFIX = {
+  dragon: "ドラゴン",
+  pegasus: "ペガサス",
+  fairy: "フェアリー",
+  cat: "マジカルキャット",
+  tiger: "タイガー",
+  phoenix: "フェニックス",
+  fenrir: "フェンリル",
+  griffon: "グリフォン",
+  swamp: "スワンプリンセス",
+  mermaid: "マーメイド",
+};
+
+// The color-only part of a variant's name plus "エッグ" (e.g. "ブルー
+// エッグ" from "ブルードラゴン") — used as the label for a card that's
+// still an unhatched egg, so it doesn't give away which species it'll
+// grow into.
+export function eggLabel(variant) {
+  const suffix = SPECIES_SUFFIX[variant.species];
+  const colorWord = suffix && variant.name.endsWith(suffix) ? variant.name.slice(0, variant.name.length - suffix.length) : variant.name;
+  return `${colorWord}エッグ`;
+}
+
 /* ---------------- RPG-style stats (LV-based) ---------------- */
 // Every collected card has a Level and 6 stats. A schedule's own progress
 // maps straight onto Level — 100% complete (Master) = Lv.20 — and each
