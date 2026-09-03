@@ -3,7 +3,7 @@ import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
-import { getVariant, finalFormImage } from "./mascots.js";
+import { getVariant, finalFormImage, computeCardStats, combineStats, STAT_LABELS, STAT_KEYS } from "./mascots.js";
 import { todayPendingSubjects, computeOverallStats } from "./progress.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
@@ -120,6 +120,8 @@ export default function ProfileRoot() {
   const [exists, setExists] = useState(false);
   const [profile, setProfile] = useState(freshProfile());
   const [schedules, setSchedules] = useState([]); // [{id, title, theme, stamps}]
+  const [selectedCardIds, setSelectedCardIds] = useState([]); // up to 2, for 配合 (breeding)
+  const [showBreedModal, setShowBreedModal] = useState(false);
   const [view, setView] = useState("main"); // main | editProfile | rewards
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
   const [copied, setCopied] = useState(false);
@@ -237,21 +239,73 @@ export default function ProfileRoot() {
   // Cards earned across every schedule linked to this stamp book, grouped
   // by theme+color so getting the same dragon/pegasus twice shows as
   // "ブルードラゴン ×2" instead of two separate entries.
-  const cardGroups = (() => {
-    const map = new Map();
-    schedules.forEach((s) => {
-      if (!s.awardedCard) return;
+  // Every card actually earned, one entry per completed+card-eligible
+  // schedule (not grouped) — breeding needs to pick two *specific* cards,
+  // and each one's stats depend on how many stars it was earned with, so
+  // two cards that look the same (same species+color) can still have
+  // different stats.
+  const myCards = schedules
+    .filter((s) => s.awardedCard)
+    .map((s) => {
       const cardTheme = s.awardedCard.theme || s.theme || "girl";
       const variant = getVariant(cardTheme, s.awardedCard.variant);
-      const groupKey = `${cardTheme}:${variant.key}`;
-      const existing = map.get(groupKey);
-      if (existing) existing.count += 1;
-      else map.set(groupKey, { theme: cardTheme, variant, count: 1 });
+      const stars = typeof s.awardedCard.stars === "number" ? s.awardedCard.stars : s.stamps;
+      return {
+        id: `sched:${s.id}`,
+        source: "schedule",
+        scheduleId: s.id,
+        theme: cardTheme,
+        variant,
+        stars,
+        stats: computeCardStats(variant.species, stars),
+        label: variant.name,
+        fromTitle: s.title,
+      };
     });
-    return Array.from(map.values());
-  })();
+
+  // Cards produced by combining two others (配合) — stored on the profile
+  // itself since they aren't tied to any one schedule.
+  const bredCards = (profile.bredCards || []).map((c) => ({
+    id: `bred:${c.id}`,
+    source: "bred",
+    theme: null,
+    variant: null,
+    stars: null,
+    stats: c.stats,
+    label: c.name,
+    fromTitle: c.parentLabel,
+  }));
+
+  const allCards = [...myCards, ...bredCards];
+
   const totalSpent = (profile.redemptions || []).reduce((sum, r) => sum + r.cost, 0);
   const available = totalEarned - totalSpent;
+
+  async function handleConfirmBreed(name) {
+    const a = allCards.find((c) => c.id === selectedCardIds[0]);
+    const b = allCards.find((c) => c.id === selectedCardIds[1]);
+    if (!a || !b) return;
+    const combined = combineStats(a.stats, b.stats);
+    const newCard = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      name: (name || "").trim() || `${a.label}×${b.label}`,
+      parentLabel: `${a.label} × ${b.label}`,
+      stats: combined,
+      createdAt: new Date().toISOString().slice(0, 10),
+    };
+    const next = { ...profile, bredCards: [...(profile.bredCards || []), newCard] };
+    await saveProfile(next);
+    setSelectedCardIds([]);
+    setShowBreedModal(false);
+  }
+
+  function toggleCardSelect(id) {
+    setSelectedCardIds((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id);
+      if (prev.length >= 2) return [prev[1], id]; // swap out the older pick
+      return [...prev, id];
+    });
+  }
 
   async function handleRedeem(reward) {
     if (available < reward.cost) return;
@@ -395,35 +449,35 @@ export default function ProfileRoot() {
           </>
         )}
 
-        {completedSchedules.length > 0 && (
-          <>
-            <SectionTitle>✅ 完了したスケジュール</SectionTitle>
-            <div style={{ marginBottom: 18 }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {completedSchedules.map((s) => {
-                  const t = s.achvTotals;
-                  const achvParts = [];
-                  if (t.minutes > 0) achvParts.push(`⏱${t.minutes}分`);
-                  if (t.pages > 0) achvParts.push(`📖${t.pages}ページ`);
-                  if (t.problems > 0) achvParts.push(`✏️${t.problems}問`);
-                  return (
-                    <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
-                      <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
-                        <div style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14, marginBottom: 4 }}>
-                          🏆 {s.title || "無題のスケジュール"}
-                        </div>
-                        <div style={{ fontSize: 12.5, color: "#7c98aa", fontWeight: 700 }}>
-                          ⭐ 獲得スタンプ {s.stamps}個
-                          {achvParts.length > 0 ? `　${achvParts.join(" ")}` : ""}
-                        </div>
+        <SectionTitle>✅ 完了したスケジュール</SectionTitle>
+        <div style={{ marginBottom: 18 }}>
+          {completedSchedules.length === 0 ? (
+            <div style={emptyCardStyle}>まだ完了したスケジュールはありません。</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {completedSchedules.map((s) => {
+                const t = s.achvTotals;
+                const achvParts = [];
+                if (t.minutes > 0) achvParts.push(`⏱${t.minutes}分`);
+                if (t.pages > 0) achvParts.push(`📖${t.pages}ページ`);
+                if (t.problems > 0) achvParts.push(`✏️${t.problems}問`);
+                return (
+                  <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
+                    <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
+                      <div style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14, marginBottom: 4 }}>
+                        🏆 {s.title || "無題のスケジュール"}
                       </div>
-                    </a>
-                  );
-                })}
-              </div>
+                      <div style={{ fontSize: 12.5, color: "#7c98aa", fontWeight: 700 }}>
+                        ⭐ 獲得スタンプ {s.stamps}個
+                        {achvParts.length > 0 ? `　${achvParts.join(" ")}` : ""}
+                      </div>
+                    </div>
+                  </a>
+                );
+              })}
             </div>
-          </>
-        )}
+          )}
+        </div>
 
         <SectionTitle>📅 つながっているスケジュール</SectionTitle>
         <div style={{ marginBottom: 18 }}>
@@ -501,64 +555,47 @@ export default function ProfileRoot() {
         </button>
 
         <SectionTitle>🎴 集めたカード</SectionTitle>
-        <div style={{ marginBottom: 18 }}>
-          {cardGroups.length === 0 ? (
+        <div style={{ marginBottom: 6 }}>
+          {allCards.length === 0 ? (
             <div style={emptyCardStyle}>まだカードがありません。スケジュールを最後まで達成するとカードがもらえます。</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(84px, 1fr))", gap: 10 }}>
-              {cardGroups.map((g) => (
-                <div key={`${g.theme}:${g.variant.key}`} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <div
-                    style={{
-                      width: "100%",
-                      aspectRatio: "1 / 1",
-                      borderRadius: 14,
-                      background: g.variant.cardBg,
-                      boxShadow: "0 6px 14px rgba(11,61,98,0.25), inset 0 0 0 2px rgba(255,255,255,0.6)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      padding: 8,
-                      position: "relative",
-                    }}
-                  >
-                    <img
-                      src={finalFormImage(g.theme, g.variant.key)}
-                      alt={g.variant.name}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "contain",
-                        filter: g.variant.filter === "none" ? "none" : g.variant.filter,
-                      }}
-                    />
-                    {g.count > 1 && (
-                      <span
-                        style={{
-                          position: "absolute",
-                          top: 4,
-                          right: 4,
-                          background: "rgba(11,61,98,0.85)",
-                          color: "#fff",
-                          fontSize: 11,
-                          fontWeight: 900,
-                          borderRadius: 999,
-                          padding: "2px 6px",
-                        }}
-                      >
-                        ×{g.count}
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.4)", marginTop: 4, textAlign: "center" }}>
-                    {g.variant.name}
-                    {g.count > 1 ? ` ×${g.count}` : ""}
-                  </div>
-                </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(104px, 1fr))", gap: 10 }}>
+              {allCards.map((c) => (
+                <CardTile
+                  key={c.id}
+                  card={c}
+                  selected={selectedCardIds.includes(c.id)}
+                  onToggle={() => toggleCardSelect(c.id)}
+                />
               ))}
             </div>
           )}
         </div>
+        {allCards.length >= 2 && (
+          <div style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 12, color: "#EAF7FB", marginBottom: 8 }}>
+              カードを2枚タップして選ぶと、ステータスを合計した新しいカードに配合できます。
+            </div>
+            <button
+              onClick={() => setShowBreedModal(true)}
+              disabled={selectedCardIds.length !== 2}
+              style={{
+                width: "100%",
+                padding: "12px 0",
+                borderRadius: 14,
+                border: "none",
+                background: selectedCardIds.length === 2 ? "linear-gradient(135deg,#B48CE0,#5A3FA0)" : "#7c8ba0",
+                color: "#fff",
+                fontWeight: 800,
+                fontSize: 14.5,
+                cursor: selectedCardIds.length === 2 ? "pointer" : "default",
+                fontFamily: "inherit",
+              }}
+            >
+              ⚗️ 配合する{selectedCardIds.length > 0 ? `（${selectedCardIds.length}/2枚選択中）` : ""}
+            </button>
+          </div>
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
           <button onClick={() => handleCreateSchedule("girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
@@ -628,6 +665,15 @@ export default function ProfileRoot() {
       )}
 
       {showGatePin && <RewardsPinModal correctPin={profile.pin} onSuccess={handleGateSuccess} onCancel={handleGateCancel} />}
+
+      {showBreedModal && selectedCardIds.length === 2 && (
+        <BreedConfirmModal
+          cardA={allCards.find((c) => c.id === selectedCardIds[0])}
+          cardB={allCards.find((c) => c.id === selectedCardIds[1])}
+          onConfirm={handleConfirmBreed}
+          onClose={() => setShowBreedModal(false)}
+        />
+      )}
     </div>
   );
 }
@@ -712,6 +758,128 @@ function RewardsPinModal({ correctPin, onSuccess, onCancel }) {
 
 function SectionTitle({ children }) {
   return <div style={{ color: "#fff", fontWeight: 900, fontSize: 15, marginBottom: 8, textShadow: "0 1px 4px rgba(0,0,0,0.3)" }}>{children}</div>;
+}
+
+// One card in the "🎴 集めたカード" grid — either an originally-awarded
+// card (has art) or a 配合 (bred) card (stats only, no unique art since
+// there's no dedicated hybrid illustration). Tappable to select for
+// breeding; shows a highlighted ring + order badge while selected.
+function CardTile({ card, selected, onToggle }) {
+  const selectedIndex = selected ? "✓" : null;
+  return (
+    <div
+      onClick={onToggle}
+      style={{ display: "flex", flexDirection: "column", alignItems: "center", cursor: "pointer" }}
+    >
+      <div
+        style={{
+          width: "100%",
+          aspectRatio: "1 / 1",
+          borderRadius: 14,
+          background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
+          boxShadow: selected
+            ? "0 0 0 3px #FFE27A, 0 6px 14px rgba(11,61,98,0.35)"
+            : "0 6px 14px rgba(11,61,98,0.25), inset 0 0 0 2px rgba(255,255,255,0.6)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 8,
+          position: "relative",
+        }}
+      >
+        {card.variant ? (
+          <img
+            src={finalFormImage(card.theme, card.variant.key)}
+            alt={card.label}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "contain",
+              filter: card.variant.filter === "none" ? "none" : card.variant.filter,
+            }}
+          />
+        ) : (
+          <span style={{ fontSize: 34 }}>⚗️</span>
+        )}
+        {selectedIndex && (
+          <span
+            style={{
+              position: "absolute",
+              top: 4,
+              right: 4,
+              width: 20,
+              height: 20,
+              borderRadius: "50%",
+              background: "#FFE27A",
+              color: "#5C3A21",
+              fontSize: 12,
+              fontWeight: 900,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {selectedIndex}
+          </span>
+        )}
+      </div>
+      <div style={{ fontSize: 11, fontWeight: 800, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.4)", marginTop: 4, textAlign: "center" }}>
+        {card.label}
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px 4px", marginTop: 3, width: "100%" }}>
+        {STAT_KEYS.map((k) => (
+          <div key={k} style={{ fontSize: 9.5, color: "#EAF7FB", display: "flex", justifyContent: "space-between" }}>
+            <span>{STAT_LABELS[k]}</span>
+            <span style={{ fontWeight: 800 }}>{card.stats[k]}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Preview + confirm for combining two selected cards (配合). Stats sum,
+// capped per-stat by mascots.js — no unique art for the result, so this
+// just shows the two parents' mini stat blocks and the combined total.
+function BreedConfirmModal({ cardA, cardB, onConfirm, onClose }) {
+  const [name, setName] = useState("");
+  const combined = combineStats(cardA.stats, cardB.stats);
+  return (
+    <div style={overlayStyle}>
+      <div style={modalCardStyle}>
+        <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>⚗️ カードを配合する</h3>
+        <p style={{ fontSize: 14.5, color: "#4a6c85", lineHeight: 1.6, marginBottom: 14 }}>
+          {cardA.label} と {cardB.label} を配合します。ステータスは2枚の合計になります。
+        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 14 }}>
+          {STAT_KEYS.map((k) => (
+            <div key={k} style={{ background: "#F5F9FB", borderRadius: 10, padding: "6px 2px", textAlign: "center" }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: "#7c98aa" }}>{STAT_LABELS[k]}</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: "#0B3D62" }}>{combined[k]}</div>
+            </div>
+          ))}
+        </div>
+        <label style={{ display: "block", fontWeight: 700, fontSize: 13, marginBottom: 6, color: "#14588C", textAlign: "left" }}>
+          新しいカードの名前（省略可）
+        </label>
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder={`${cardA.label}×${cardB.label}`}
+          maxLength={24}
+          style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 15, fontFamily: "inherit", marginBottom: 18, color: "#0B3D62" }}
+        />
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
+            やめる
+          </button>
+          <button onClick={() => onConfirm(name)} style={{ ...modalBtnStyle, background: "linear-gradient(135deg,#B48CE0,#5A3FA0)", color: "#fff", border: "none" }}>
+            配合する
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const iconBtnStyle = {

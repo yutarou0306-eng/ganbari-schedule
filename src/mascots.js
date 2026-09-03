@@ -1,23 +1,34 @@
 // Color variants for the growth mascots. 男の子用 has one species (dragon,
-// 5 colors). 女の子用 has three species — pegasus (5 colors, the
-// original), and fairy / magical cat (3 colors each, added later) — 11
-// variants total. Most colors are produced with a CSS `filter` on top of
-// a single base art asset per species/stage rather than needing separate
-// art per color; a couple of "native" colors (blue dragon, blue cat) use
-// no filter since the base art is already that color.
+// 5 colors). 女の子用 has many species — pegasus (5 colors, the
+// original — treated as "unicorn" for stats purposes, see STATS below),
+// fairy / magical cat (3 colors each, added later, kept as flavor-only
+// species with average stats), and tiger / phoenix / fenrir / griffon /
+// swamp princess / mermaid (3 colors each, added later still, each with
+// its own stat leanings). Most colors are produced with a CSS `filter` on
+// top of a single base art asset per species/stage rather than needing
+// separate art per color; a couple of "native" colors use no filter since
+// the base art is already that color.
 //
 // Shared by App.jsx (growth art + the "schedule complete" card reveal)
-// and ProfileRoot.jsx (the collected-cards list in the stamp book), so a
+// and ProfileRoot.jsx (the collected-cards list + breeding), so a
 // schedule's `config.mascotVariant` means the same thing everywhere.
 
-// Growth-stage art per species, ordered egg → fully grown. Pegasus and
-// dragon have 6 hand-drawn stages; fairy and cat have 5 (no separate
+// Growth-stage art per species, ordered egg → fully grown. Dragon and
+// pegasus have 6 hand-drawn stages; everything else has 5 (no separate
 // "kids" stage between infant and adult).
+const PEGASUS_STAGES = ["/unicorn-0.png", "/unicorn-20.png", "/unicorn-40.png", "/unicorn-60.png", "/unicorn-80.png", "/unicorn-100.png"];
+
 const STAGE_FILES = {
   dragon: ["/egg.png", "/baby.png", "/infant.png", "/kids.png", "/adult.png", "/master.png"],
-  pegasus: ["/unicorn-0.png", "/unicorn-20.png", "/unicorn-40.png", "/unicorn-60.png", "/unicorn-80.png", "/unicorn-100.png"],
+  pegasus: PEGASUS_STAGES,
   fairy: ["/fairy-egg.png", "/fairy-baby.png", "/fairy-infant.png", "/fairy-adult.png", "/fairy-master.png"],
   cat: ["/cat-egg.png", "/cat-baby.png", "/cat-infant.png", "/cat-adult.png", "/cat-master.png"],
+  tiger: ["/tiger-egg.png", "/tiger-baby.png", "/tiger-infant.png", "/tiger-adult.png", "/tiger-master.png"],
+  phoenix: ["/phoenix-egg.png", "/phoenix-baby.png", "/phoenix-infant.png", "/phoenix-adult.png", "/phoenix-master.png"],
+  fenrir: ["/fenrir-egg.png", "/fenrir-baby.png", "/fenrir-infant.png", "/fenrir-adult.png", "/fenrir-master.png"],
+  griffon: ["/griffon-egg.png", "/griffon-baby.png", "/griffon-infant.png", "/griffon-adult.png", "/griffon-master.png"],
+  swamp: ["/swamp-egg.png", "/swamp-baby.png", "/swamp-infant.png", "/swamp-adult.png", "/swamp-master.png"],
+  mermaid: ["/mermaid-egg.png", "/mermaid-baby.png", "/mermaid-infant.png", "/mermaid-adult.png", "/mermaid-master.png"],
 };
 
 // Picks the growth-stage index (0 = still an egg, higher = further grown)
@@ -191,7 +202,161 @@ const CAT_VARIANTS = [
   },
 ];
 
-export const GIRL_VARIANTS = [...PEGASUS_VARIANTS, ...FAIRY_VARIANTS, ...CAT_VARIANTS];
+const TIGER_VARIANTS = [
+  {
+    key: "tiger-red",
+    species: "tiger",
+    name: "レッドタイガー",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#FFB870,#B0430E)",
+  },
+  {
+    key: "tiger-blue",
+    species: "tiger",
+    name: "ブルータイガー",
+    filter: "hue-rotate(216deg) saturate(1.3)",
+    cardBg: "linear-gradient(135deg,#8CA6FF,#1E2C8C)",
+  },
+  {
+    key: "tiger-green",
+    species: "tiger",
+    name: "グリーンタイガー",
+    filter: "hue-rotate(96deg) saturate(1.3)",
+    cardBg: "linear-gradient(135deg,#9FE68A,#276B1E)",
+  },
+];
+
+const PHOENIX_VARIANTS = [
+  {
+    key: "phoenix-red",
+    species: "phoenix",
+    name: "レッドフェニックス",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#FFB870,#B0261E)",
+  },
+  {
+    key: "phoenix-blue",
+    species: "phoenix",
+    name: "ブルーフェニックス",
+    filter: "hue-rotate(214deg) saturate(1.3)",
+    cardBg: "linear-gradient(135deg,#8CB8FF,#1E3E8C)",
+  },
+  {
+    key: "phoenix-green",
+    species: "phoenix",
+    name: "グリーンフェニックス",
+    filter: "hue-rotate(94deg) saturate(1.3)",
+    cardBg: "linear-gradient(135deg,#9FE68A,#276B2E)",
+  },
+];
+
+const FENRIR_VARIANTS = [
+  {
+    key: "fenrir-blue",
+    species: "fenrir",
+    name: "ブルーフェンリル",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#9AC8FF,#1E3E8C)",
+  },
+  {
+    key: "fenrir-red",
+    species: "fenrir",
+    name: "レッドフェンリル",
+    filter: "hue-rotate(142deg) saturate(1.3)",
+    cardBg: "linear-gradient(135deg,#FFA6A6,#A3212F)",
+  },
+  {
+    key: "fenrir-green",
+    species: "fenrir",
+    name: "グリーンフェンリル",
+    filter: "hue-rotate(262deg) saturate(1.3)",
+    cardBg: "linear-gradient(135deg,#9FE68A,#22762F)",
+  },
+];
+
+const GRIFFON_VARIANTS = [
+  {
+    key: "griffon-gold",
+    species: "griffon",
+    name: "ゴールドグリフォン",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#FFE27A,#B0791E)",
+  },
+  {
+    key: "griffon-blue",
+    species: "griffon",
+    name: "ブルーグリフォン",
+    filter: "hue-rotate(213deg) saturate(1.3)",
+    cardBg: "linear-gradient(135deg,#9AB3FF,#242E8C)",
+  },
+  {
+    key: "griffon-green",
+    species: "griffon",
+    name: "グリーングリフォン",
+    filter: "hue-rotate(93deg) saturate(1.3)",
+    cardBg: "linear-gradient(135deg,#9FE68A,#1E7B2E)",
+  },
+];
+
+const SWAMP_VARIANTS = [
+  {
+    key: "swamp-gold",
+    species: "swamp",
+    name: "ゴールドスワンプリンセス",
+    filter: "saturate(1.5)",
+    cardBg: "linear-gradient(135deg,#FFE9A8,#C98A12)",
+  },
+  {
+    key: "swamp-blue",
+    species: "swamp",
+    name: "ブルースワンプリンセス",
+    filter: "hue-rotate(207deg) saturate(1.6)",
+    cardBg: "linear-gradient(135deg,#B6D4FF,#33459E)",
+  },
+  {
+    key: "swamp-green",
+    species: "swamp",
+    name: "グリーンスワンプリンセス",
+    filter: "hue-rotate(87deg) saturate(1.6)",
+    cardBg: "linear-gradient(135deg,#C1F0B0,#2F8F3B)",
+  },
+];
+
+const MERMAID_VARIANTS = [
+  {
+    key: "mermaid-green",
+    species: "mermaid",
+    name: "グリーンマーメイド",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#9FE6C8,#137A55)",
+  },
+  {
+    key: "mermaid-blue",
+    species: "mermaid",
+    name: "ブルーマーメイド",
+    filter: "hue-rotate(68deg) saturate(1.2)",
+    cardBg: "linear-gradient(135deg,#9AC8FF,#1F5FB8)",
+  },
+  {
+    key: "mermaid-red",
+    species: "mermaid",
+    name: "レッドマーメイド",
+    filter: "hue-rotate(188deg) saturate(1.2)",
+    cardBg: "linear-gradient(135deg,#FFA6C0,#C6265E)",
+  },
+];
+
+export const GIRL_VARIANTS = [
+  ...PEGASUS_VARIANTS,
+  ...FAIRY_VARIANTS,
+  ...CAT_VARIANTS,
+  ...TIGER_VARIANTS,
+  ...PHOENIX_VARIANTS,
+  ...FENRIR_VARIANTS,
+  ...GRIFFON_VARIANTS,
+  ...SWAMP_VARIANTS,
+  ...MERMAID_VARIANTS,
+];
 
 export function variantsForTheme(themeKey) {
   return themeKey === "boy" ? DRAGON_VARIANTS : GIRL_VARIANTS;
@@ -213,4 +378,68 @@ export function finalFormImage(themeKey, variantKey) {
   const variant = getVariant(themeKey, variantKey);
   const files = STAGE_FILES[variant.species] || STAGE_FILES.pegasus;
   return files[files.length - 1];
+}
+
+/* ---------------- RPG-style stats ---------------- */
+// Every collected card has 6 stats. HP/MP cap at 999; the rest cap at 255.
+// Each species leans toward 1-3 stats (its "high" tier); the others start
+// modest, so a card's strengths and weaknesses are visible from the very
+// first egg — and so combining (配合) two cards for their summed stats
+// actually means something. Base values sit around 1/15-1/20 of the max
+// for a species' high stats, on purpose: there's plenty of room to grow
+// both from stars earned and from combining cards.
+export const STAT_MAX = { hp: 999, mp: 999, power: 255, defense: 255, speed: 255, wisdom: 255 };
+export const STAT_LABELS = { hp: "HP", mp: "MP", power: "ちから", defense: "しゅび", speed: "はやさ", wisdom: "かしこさ" };
+export const STAT_KEYS = ["hp", "mp", "power", "defense", "speed", "wisdom"];
+
+const HP_HIGH = 60,
+  HP_MID = 25;
+const ST_HIGH = 15,
+  ST_MID = 6,
+  ST_AVG = 9;
+
+// species key -> base stats. "pegasus" carries the ユニコーン archetype
+// (treated as the same creature — see mascots feature notes), and the
+// original flavor-only fairy/cat get a flat, unfavored spread.
+export const SPECIES_BASE_STATS = {
+  dragon: { hp: HP_HIGH, mp: HP_MID, power: ST_HIGH, defense: ST_MID, speed: ST_MID, wisdom: ST_MID }, // HP・ちから高め
+  tiger: { hp: HP_HIGH, mp: HP_MID, power: ST_HIGH, defense: ST_MID, speed: ST_HIGH, wisdom: ST_MID }, // HP・ちから・はやさ高め
+  phoenix: { hp: HP_MID, mp: HP_HIGH, power: ST_MID, defense: ST_MID, speed: ST_MID, wisdom: ST_HIGH }, // MP・かしこさ高め
+  fenrir: { hp: HP_MID, mp: HP_HIGH, power: ST_MID, defense: ST_HIGH, speed: ST_MID, wisdom: ST_MID }, // MP・しゅび高め
+  griffon: { hp: HP_HIGH, mp: HP_MID, power: ST_MID, defense: ST_MID, speed: ST_MID, wisdom: ST_HIGH }, // HP・かしこさ高め
+  pegasus: { hp: HP_HIGH, mp: HP_MID, power: ST_MID, defense: ST_HIGH, speed: ST_MID, wisdom: ST_HIGH }, // (ユニコーン) HP・しゅび・かしこさ高め
+  swamp: { hp: HP_MID, mp: HP_HIGH, power: ST_MID, defense: ST_MID, speed: ST_HIGH, wisdom: ST_MID }, // MP・はやさ高め
+  mermaid: { hp: HP_MID, mp: HP_HIGH, power: ST_MID, defense: ST_HIGH, speed: ST_MID, wisdom: ST_HIGH }, // MP・しゅび・かしこさ高め
+  fairy: { hp: HP_MID + 5, mp: HP_MID + 5, power: ST_AVG, defense: ST_AVG, speed: ST_AVG, wisdom: ST_AVG }, // 平均型
+  cat: { hp: HP_MID + 5, mp: HP_MID + 5, power: ST_AVG, defense: ST_AVG, speed: ST_AVG, wisdom: ST_AVG }, // 平均型
+};
+
+function capFor(statKey) {
+  return statKey === "hp" || statKey === "mp" ? STAT_MAX.hp : STAT_MAX.power;
+}
+
+// A star earned grows a card's stats a little — proportionally to that
+// stat's base, so a species' strong stats also grow faster with use, the
+// way its weak stats stay relatively weak. HP/MP grow off a bigger divisor
+// since their base numbers (and cap) are already much larger than the
+// other four stats.
+export function computeCardStats(species, stars) {
+  const base = SPECIES_BASE_STATS[species] || SPECIES_BASE_STATS.fairy;
+  const n = Math.max(0, stars || 0);
+  const out = {};
+  STAT_KEYS.forEach((k) => {
+    const divisor = k === "hp" || k === "mp" ? 300 : 150;
+    const grown = base[k] + Math.floor((n * base[k]) / divisor);
+    out[k] = Math.min(capFor(k), grown);
+  });
+  return out;
+}
+
+// Combining (配合) two cards sums their stats, capped at each stat's max.
+export function combineStats(statsA, statsB) {
+  const out = {};
+  STAT_KEYS.forEach((k) => {
+    out[k] = Math.min(capFor(k), (statsA[k] || 0) + (statsB[k] || 0));
+  });
+  return out;
 }

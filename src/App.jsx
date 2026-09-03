@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { pickRandomVariant, getVariant, finalFormImage, stageImage, stageIndex, stageImageAt, stageCount } from "./mascots.js";
+import { pickRandomVariant, getVariant, finalFormImage, stageImage, stageIndex, stageImageAt, stageCount, computeCardStats, STAT_LABELS, STAT_KEYS } from "./mascots.js";
 import { computeOverallStats } from "./progress.js";
 import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 import { supabase } from "./db.js";
@@ -909,6 +909,10 @@ export default function KidsScheduleApp() {
           theme: prev.theme,
           variant: prev.mascotVariant || pickRandomVariant(prev.theme),
           earnedAt: todayStr(),
+          // Stars this card was earned with — the stat system (mascots.js
+          // computeCardStats) grows the card's stats off this number, so
+          // it needs to be locked in at award time.
+          stars: totalStamps,
         },
       };
     });
@@ -1193,6 +1197,7 @@ export default function KidsScheduleApp() {
           theme={config.theme}
           variantKey={config.mascotVariant}
           awarded={!!config.awardedCard}
+          stars={config.awardedCard ? config.awardedCard.stars : 0}
         />
       )}
       {showHatchNaming && (
@@ -2648,8 +2653,9 @@ function DayCelebration({ onClose, theme }) {
   );
 }
 
-function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey, awarded }) {
+function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey, awarded, stars }) {
   const variant = getVariant(theme, variantKey);
+  const cardStats = awarded ? computeCardStats(variant.species, stars) : null;
   return (
     <div style={styles.weekCelebrateOverlay}>
       <Confetti />
@@ -2680,6 +2686,16 @@ function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey
               />
             </div>
             <div style={styles.cardGetName}>{variant.name}</div>
+            {cardStats && (
+              <div style={styles.cardStatsGrid}>
+                {STAT_KEYS.map((k) => (
+                  <div key={k} style={styles.cardStatChip}>
+                    <span style={styles.cardStatLabel}>{STAT_LABELS[k]}</span>
+                    <span style={styles.cardStatValue}>{cardStats[k]}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {reward ? (
@@ -3362,6 +3378,17 @@ const styles = {
   },
   cardGetImg: { width: "100%", height: "100%", objectFit: "contain" },
   cardGetName: { marginTop: 8, fontSize: 16, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif" },
+  cardStatsGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 10, width: "100%" },
+  cardStatChip: {
+    background: "#F5F9FB",
+    borderRadius: 10,
+    padding: "4px 2px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  },
+  cardStatLabel: { fontSize: 10, fontWeight: 700, color: "#7c98aa" },
+  cardStatValue: { fontSize: 14, fontWeight: 900, color: "#0B3D62" },
   mascotNameLabel: {
     position: "absolute",
     textAlign: "center",
