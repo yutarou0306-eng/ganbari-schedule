@@ -12,7 +12,7 @@ const pillStyle = {
   whiteSpace: "nowrap",
 };
 
-export default function ShareBar() {
+export default function ShareBar({ profileId }) {
   const [copied, setCopied] = useState(false);
 
   function handleCopy() {
@@ -45,10 +45,20 @@ export default function ShareBar() {
 
   return (
     <>
-      <div style={{ position: "fixed", top: 8, left: 8, zIndex: 999 }}>
+      <div style={{ position: "fixed", top: 8, left: 8, zIndex: 999, display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
         <button onClick={handleBackHome} style={{ ...pillStyle, background: "rgba(11,61,98,0.85)", color: "#fff" }}>
           🏠 トップへ
         </button>
+        {profileId && (
+          // Jumping straight to the linked stamp book — saves going all the
+          // way back to the top page just to switch to a different schedule.
+          <a
+            href={`${window.location.pathname}?profile=${profileId}`}
+            style={{ ...pillStyle, background: "rgba(197,144,29,0.9)", color: "#fff", textDecoration: "none", display: "inline-block" }}
+          >
+            🌟 スタンプ帳へ
+          </a>
+        )}
       </div>
 
       <div style={{ position: "absolute", top: 8, right: 8, zIndex: 5, display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end", maxWidth: "70%" }}>

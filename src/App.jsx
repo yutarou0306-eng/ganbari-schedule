@@ -3,6 +3,7 @@ import { pickRandomVariant, getVariant, finalFormImage, stageImage, stageIndex, 
 import { computeOverallStats } from "./progress.js";
 import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 import { supabase } from "./db.js";
+import ShareBar from "./ShareBar.jsx";
 
 const STORAGE_KEY = "pearl-sea-schedule-v2";
 // Backup PIN — always accepted alongside whatever PIN the parent set, in case
@@ -566,10 +567,12 @@ export default function KidsScheduleApp() {
   const [showHatchNaming, setShowHatchNaming] = useState(false);
   const [hatchDefaultName, setHatchDefaultName] = useState("");
   const [hatchStageIdx, setHatchStageIdx] = useState(0);
+  const [hatchNamingSnoozed, setHatchNamingSnoozed] = useState(false); // "あとで" was pressed this session
   useEffect(() => {
     if (!loaded || view !== "main") return;
     if (!config.subjects || config.subjects.length === 0) return;
     if (config.mascotHatchPrompted) return;
+    if (hatchNamingSnoozed) return; // wait for next app open, not this session
     const variant = getVariant(config.theme, config.mascotVariant);
     const overall = computeOverallStats(config, completions);
     const overallPct = overall.need > 0 ? Math.round((overall.done / overall.need) * 100) : 0;
@@ -578,7 +581,7 @@ export default function KidsScheduleApp() {
     setHatchDefaultName(variant.name);
     setHatchStageIdx(idx);
     setShowHatchNaming(true);
-  }, [loaded, view, config, completions]);
+  }, [loaded, view, config, completions, hatchNamingSnoozed]);
 
   // Plays a Pokémon-style evolution animation whenever the mascot's growth
   // stage advances past the one last shown — silhouette shake, white
@@ -1062,6 +1065,7 @@ export default function KidsScheduleApp() {
   return (
     <div style={styles.appRoot}>
       <GlobalStyle />
+      <ShareBar profileId={config.profileId} />
       {view === "setup" && (
         <SetupScreen
           initial={config}
@@ -1204,6 +1208,10 @@ export default function KidsScheduleApp() {
               mascotStageSeen: hatchStageIdx,
             }));
             setShowHatchNaming(false);
+          }}
+          onSkip={() => {
+            setShowHatchNaming(false);
+            setHatchNamingSnoozed(true);
           }}
         />
       )}
@@ -1529,6 +1537,8 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
     setSubjects((prev) => (prev.length > 1 ? prev.filter((s) => s.id !== id) : prev));
   }
 
+  const [pendingLowCardSave, setPendingLowCardSave] = useState(null); // payload awaiting confirmation, or null
+
   function handleSave() {
     const t = title.trim() || "がんばりスケジュール";
     const cleanSubjects = subjects.filter((s) => s.name.trim().length > 0).map((s) => ({ ...s, name: s.name.trim() }));
@@ -1536,7 +1546,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
     let sd = startDate,
       ed = endDate;
     if (parseDate(ed) < parseDate(sd)) ed = sd;
-    onSave({
+    const payload = {
       ...(initial.mascotVariant ? { mascotVariant: initial.mascotVariant } : {}),
       ...(initial.awardedCard ? { awardedCard: initial.awardedCard } : {}),
       title: t,
@@ -1547,7 +1557,19 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       pin: pin.trim(),
       reward: reward.trim(),
       ...(profileId ? { profileId } : {}),
-    });
+    };
+
+    if (!hasExisting) {
+      // Only warn on brand-new schedules — someone editing an existing one
+      // has already made this choice once.
+      const days = Math.round((parseDate(ed).getTime() - parseDate(sd).getTime()) / 86400000) + 1;
+      const totalStamps = computeOverallStats({ subjects: cleanSubjects, startDate: sd, endDate: ed }, {}).need;
+      if (days < 30 || totalStamps <= 50) {
+        setPendingLowCardSave(payload);
+        return;
+      }
+    }
+    onSave(payload);
   }
 
   return (
@@ -1692,6 +1714,19 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
           </button>
         )}
       </div>
+      {pendingLowCardSave && (
+        <ConfirmModal
+          title="カードがもらえないかも"
+          message="スケジュールが30日未満、若しくは獲得スタンプ数が50個以下だと完了した時カードが貰えないよ。それでもスケジュール帳作る？"
+          confirmLabel="作る"
+          cancelLabel="編集にもどる"
+          onConfirm={() => {
+            onSave(pendingLowCardSave);
+            setPendingLowCardSave(null);
+          }}
+          onCancel={() => setPendingLowCardSave(null)}
+        />
+      )}
     </div>
   );
 }
@@ -2663,8 +2698,8 @@ function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey
   );
 }
 
-function HatchNamingModal({ theme, variantKey, defaultName, onSave }) {
-  const [name, setName] = useState(defaultName);
+function HatchNamingModal({ theme, variantKey, defaultName, onSave, onSkip }) {
+  const [name, setName] = useState("");
   const variant = getVariant(theme, variantKey);
   return (
     <div style={styles.weekCelebrateOverlay}>
@@ -2693,6 +2728,7 @@ function HatchNamingModal({ theme, variantKey, defaultName, onSave }) {
             onChange={(e) => setName(e.target.value)}
             maxLength={20}
             placeholder={defaultName}
+            className="hatchNameInput"
             style={{
               marginTop: 12,
               width: "100%",
@@ -2711,6 +2747,15 @@ function HatchNamingModal({ theme, variantKey, defaultName, onSave }) {
         <button style={styles.weekCelebrateBtn} onClick={() => onSave(name)}>
           きめる
         </button>
+        {onSkip && (
+          // The kid should get to choose their own mascot's name — if a
+          // parent happens to be the one who opens the app right after it
+          // hatches, this lets them back out without naming it for them.
+          // Naming later just re-shows this same modal next time.
+          <button style={styles.hatchSkipBtn} onClick={onSkip}>
+            あとで（大人の方はこちら）
+          </button>
+        )}
       </div>
     </div>
   );
@@ -2985,6 +3030,11 @@ function GlobalStyle() {
   return (
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yuji+Syuku&family=Kaisei+Decol:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap');
+      .hatchNameInput::placeholder {
+        color: #a9bdca;
+        font-weight: 700;
+        opacity: 1;
+      }
       @keyframes confettiFall {
         0% { transform: translateY(0) rotate(0deg); opacity: 1; }
         100% { transform: translateY(520px) rotate(340deg); opacity: 0; }
@@ -3327,4 +3377,18 @@ const styles = {
   rewardLabel: { fontSize: 15, fontWeight: 900, color: "#B5651D", marginBottom: 4 },
   rewardText: { fontSize: 21, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif", lineHeight: 1.4 },
   weekCelebrateBtn: { display: "block", margin: "0 auto", padding: "12px 32px", borderRadius: 999, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 18 },
+  hatchSkipBtn: {
+    display: "block",
+    margin: "10px auto 0",
+    padding: "6px 10px",
+    borderRadius: 999,
+    border: "none",
+    background: "none",
+    color: "#8296a8",
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    fontSize: 13,
+    textDecoration: "underline",
+  },
 };
