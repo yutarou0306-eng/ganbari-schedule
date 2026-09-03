@@ -3,7 +3,7 @@ import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
-import { getVariant, finalFormImage, computeCardStats, combineStats, totalAllocated, stageImageAt, stageCount, STAT_LABELS, STAT_KEYS, STAT_MAX } from "./mascots.js";
+import { getVariant, finalFormImage, stageImage, stageIndex, computeCardStats, combineStats, totalAllocated, stageImageAt, stageCount, STAT_LABELS, STAT_KEYS, STAT_MAX } from "./mascots.js";
 import { todayPendingSubjects, computeOverallStats } from "./progress.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
@@ -173,6 +173,9 @@ export default function ProfileRoot() {
             endDate: row.blob.config.endDate || "",
             stamps: countStampsInBlob(row.blob),
             awardedCard: row.blob.config.awardedCard || null,
+            mascotVariant: row.blob.config.mascotVariant || null,
+            mascotName: row.blob.config.mascotName || "",
+            currentPct: stats.pct,
             pendingToday: todayPendingSubjects(row.blob.config, row.blob.completions),
             completed: stats.need > 0 && stats.done >= stats.need,
             achvTotals: totalAchievementsInBlob(row.blob),
@@ -269,17 +272,42 @@ export default function ProfileRoot() {
         scheduleId: s.id,
         theme: cardTheme,
         variant,
+        imgSrc: finalFormImage(cardTheme, s.awardedCard.variant),
         stars,
         allocations,
         locked,
         remaining: Math.max(0, stars - spent),
         stats: computeCardStats(variant.species, allocations),
-        label: variant.name,
+        label: s.mascotName || variant.name,
         fromTitle: s.title,
         earnedAt: s.awardedCard.earnedAt || "",
         startDate: s.startDate,
         endDate: s.endDate,
         achvTotals: s.achvTotals,
+      };
+    });
+
+  // Pets still growing (not yet awarded — the schedule hasn't reached
+  // 100%, or hasn't crossed the 30-day/50-stamp card threshold yet) — the
+  // kid can still see them here at their current stage while working
+  // toward it, using whatever name they've already given it.
+  const growingCards = schedules
+    .filter((s) => !s.awardedCard && s.mascotVariant)
+    .map((s) => {
+      const variant = getVariant(s.theme, s.mascotVariant);
+      return {
+        id: `growing:${s.id}`,
+        source: "growing",
+        scheduleId: s.id,
+        theme: s.theme,
+        variant,
+        imgSrc: stageImage(variant.species, s.currentPct),
+        label: s.mascotName || variant.name,
+        fromTitle: s.title,
+        startDate: s.startDate,
+        endDate: s.endDate,
+        currentPct: s.currentPct,
+        stamps: s.stamps,
       };
     });
 
@@ -290,6 +318,7 @@ export default function ProfileRoot() {
     source: "bred",
     theme: null,
     variant: null,
+    imgSrc: null,
     stars: null,
     stats: c.stats,
     label: c.name,
@@ -297,7 +326,7 @@ export default function ProfileRoot() {
     earnedAt: c.createdAt || "",
   }));
 
-  const allCards = [...myCards, ...bredCards];
+  const allCards = [...myCards, ...growingCards, ...bredCards];
 
   const totalSpent = (profile.redemptions || []).reduce((sum, r) => sum + r.cost, 0);
   const available = totalEarned - totalSpent;
@@ -600,7 +629,7 @@ export default function ProfileRoot() {
           {allCards.length === 0 ? (
             <div style={emptyCardStyle}>まだカードがありません。スケジュールを最後まで達成するとカードがもらえます。</div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
               {allCards.map((c) => (
                 <CardTile
                   key={c.id}
@@ -821,6 +850,7 @@ function SectionTitle({ children }) {
 // breeding; shows a highlighted ring + order badge while selected.
 function CardTile({ card, selected, onToggle, onOpen }) {
   const needsAttention = card.source === "schedule" && !card.locked && card.remaining > 0;
+  const breedable = card.source === "schedule" || card.source === "bred";
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div
@@ -828,22 +858,23 @@ function CardTile({ card, selected, onToggle, onOpen }) {
         style={{
           width: "100%",
           aspectRatio: "1 / 1",
-          borderRadius: 14,
+          borderRadius: 12,
           background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
           boxShadow: selected
-            ? "0 0 0 3px #FFE27A, 0 6px 14px rgba(11,61,98,0.35)"
-            : "0 6px 14px rgba(11,61,98,0.25), inset 0 0 0 2px rgba(255,255,255,0.6)",
+            ? "0 0 0 3px #FFE27A, 0 4px 10px rgba(11,61,98,0.35)"
+            : "0 4px 10px rgba(11,61,98,0.25), inset 0 0 0 2px rgba(255,255,255,0.6)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: 8,
+          padding: 6,
           position: "relative",
           cursor: "pointer",
+          opacity: card.source === "growing" ? 0.9 : 1,
         }}
       >
-        {card.variant ? (
+        {card.imgSrc ? (
           <img
-            src={finalFormImage(card.theme, card.variant.key)}
+            src={card.imgSrc}
             alt={card.label}
             style={{
               width: "100%",
@@ -853,56 +884,75 @@ function CardTile({ card, selected, onToggle, onOpen }) {
             }}
           />
         ) : (
-          <span style={{ fontSize: 48 }}>⚗️</span>
+          <span style={{ fontSize: 30 }}>⚗️</span>
         )}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggle();
-          }}
-          aria-label="配合に選ぶ"
-          style={{
-            position: "absolute",
-            top: 6,
-            right: 6,
-            width: 26,
-            height: 26,
-            borderRadius: "50%",
-            border: selected ? "none" : "2px solid rgba(255,255,255,0.85)",
-            background: selected ? "#FFE27A" : "rgba(11,61,98,0.35)",
-            color: "#5C3A21",
-            fontSize: 14,
-            fontWeight: 900,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            padding: 0,
-          }}
-        >
-          {selected ? "✓" : ""}
-        </button>
+        {breedable && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            aria-label="配合に選ぶ"
+            style={{
+              position: "absolute",
+              top: 4,
+              right: 4,
+              width: 18,
+              height: 18,
+              borderRadius: "50%",
+              border: selected ? "none" : "2px solid rgba(255,255,255,0.85)",
+              background: selected ? "#FFE27A" : "rgba(11,61,98,0.35)",
+              color: "#5C3A21",
+              fontSize: 10,
+              fontWeight: 900,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              padding: 0,
+            }}
+          >
+            {selected ? "✓" : ""}
+          </button>
+        )}
         {needsAttention && (
           <span
             style={{
               position: "absolute",
-              bottom: 6,
-              left: 6,
+              bottom: 3,
+              left: 3,
               background: "#FFE27A",
               color: "#5C3A21",
-              fontSize: 11.5,
+              fontSize: 9,
               fontWeight: 900,
               borderRadius: 999,
-              padding: "2px 8px",
+              padding: "1px 5px",
             }}
           >
             ⭐{card.remaining}
           </span>
         )}
+        {card.source === "growing" && (
+          <span
+            style={{
+              position: "absolute",
+              bottom: 3,
+              left: 3,
+              background: "rgba(11,61,98,0.75)",
+              color: "#fff",
+              fontSize: 9,
+              fontWeight: 900,
+              borderRadius: 999,
+              padding: "1px 5px",
+            }}
+          >
+            育成中 {card.currentPct}%
+          </span>
+        )}
       </div>
       <div
         onClick={onOpen}
-        style={{ fontSize: 13, fontWeight: 800, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.4)", marginTop: 6, textAlign: "center", cursor: "pointer" }}
+        style={{ fontSize: 10.5, fontWeight: 800, color: "#fff", textShadow: "0 1px 3px rgba(0,0,0,0.4)", marginTop: 4, textAlign: "center", cursor: "pointer", lineHeight: 1.3 }}
       >
         {card.label}
       </div>
@@ -921,8 +971,10 @@ function CardDetailModal({ card, onFinalize, onClose }) {
   const [confirming, setConfirming] = useState(false);
   const [zoomedStage, setZoomedStage] = useState(null); // stage index currently shown large, or null
   const isSchedule = card.source === "schedule";
+  const isGrowing = card.source === "growing";
   const canEdit = isSchedule && !card.locked;
-  const heroSrc = isSchedule && card.variant ? stageImageAt(card.variant.species, stageCount(card.variant.species) - 1) : null;
+  const heroSrc = isGrowing ? card.imgSrc : isSchedule && card.variant ? stageImageAt(card.variant.species, stageCount(card.variant.species) - 1) : null;
+  const currentStageIdx = isGrowing && card.variant ? stageIndex(card.variant.species, card.currentPct) : null;
 
   // Local draft of the allocation — buttons and the number inputs both
   // edit this, and nothing reaches the server until 決定する is pressed
@@ -982,12 +1034,12 @@ function CardDetailModal({ card, onFinalize, onClose }) {
           )}
         </div>
 
-        {isSchedule && card.variant && (
+        {(isSchedule || isGrowing) && card.variant && (
           <>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", margin: "12px 0 6px" }}>成長の様子（タップで拡大）</div>
             <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
               {Array.from({ length: stageCount(card.variant.species) }).map((_, i) => {
-                const isLast = i === stageCount(card.variant.species) - 1;
+                const isCurrent = isGrowing ? i === currentStageIdx : i === stageCount(card.variant.species) - 1;
                 return (
                   <div
                     key={i}
@@ -1001,7 +1053,7 @@ function CardDetailModal({ card, onFinalize, onClose }) {
                       alignItems: "center",
                       justifyContent: "center",
                       padding: 3,
-                      boxShadow: isLast ? "0 0 0 2px #FFE27A" : "none",
+                      boxShadow: isCurrent ? "0 0 0 2px #FFE27A" : "none",
                       cursor: "pointer",
                     }}
                   >
@@ -1017,7 +1069,24 @@ function CardDetailModal({ card, onFinalize, onClose }) {
           </>
         )}
 
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>ステータス</div>
+        {isGrowing ? (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>育成中のスケジュール</div>
+            <div style={{ background: "#F5F9FB", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4a6c85", lineHeight: 1.8, marginBottom: 4 }}>
+              <div style={{ fontWeight: 800, color: "#0B3D62" }}>{card.fromTitle || "無題のスケジュール"}</div>
+              {card.startDate && card.endDate && (
+                <div>
+                  期間：{card.startDate} 〜 {card.endDate}
+                </div>
+              )}
+              <div>⭐ 今のスタンプ数：{card.stamps}個</div>
+              <div>達成度：{card.currentPct}%</div>
+            </div>
+            <p style={{ fontSize: 12, color: "#7c98aa", marginBottom: 4 }}>スケジュールを最後まで達成すると、正式なカードとしてステータスを割り振れるようになります。</p>
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>ステータス</div>
         {confirming ? (
           <div style={{ background: "#FFF7E0", border: "2px solid #F4C95D", borderRadius: 12, padding: 14, marginBottom: 14, textAlign: "center" }}>
             <p style={{ fontSize: 14.5, color: "#5C3A21", fontWeight: 700, margin: "0 0 12px" }}>これでよいですか？あとから変更できません。</p>
@@ -1134,41 +1203,44 @@ function CardDetailModal({ card, onFinalize, onClose }) {
             ) : null}
           </>
         )}
-
-        {isSchedule ? (
-          <>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>獲得したスケジュール</div>
-            <div style={{ background: "#F5F9FB", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4a6c85", lineHeight: 1.8 }}>
-              <div style={{ fontWeight: 800, color: "#0B3D62" }}>{card.fromTitle || "無題のスケジュール"}</div>
-              {card.startDate && card.endDate && (
-                <div>
-                  期間：{card.startDate} 〜 {card.endDate}
-                </div>
-              )}
-              <div>⭐ 獲得スタンプ：{card.stars}個</div>
-              {card.achvTotals && (card.achvTotals.minutes > 0 || card.achvTotals.pages > 0 || card.achvTotals.problems > 0) && (
-                <div>
-                  取り組んだ内容：
-                  {card.achvTotals.minutes > 0 ? `⏱${card.achvTotals.minutes}分 ` : ""}
-                  {card.achvTotals.pages > 0 ? `📖${card.achvTotals.pages}ページ ` : ""}
-                  {card.achvTotals.problems > 0 ? `✏️${card.achvTotals.problems}問` : ""}
-                </div>
-              )}
-              {card.earnedAt && <div>達成日：{card.earnedAt}</div>}
-            </div>
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>配合の記録</div>
-            <div style={{ background: "#F5F9FB", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4a6c85", lineHeight: 1.8 }}>
-              <div>元のカード：{card.fromTitle}</div>
-              {card.earnedAt && <div>配合した日：{card.earnedAt}</div>}
-            </div>
           </>
         )}
+
+        {!isGrowing &&
+          (isSchedule ? (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>獲得したスケジュール</div>
+              <div style={{ background: "#F5F9FB", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4a6c85", lineHeight: 1.8 }}>
+                <div style={{ fontWeight: 800, color: "#0B3D62" }}>{card.fromTitle || "無題のスケジュール"}</div>
+                {card.startDate && card.endDate && (
+                  <div>
+                    期間：{card.startDate} 〜 {card.endDate}
+                  </div>
+                )}
+                <div>⭐ 獲得スタンプ：{card.stars}個</div>
+                {card.achvTotals && (card.achvTotals.minutes > 0 || card.achvTotals.pages > 0 || card.achvTotals.problems > 0) && (
+                  <div>
+                    取り組んだ内容：
+                    {card.achvTotals.minutes > 0 ? `⏱${card.achvTotals.minutes}分 ` : ""}
+                    {card.achvTotals.pages > 0 ? `📖${card.achvTotals.pages}ページ ` : ""}
+                    {card.achvTotals.problems > 0 ? `✏️${card.achvTotals.problems}問` : ""}
+                  </div>
+                )}
+                {card.earnedAt && <div>達成日：{card.earnedAt}</div>}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>配合の記録</div>
+              <div style={{ background: "#F5F9FB", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4a6c85", lineHeight: 1.8 }}>
+                <div>元のカード：{card.fromTitle}</div>
+                {card.earnedAt && <div>配合した日：{card.earnedAt}</div>}
+              </div>
+            </>
+          ))}
       </div>
 
-      {isSchedule && card.variant && zoomedStage !== null && (
+      {(isSchedule || isGrowing) && card.variant && zoomedStage !== null && (
         <div
           onClick={() => setZoomedStage(null)}
           style={{ position: "fixed", inset: 0, background: "rgba(11,61,98,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: 30 }}
