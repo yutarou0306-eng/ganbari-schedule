@@ -331,31 +331,16 @@ export default function ProfileRoot() {
   // +1 / -1 a point on one stat for one card. Guarded so a "+" can't spend
   // more points than the card has earned in stars, and can't push a stat
   // past its cap; a "−" can't go below zero.
-  async function handleAllocate(card, statKey, delta) {
+  // Commits a card's stat allocation and locks it in, in one write — the
+  // kid can freely edit their draft (buttons or typed numbers) in
+  // CardDetailModal without touching the server; nothing is saved until
+  // they confirm "これでよいですか？". Refuses to run if the draft spends
+  // more points than the card has earned (CardDetailModal's own "決定する"
+  // button is disabled in that case, so this is a safety backstop).
+  async function handleFinalizeAllocation(card, draftAllocations) {
     if (card.source !== "schedule" || card.locked) return;
-    const current = (profile.cardAllocations && profile.cardAllocations[card.scheduleId]) || {};
-    const bonus = Math.max(0, current[statKey] || 0);
-    if (delta > 0) {
-      if (card.remaining <= 0) return;
-      const cap = statKey === "hp" || statKey === "mp" ? STAT_MAX.hp : STAT_MAX.power;
-      if (card.stats[statKey] >= cap) return;
-    }
-    if (delta < 0 && bonus <= 0) return;
-    const next = { ...current, [statKey]: Math.max(0, bonus + delta) };
-    const nextProfile = {
-      ...profile,
-      cardAllocations: { ...(profile.cardAllocations || {}), [card.scheduleId]: next },
-    };
-    await saveProfile(nextProfile);
-  }
-
-  // Locks a card's stat allocation in for good — after this, handleAllocate
-  // refuses further changes. One-shot: the kid gets one allocation session
-  // per card, confirmed with "これでよいですか？" before it's final.
-  async function handleLockAllocation(card) {
-    if (card.source !== "schedule" || card.locked) return;
-    const current = (profile.cardAllocations && profile.cardAllocations[card.scheduleId]) || {};
-    const next = { ...current, locked: true };
+    if (totalAllocated(draftAllocations) > card.stars) return;
+    const next = { ...draftAllocations, locked: true };
     const nextProfile = {
       ...profile,
       cardAllocations: { ...(profile.cardAllocations || {}), [card.scheduleId]: next },
@@ -739,8 +724,7 @@ export default function ProfileRoot() {
           return (
             <CardDetailModal
               card={card}
-              onAllocate={(statKey, delta) => handleAllocate(card, statKey, delta)}
-              onLock={() => handleLockAllocation(card)}
+              onFinalize={(draftAllocations) => handleFinalizeAllocation(card, draftAllocations)}
               onClose={() => setOpenCardId(null)}
             />
           );
@@ -928,16 +912,35 @@ function CardTile({ card, selected, onToggle, onOpen }) {
 
 // The card's full detail view — opened by tapping a card in the grid.
 // Shows the growth line (small thumbnails), the 6 stats (editable with
-// +/- until locked in), and which schedule earned it. Allocation is a
-// one-shot decision: pressing 決定する asks "これでよいですか？" before
-// actually locking it in — after that, handleAllocate refuses further
-// changes and this view only shows the final numbers.
-function CardDetailModal({ card, onAllocate, onLock, onClose }) {
+// +/- buttons or typed numbers until locked in), and which schedule
+// earned it. Allocation is a one-shot decision: editing only touches a
+// local draft, and pressing 決定する asks "これでよいですか？" before
+// onFinalize actually saves and locks it — after that, this view only
+// shows the final numbers.
+function CardDetailModal({ card, onFinalize, onClose }) {
   const [confirming, setConfirming] = useState(false);
   const [zoomedStage, setZoomedStage] = useState(null); // stage index currently shown large, or null
   const isSchedule = card.source === "schedule";
   const canEdit = isSchedule && !card.locked;
   const heroSrc = isSchedule && card.variant ? stageImageAt(card.variant.species, stageCount(card.variant.species) - 1) : null;
+
+  // Local draft of the allocation — buttons and the number inputs both
+  // edit this, and nothing reaches the server until 決定する is pressed
+  // and confirmed. Seeded once from the card's saved allocations (this
+  // component remounts fresh each time the modal opens).
+  const [draft, setDraft] = useState(() => ({ ...(card.allocations || {}) }));
+  const baseStats = canEdit && card.variant ? computeCardStats(card.variant.species, {}) : null;
+  const liveStats = canEdit && card.variant ? computeCardStats(card.variant.species, draft) : card.stats;
+  const spent = canEdit ? totalAllocated(draft) : 0;
+  const remaining = canEdit ? card.stars - spent : card.remaining;
+  const overBudget = canEdit && remaining < 0;
+
+  function setBonus(k, rawBonus) {
+    const cap = k === "hp" || k === "mp" ? STAT_MAX.hp : STAT_MAX.power;
+    const maxBonus = baseStats ? cap - baseStats[k] : cap;
+    const clamped = Math.max(0, Math.min(maxBonus, rawBonus));
+    setDraft((prev) => ({ ...prev, [k]: clamped }));
+  }
 
   return (
     <div style={overlayStyle}>
@@ -1026,7 +1029,7 @@ function CardDetailModal({ card, onAllocate, onLock, onClose }) {
               </button>
               <button
                 onClick={() => {
-                  onLock();
+                  onFinalize(draft);
                   setConfirming(false);
                 }}
                 style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}
@@ -1039,31 +1042,60 @@ function CardDetailModal({ card, onAllocate, onLock, onClose }) {
           <>
             {canEdit && (
               <p style={{ fontSize: 13, color: "#7c98aa", marginBottom: 8 }}>
-                残り <span style={{ color: "#0B3D62", fontSize: 17, fontWeight: 900 }}>{card.remaining}</span> ポイント
+                残り{" "}
+                <span style={{ color: overBudget ? "#C6262E" : "#0B3D62", fontSize: 17, fontWeight: 900 }}>
+                  {overBudget ? `-${Math.abs(remaining)}` : remaining}
+                </span>{" "}
+                ポイント
               </p>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
               {STAT_KEYS.map((k) => {
-                const bonus = Math.max(0, (card.allocations && card.allocations[k]) || 0);
+                const bonus = Math.max(0, draft[k] || 0);
                 const cap = k === "hp" || k === "mp" ? STAT_MAX.hp : STAT_MAX.power;
-                const atCap = card.stats[k] >= cap;
+                const atCap = liveStats[k] >= cap;
                 return (
                   <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F5F9FB", borderRadius: 10, padding: "8px 10px" }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0B3D62", width: 66, textAlign: "left" }}>{STAT_LABELS[k]}</div>
-                    <div style={{ fontSize: 16, fontWeight: 900, color: "#0B3D62", flex: 1, textAlign: "center" }}>{card.stats[k]}</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0B3D62", width: 60, textAlign: "left" }}>{STAT_LABELS[k]}</div>
+                    {canEdit ? (
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={liveStats[k]}
+                        onChange={(e) => {
+                          const typed = e.target.value === "" ? 0 : parseInt(e.target.value, 10);
+                          if (Number.isNaN(typed)) return;
+                          setBonus(k, typed - baseStats[k]);
+                        }}
+                        style={{
+                          width: 56,
+                          flex: 1,
+                          textAlign: "center",
+                          fontSize: 16,
+                          fontWeight: 900,
+                          color: "#0B3D62",
+                          border: "2px solid #d7ecf3",
+                          borderRadius: 8,
+                          padding: "4px 2px",
+                          fontFamily: "inherit",
+                        }}
+                      />
+                    ) : (
+                      <div style={{ fontSize: 16, fontWeight: 900, color: "#0B3D62", flex: 1, textAlign: "center" }}>{liveStats[k]}</div>
+                    )}
                     {canEdit && (
                       <div style={{ display: "flex", gap: 6 }}>
                         <button
-                          onClick={() => onAllocate(k, -1)}
+                          onClick={() => setBonus(k, bonus - 1)}
                           disabled={bonus <= 0}
                           style={{ ...allocBtnStyle, opacity: bonus <= 0 ? 0.35 : 1, cursor: bonus <= 0 ? "default" : "pointer" }}
                         >
                           −
                         </button>
                         <button
-                          onClick={() => onAllocate(k, 1)}
-                          disabled={card.remaining <= 0 || atCap}
-                          style={{ ...allocBtnStyle, opacity: card.remaining <= 0 || atCap ? 0.35 : 1, cursor: card.remaining <= 0 || atCap ? "default" : "pointer" }}
+                          onClick={() => setBonus(k, bonus + 1)}
+                          disabled={atCap}
+                          style={{ ...allocBtnStyle, opacity: atCap ? 0.35 : 1, cursor: atCap ? "default" : "pointer" }}
                         >
                           ＋
                         </button>
@@ -1074,12 +1106,28 @@ function CardDetailModal({ card, onAllocate, onLock, onClose }) {
               })}
             </div>
             {canEdit ? (
-              <button
-                onClick={() => setConfirming(true)}
-                style={{ ...modalBtnStyle, width: "100%", background: "linear-gradient(135deg,#F4C95D,#E0A83E)", color: "#5C3A21", border: "none", marginBottom: 16 }}
-              >
-                決定する
-              </button>
+              <>
+                {overBudget && (
+                  <p style={{ fontSize: 12.5, color: "#C6262E", fontWeight: 700, marginBottom: 8, textAlign: "center" }}>
+                    ⚠️ 持っている星より多く使っています。数を減らしてください。
+                  </p>
+                )}
+                <button
+                  onClick={() => setConfirming(true)}
+                  disabled={overBudget}
+                  style={{
+                    ...modalBtnStyle,
+                    width: "100%",
+                    background: overBudget ? "#d8d8d8" : "linear-gradient(135deg,#F4C95D,#E0A83E)",
+                    color: overBudget ? "#8a8a8a" : "#5C3A21",
+                    border: "none",
+                    marginBottom: 16,
+                    cursor: overBudget ? "default" : "pointer",
+                  }}
+                >
+                  決定する
+                </button>
+              </>
             ) : isSchedule ? (
               <div style={{ fontSize: 12, color: "#7c98aa", fontWeight: 700, marginBottom: 16 }}>⭐ 配点済み（変更できません）</div>
             ) : null}
