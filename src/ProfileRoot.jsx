@@ -123,8 +123,7 @@ export default function ProfileRoot() {
   const [exists, setExists] = useState(false);
   const [profile, setProfile] = useState(freshProfile());
   const [schedules, setSchedules] = useState([]); // [{id, title, theme, stamps}]
-  const [selectedCardIds, setSelectedCardIds] = useState([]); // up to 2, for 配合 (breeding)
-  const [showBreedModal, setShowBreedModal] = useState(false);
+  const [breedPage, setBreedPage] = useState(false); // 配合ページを表示中かどうか
   const [openCardId, setOpenCardId] = useState(null); // card.id currently open in the detail view
   const [view, setView] = useState("main"); // main | editProfile | rewards
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
@@ -254,14 +253,18 @@ export default function ProfileRoot() {
   // two cards that look the same (same species+color) can still have
   // different stats.
   const myCards = schedules
-    .filter((s) => s.awardedCard)
+    .filter((s) => s.awardedCard && !(profile.consumedScheduleCards || []).includes(s.id))
     .map((s) => {
       const cardTheme = s.awardedCard.theme || s.theme || "girl";
       const variant = getVariant(cardTheme, s.awardedCard.variant);
       const stars = typeof s.awardedCard.stars === "number" ? s.awardedCard.stars : s.stamps;
       // A schedule that's actually earned a card is by definition 100%
-      // done, so it's always Lv.20 (Master) — no need to look at pct.
-      const lv = MASTER_LEVEL;
+      // done, so it's naturally Lv.20 (Master) — unless it's been used as
+      // a ベース (base) in 配合 before, in which case its Lv/stats were
+      // upgraded in place and are stored as an override.
+      const override = (profile.cardOverrides && profile.cardOverrides[s.id]) || null;
+      const lv = override ? override.lv : MASTER_LEVEL;
+      const stats = override ? override.stats : computeCardStats(variant.species, lv);
       return {
         id: `sched:${s.id}`,
         source: "schedule",
@@ -272,7 +275,7 @@ export default function ProfileRoot() {
         stars,
         lv,
         isMaster: true,
-        stats: computeCardStats(variant.species, lv),
+        stats,
         label: s.mascotName || variant.name,
         fromTitle: s.title,
         earnedAt: s.awardedCard.earnedAt || "",
@@ -317,9 +320,11 @@ export default function ProfileRoot() {
 
   // Cards produced by combining two others (配合) — stored on the profile
   // itself since they aren't tied to any one schedule. Always Master-tier
-  // (breedable again) once created.
+  // (breedable again) once created; updated in place if later used as a
+  // ベース (base) themselves.
   const bredCards = (profile.bredCards || []).map((c) => ({
     id: `bred:${c.id}`,
+    bredId: c.id,
     source: "bred",
     theme: null,
     variant: null,
@@ -334,35 +339,34 @@ export default function ProfileRoot() {
   }));
 
   const allCards = [...myCards, ...growingCards, ...bredCards];
+  const masterCards = allCards.filter((c) => c.isMaster);
 
   const totalSpent = (profile.redemptions || []).reduce((sum, r) => sum + r.cost, 0);
   const available = totalEarned - totalSpent;
 
-  async function handleConfirmBreed(name) {
-    const a = allCards.find((c) => c.id === selectedCardIds[0]);
-    const b = allCards.find((c) => c.id === selectedCardIds[1]);
-    if (!a || !b || !a.isMaster || !b.isMaster) return;
-    const combined = combineStats(a.stats, b.stats);
-    const newCard = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      name: (name || "").trim() || `${a.label}×${b.label}`,
-      parentLabel: `${a.label} × ${b.label}`,
-      stats: combined,
-      lv: combineLevel(a.lv, b.lv),
-      createdAt: new Date().toISOString().slice(0, 10),
-    };
-    const next = { ...profile, bredCards: [...(profile.bredCards || []), newCard] };
-    await saveProfile(next);
-    setSelectedCardIds([]);
-    setShowBreedModal(false);
-  }
+  // 配合 (breeding): ベース (base) keeps existing as one card, upgraded
+  // in place with the combined Lv/stats; サブ (sub, the material) is
+  // consumed — removed from the collection entirely. No third card is
+  // created.
+  async function handleFinalizeBreed(baseId, subId) {
+    const base = allCards.find((c) => c.id === baseId);
+    const sub = allCards.find((c) => c.id === subId);
+    if (!base || !sub || !base.isMaster || !sub.isMaster) return;
+    const newLv = combineLevel(base.lv, sub.lv);
+    const newStats = combineStats(base.stats, sub.stats);
 
-  function toggleCardSelect(id) {
-    setSelectedCardIds((prev) => {
-      if (prev.includes(id)) return prev.filter((x) => x !== id);
-      if (prev.length >= 2) return [prev[1], id]; // swap out the older pick
-      return [...prev, id];
-    });
+    let next = { ...profile };
+    if (base.source === "schedule") {
+      next.cardOverrides = { ...(next.cardOverrides || {}), [base.scheduleId]: { lv: newLv, stats: newStats } };
+    } else if (base.source === "bred") {
+      next.bredCards = (next.bredCards || []).map((c) => (c.id === base.bredId ? { ...c, lv: newLv, stats: newStats } : c));
+    }
+    if (sub.source === "schedule") {
+      next.consumedScheduleCards = [...(next.consumedScheduleCards || []), sub.scheduleId];
+    } else if (sub.source === "bred") {
+      next.bredCards = (next.bredCards || []).filter((c) => c.id !== sub.bredId);
+    }
+    await saveProfile(next);
   }
 
   async function handleRedeem(reward) {
@@ -446,6 +450,10 @@ export default function ProfileRoot() {
         onCancel={() => setView("main")}
       />
     );
+  }
+
+  if (breedPage) {
+    return <BreedPage masterCards={masterCards} onFinalize={handleFinalizeBreed} onClose={() => setBreedPage(false)} />;
   }
 
   return (
@@ -535,12 +543,6 @@ export default function ProfileRoot() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
-          <button onClick={handleShare} style={{ ...actionBtnStyle, background: "#5A4FCF" }}>
-            {copied ? "✅ コピーしました！" : "📤 プロフィールを共有"}
-          </button>
-        </div>
-
         <SectionTitle>🎁 景品と交換</SectionTitle>
         <div style={{ marginBottom: 8 }}>
           {(profile.rewards || []).length === 0 ? (
@@ -582,48 +584,37 @@ export default function ProfileRoot() {
           ✏️ 景品を編集する（保護者のみ）
         </button>
 
-        <SectionTitle>🎴 集めたカード</SectionTitle>
+        <SectionTitle>🎴 集めたファミリアカード</SectionTitle>
         <div style={{ marginBottom: 6 }}>
           {allCards.length === 0 ? (
-            <div style={emptyCardStyle}>まだカードがありません。スケジュールを最後まで達成するとカードがもらえます。</div>
+            <div style={emptyCardStyle}>まだファミリアカードがありません。スケジュールを最後まで達成するとファミリアカードがもらえます。</div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
               {allCards.map((c) => (
-                <CardTile
-                  key={c.id}
-                  card={c}
-                  selected={selectedCardIds.includes(c.id)}
-                  onToggle={() => toggleCardSelect(c.id)}
-                  onOpen={() => setOpenCardId(c.id)}
-                />
+                <CardTile key={c.id} card={c} onOpen={() => setOpenCardId(c.id)} />
               ))}
             </div>
           )}
         </div>
-        {allCards.length >= 2 && (
-          <div style={{ marginBottom: 18 }}>
-            <div style={{ fontSize: 12, color: "#EAF7FB", marginBottom: 8 }}>
-              Masterのカード右上の丸を2枚タップして選ぶと、LVとステータスを合計した新しいカードに配合できます。
-            </div>
-            <button
-              onClick={() => setShowBreedModal(true)}
-              disabled={selectedCardIds.length !== 2}
-              style={{
-                width: "100%",
-                padding: "12px 0",
-                borderRadius: 14,
-                border: "none",
-                background: selectedCardIds.length === 2 ? "linear-gradient(135deg,#B48CE0,#5A3FA0)" : "#7c8ba0",
-                color: "#fff",
-                fontWeight: 800,
-                fontSize: 14.5,
-                cursor: selectedCardIds.length === 2 ? "pointer" : "default",
-                fontFamily: "inherit",
-              }}
-            >
-              ⚗️ 配合する{selectedCardIds.length > 0 ? `（${selectedCardIds.length}/2枚選択中）` : ""}
-            </button>
-          </div>
+        {masterCards.length >= 2 && (
+          <button
+            onClick={() => setBreedPage(true)}
+            style={{
+              width: "100%",
+              padding: "12px 0",
+              borderRadius: 14,
+              border: "none",
+              background: "linear-gradient(135deg,#B48CE0,#5A3FA0)",
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: 14.5,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              marginBottom: 18,
+            }}
+          >
+            ⚗️ 配合する
+          </button>
         )}
 
         <SectionTitle>✅ 完了したスケジュール</SectionTitle>
@@ -725,15 +716,6 @@ export default function ProfileRoot() {
 
       {showGatePin && <RewardsPinModal correctPin={profile.pin} onSuccess={handleGateSuccess} onCancel={handleGateCancel} />}
 
-      {showBreedModal && selectedCardIds.length === 2 && (
-        <BreedConfirmModal
-          cardA={allCards.find((c) => c.id === selectedCardIds[0])}
-          cardB={allCards.find((c) => c.id === selectedCardIds[1])}
-          onConfirm={handleConfirmBreed}
-          onClose={() => setShowBreedModal(false)}
-        />
-      )}
-
       {openCardId &&
         (() => {
           const card = allCards.find((c) => c.id === openCardId);
@@ -830,8 +812,7 @@ function SectionTitle({ children }) {
 // card (has art) or a 配合 (bred) card (stats only, no unique art since
 // there's no dedicated hybrid illustration). Tappable to select for
 // breeding; shows a highlighted ring + order badge while selected.
-function CardTile({ card, selected, onToggle, onOpen }) {
-  const breedable = card.isMaster;
+function CardTile({ card, selected, onOpen }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div
@@ -866,35 +847,6 @@ function CardTile({ card, selected, onToggle, onOpen }) {
           />
         ) : (
           <span style={{ fontSize: 30 }}>⚗️</span>
-        )}
-        {breedable && (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle();
-            }}
-            aria-label="配合に選ぶ"
-            style={{
-              position: "absolute",
-              top: 4,
-              right: 4,
-              width: 18,
-              height: 18,
-              borderRadius: "50%",
-              border: selected ? "none" : "2px solid rgba(255,255,255,0.85)",
-              background: selected ? "#FFE27A" : "rgba(11,61,98,0.35)",
-              color: "#5C3A21",
-              fontSize: 10,
-              fontWeight: 900,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              padding: 0,
-            }}
-          >
-            {selected ? "✓" : ""}
-          </button>
         )}
         <span
           style={{
@@ -1078,7 +1030,7 @@ function CardDetailModal({ card, onClose }) {
           <>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>配合の記録</div>
             <div style={{ background: "#F5F9FB", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4a6c85", lineHeight: 1.8 }}>
-              <div>元のカード：{card.fromTitle}</div>
+              <div>元のファミリアカード：{card.fromTitle}</div>
               {card.earnedAt && <div>配合した日：{card.earnedAt}</div>}
             </div>
           </>
@@ -1092,45 +1044,153 @@ function CardDetailModal({ card, onClose }) {
 // Preview + confirm for combining two selected cards (配合). Stats sum,
 // capped per-stat by mascots.js — no unique art for the result, so this
 // just shows the two parents' mini stat blocks and the combined total.
-function BreedConfirmModal({ cardA, cardB, onConfirm, onClose }) {
-  const [name, setName] = useState("");
-  const combined = combineStats(cardA.stats, cardB.stats);
+function BreedPage({ masterCards, onFinalize, onClose }) {
+  const [baseId, setBaseId] = useState(null);
+  const [subId, setSubId] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+
+  function handleTap(id) {
+    if (id === baseId) {
+      setBaseId(null);
+      return;
+    }
+    if (id === subId) {
+      setSubId(null);
+      return;
+    }
+    if (!baseId) {
+      setBaseId(id);
+      return;
+    }
+    if (!subId) {
+      setSubId(id);
+      return;
+    }
+    // both slots already filled — swap in the new pick as サブ
+    setSubId(id);
+  }
+
+  const base = masterCards.find((c) => c.id === baseId);
+  const sub = masterCards.find((c) => c.id === subId);
+  const combined = base && sub ? combineStats(base.stats, sub.stats) : null;
+  const combinedLv = base && sub ? combineLevel(base.lv, sub.lv) : null;
+
   return (
-    <div style={overlayStyle}>
-      <div style={modalCardStyle}>
-        <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>⚗️ カードを配合する</h3>
-        <p style={{ fontSize: 14.5, color: "#4a6c85", lineHeight: 1.6, marginBottom: 14 }}>
-          {cardA.label} と {cardB.label} を配合します。ステータスは2枚の合計になります。
+    <div style={{ minHeight: "100vh", background: bg, fontFamily: "'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', sans-serif", padding: "28px 16px" }}>
+      <div style={{ maxWidth: 480, margin: "0 auto" }}>
+        <button
+          onClick={onClose}
+          style={{ background: "none", border: "none", color: "#EAF7FB", fontWeight: 700, fontSize: 15, cursor: "pointer", marginBottom: 14, fontFamily: "inherit", padding: 0 }}
+        >
+          ← もどる
+        </button>
+        <h1 style={{ fontFamily: "'Kaisei Decol', serif", color: "#fff", fontSize: 24, textAlign: "center", textShadow: "0 2px 8px rgba(11,61,98,0.5)", marginBottom: 6 }}>
+          ⚗️ ファミリア配合
+        </h1>
+        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 13, marginBottom: 18, lineHeight: 1.7 }}>
+          「ベース」と「サブ」を1枚ずつ選んでください。配合すると、ベースのLVとステータスにサブの分が合計され、サブのファミリアカードはなくなります。
         </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginBottom: 14 }}>
-          {STAT_KEYS.map((k) => (
-            <div key={k} style={{ background: "#F5F9FB", borderRadius: 10, padding: "6px 2px", textAlign: "center" }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: "#7c98aa" }}>{STAT_LABELS[k]}</div>
-              <div style={{ fontSize: 15, fontWeight: 900, color: "#0B3D62" }}>{combined[k]}</div>
+
+        {(base || sub) && (
+          <div style={{ display: "flex", gap: 14, marginBottom: 18, alignItems: "center", justifyContent: "center" }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 11, color: "#FFE27A", fontWeight: 800, marginBottom: 4 }}>ベース</div>
+              {base ? <MiniCard card={base} /> : <EmptySlot />}
             </div>
+            <div style={{ color: "#fff", fontSize: 22, fontWeight: 900 }}>＋</div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 11, color: "#EAF7FB", fontWeight: 800, marginBottom: 4 }}>サブ</div>
+              {sub ? <MiniCard card={sub} /> : <EmptySlot />}
+            </div>
+          </div>
+        )}
+
+        {combined && (
+          <div style={{ background: "#fff", borderRadius: 16, padding: 16, marginBottom: 18 }}>
+            <div style={{ textAlign: "center", fontWeight: 900, color: "#5A3FA0", fontSize: 15, marginBottom: 4 }}>配合後の予測</div>
+            <div style={{ textAlign: "center", fontWeight: 900, color: "#0B3D62", fontSize: 16, marginBottom: 10 }}>Lv.{combinedLv}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+              {STAT_KEYS.map((k) => (
+                <div key={k} style={{ background: "#F5F9FB", borderRadius: 10, padding: "6px 2px", textAlign: "center" }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#7c98aa" }}>{STAT_LABELS[k]}</div>
+                  <div style={{ fontSize: 15, fontWeight: 900, color: "#0B3D62" }}>{combined[k]}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {base && sub && !confirming && (
+          <button
+            onClick={() => setConfirming(true)}
+            style={{ width: "100%", padding: "14px 0", borderRadius: 16, border: "none", background: "linear-gradient(135deg,#B48CE0,#5A3FA0)", color: "#fff", fontWeight: 900, fontSize: 16, cursor: "pointer", fontFamily: "inherit", marginBottom: 18 }}
+          >
+            この内容で配合する
+          </button>
+        )}
+
+        {confirming && (
+          <div style={{ background: "#FFF7E0", border: "2px solid #F4C95D", borderRadius: 14, padding: 16, marginBottom: 18, textAlign: "center" }}>
+            <p style={{ fontSize: 14.5, color: "#5C3A21", fontWeight: 700, margin: "0 0 12px" }}>
+              これでよいですか？サブの「{sub.label}」のファミリアカードはなくなります。
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => setConfirming(false)}
+                style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "2px solid #d7ecf3", background: "#fff", color: "#5a7d94", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                いいえ、やめる
+              </button>
+              <button
+                onClick={async () => {
+                  await onFinalize(base.id, sub.id);
+                  onClose();
+                }}
+                style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#5A3FA0", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                はい、配合する
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ fontSize: 12, color: "#EAF7FB", fontWeight: 700, marginBottom: 8 }}>Masterのファミリアカード一覧</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+          {masterCards.map((c) => (
+            <CardTile key={c.id} card={c} selected={c.id === baseId || c.id === subId} onOpen={() => handleTap(c.id)} />
           ))}
-        </div>
-        <label style={{ display: "block", fontWeight: 700, fontSize: 13, marginBottom: 6, color: "#14588C", textAlign: "left" }}>
-          新しいカードの名前（省略可）
-        </label>
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={`${cardA.label}×${cardB.label}`}
-          maxLength={24}
-          style={{ width: "100%", boxSizing: "border-box", padding: "10px 12px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 15, fontFamily: "inherit", marginBottom: 18, color: "#0B3D62" }}
-        />
-        <div style={{ display: "flex", gap: 10 }}>
-          <button onClick={onClose} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
-            やめる
-          </button>
-          <button onClick={() => onConfirm(name)} style={{ ...modalBtnStyle, background: "linear-gradient(135deg,#B48CE0,#5A3FA0)", color: "#fff", border: "none" }}>
-            配合する
-          </button>
         </div>
       </div>
     </div>
   );
+}
+
+function MiniCard({ card }) {
+  return (
+    <div
+      style={{
+        width: 70,
+        height: 70,
+        borderRadius: 12,
+        background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 6,
+        margin: "0 auto",
+      }}
+    >
+      {card.imgSrc ? (
+        <img src={card.imgSrc} alt={card.label} style={{ width: "100%", height: "100%", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }} />
+      ) : (
+        <span style={{ fontSize: 24 }}>⚗️</span>
+      )}
+    </div>
+  );
+}
+
+function EmptySlot() {
+  return <div style={{ width: 70, height: 70, borderRadius: 12, border: "2px dashed rgba(255,255,255,0.5)", margin: "0 auto" }} />;
 }
 
 const iconBtnStyle = {
@@ -1218,20 +1278,23 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
   const [pin, setPin] = useState(initial.pin || "");
   const [dupProfile, setDupProfile] = useState(null); // { id, name } | null
   const [checking, setChecking] = useState(false);
+  const pinValid = pin.length >= 4 && pin.length <= 6;
+  const canSave = !!name.trim() && !!birthdate && pinValid;
 
   async function handleSaveClick() {
-    const trimmedName = name.trim();
-    if (!trimmedName) return;
+    if (!canSave) return;
     setDupProfile(null);
 
     if (isNew) {
       setChecking(true);
       try {
-        let query = supabase.from("profiles").select("id, blob").eq("blob->>name", trimmedName);
-        if (birthdate) query = query.eq("blob->>birthdate", birthdate);
-        const { data } = await query;
+        const { data } = await supabase
+          .from("profiles")
+          .select("id, blob")
+          .eq("blob->>name", name.trim())
+          .eq("blob->>birthdate", birthdate);
         if (data && data.length > 0) {
-          setDupProfile({ id: data[0].id, name: (data[0].blob && data[0].blob.name) || trimmedName });
+          setDupProfile({ id: data[0].id, name: (data[0].blob && data[0].blob.name) || name.trim() });
           setChecking(false);
           return;
         }
@@ -1273,7 +1336,7 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
           style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 16, fontFamily: "inherit", marginBottom: 18, boxSizing: "border-box" }}
         />
 
-        <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>生年月日（任意）</label>
+        <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>生年月日</label>
         <div style={{ marginBottom: 22 }}>
           <BirthdateSelects
             value={birthdate}
@@ -1285,7 +1348,7 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
         </div>
 
         <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>
-          保護者用 暗証番号（任意・数字4〜6桁）
+          保護者用 暗証番号（数字4〜6桁）
         </label>
         <input
           type="password"
@@ -1293,11 +1356,11 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
           autoComplete="off"
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-          placeholder="設定しない場合は空欄でOK"
+          placeholder="例）1234"
           style={{ width: "100%", padding: "11px 12px", borderRadius: 12, border: "2px solid #BFE3F0", fontSize: 15, fontFamily: "inherit", marginBottom: 8, boxSizing: "border-box" }}
         />
         <p style={{ color: "#7c98aa", fontSize: 12.5, marginTop: 0, marginBottom: 22, lineHeight: 1.5 }}>
-          設定すると、「景品を編集する」を開くときにこの番号の入力が必要になります（お子さんが誤って変更しないためです）。
+          「景品を編集する」を開くときにこの番号の入力が必要になります（お子さんが誤って変更しないためです）。同じ名前のお子さんがいても、生年月日でスタンプ帳を区別できます。
         </p>
 
         {dupProfile && (
@@ -1316,17 +1379,17 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
 
         <button
           onClick={handleSaveClick}
-          disabled={!name.trim() || checking}
+          disabled={!canSave || checking}
           style={{
             width: "100%",
             padding: "15px 0",
             borderRadius: 16,
             border: "none",
-            background: name.trim() ? "linear-gradient(135deg,#FFB6C9,#F4C95D)" : "#e5edf1",
-            color: name.trim() ? "#fff" : "#aab8c0",
+            background: canSave ? "linear-gradient(135deg,#FFB6C9,#F4C95D)" : "#e5edf1",
+            color: canSave ? "#fff" : "#aab8c0",
             fontWeight: 900,
             fontSize: 17,
-            cursor: name.trim() ? "pointer" : "default",
+            cursor: canSave ? "pointer" : "default",
             fontFamily: "inherit",
           }}
         >

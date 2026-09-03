@@ -1715,8 +1715,8 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       </div>
       {pendingLowCardSave && (
         <ConfirmModal
-          title="カードがもらえないかも"
-          message="スケジュールが30日未満、若しくは獲得スタンプ数が50個以下だと完了した時カードが貰えないよ。それでもスケジュール帳作る？"
+          title="ファミリアカードがもらえないかも"
+          message="スケジュールが30日未満、若しくは獲得スタンプ数が50個以下だと完了した時ファミリアカードが貰えないよ。それでもスケジュール帳作る？"
           confirmLabel="作る"
           cancelLabel="編集にもどる"
           onConfirm={() => {
@@ -2664,7 +2664,7 @@ function ScheduleCompleteCelebration({ onClose, title, reward, theme, variantKey
         <p style={styles.weekCelebrateSub}>{title} 最後まで、本当によく頑張ったね！</p>
         {awarded && (
           <div style={styles.cardGetBox}>
-            <div style={styles.cardGetLabel}>🎴 カードげっと！</div>
+            <div style={styles.cardGetLabel}>🎴 ファミリアカードげっと！</div>
             <div
               style={{
                 ...styles.cardGetImgWrap,
