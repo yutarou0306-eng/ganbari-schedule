@@ -85,9 +85,12 @@ export function stageCount(species) {
 }
 
 // Japanese name for a growth-stage index — shown next to the mascot's name
-// at evolution time. Index 0 (egg) has no label; hatching (egg → baby) has
-// its own celebration copy ("たまごが かえったよ！") instead of this.
-const STAGE_LABELS = ["", "幼年期", "青年期", "成熟期", "マスター"];
+// at evolution time, and next to the color+species name when previewing a
+// stage in a card's growth history. Index 0 is "卵" — this never actually
+// shows during an evolution celebration itself (evolving always targets
+// stage 1+; hatching has its own separate celebration copy, "たまごが
+// かえったよ！"), so this is safe to fill in for the growth-history use.
+const STAGE_LABELS = ["卵", "幼年期", "青年期", "成熟期", "マスター"];
 
 export function stageLabel(index) {
   return STAGE_LABELS[index] || "";
