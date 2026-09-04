@@ -952,7 +952,7 @@ function SectionTitle({ children }) {
 // card (has art) or a 配合 (bred) card (stats only, no unique art since
 // there's no dedicated hybrid illustration). Tappable to select for
 // breeding; shows a highlighted ring + order badge while selected.
-function CardTile({ card, selected, onOpen }) {
+function CardTile({ card, selected, roleLabel, onOpen }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div
@@ -997,6 +997,25 @@ function CardTile({ card, selected, onOpen }) {
             />
           ) : (
             <span style={{ fontSize: 30 }}>⚗️</span>
+          )}
+          {roleLabel && (
+            <span
+              style={{
+                position: "absolute",
+                top: 3,
+                left: 3,
+                right: 3,
+                textAlign: "center",
+                background: roleLabel === "ベース" ? "#FFE27A" : "#9FD8EE",
+                color: "#5C3A21",
+                fontSize: 9.5,
+                fontWeight: 900,
+                borderRadius: 999,
+                padding: "1px 4px",
+              }}
+            >
+              {roleLabel}
+            </span>
           )}
           <span
             style={{
@@ -1623,25 +1642,32 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
           「ベース」と「サブ」を1枚ずつ選んでください。配合すると、ベースのLVとステータスにサブの分が合計され、サブのファミリアカードはなくなります。
         </p>
 
-        {(base || sub) && (
-          <>
-            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", justifyContent: "center", marginBottom: 6 }}>
-              <StatSlotCard label="ベース" accent="#FFE27A" card={base} />
-              <div style={{ color: "#fff", fontSize: 22, fontWeight: 900, marginTop: 50, flexShrink: 0 }}>＋</div>
-              <StatSlotCard label="サブ" accent="#9FD8EE" card={sub} />
-            </div>
+        <div style={{ fontSize: 12, color: "#EAF7FB", fontWeight: 700, marginBottom: 8 }}>Masterのファミリアカード一覧</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18, marginBottom: 22 }}>
+          {masterCards.map((c) => (
+            <CardTile
+              key={c.id}
+              card={c}
+              selected={c.id === baseId || c.id === subId}
+              roleLabel={c.id === baseId ? "ベース" : c.id === subId ? "サブ" : null}
+              onOpen={() => handleTap(c.id)}
+            />
+          ))}
+        </div>
 
-            {combined && (
-              <>
-                <div style={{ textAlign: "center", color: "#EAF7FB", fontSize: 22, fontWeight: 900, margin: "4px 0" }}>↓</div>
-                <div style={{ textAlign: "center", color: "#EAF7FB", fontSize: 12.5, fontWeight: 700, marginBottom: 10 }}>ステータスを合算！</div>
-                <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
-                  <ResultStatCard base={base} combined={combined} combinedLv={combinedLv} willGrandMaster={willGrandMaster} />
-                </div>
-              </>
-            )}
-          </>
-        )}
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-start", justifyContent: "center", marginBottom: 6 }}>
+          <StatSlotCard label="ベース" accent="#FFE27A" card={base} />
+          <div style={{ color: "#fff", fontSize: 22, fontWeight: 900, marginTop: 50, flexShrink: 0 }}>＋</div>
+          <StatSlotCard label="サブ" accent="#9FD8EE" card={sub} />
+        </div>
+
+        <div style={{ textAlign: "center", color: "#EAF7FB", fontSize: 22, fontWeight: 900, margin: "4px 0" }}>↓</div>
+        <div style={{ textAlign: "center", color: "#EAF7FB", fontSize: 12.5, fontWeight: 700, marginBottom: 10 }}>
+          {combined ? "ステータスを合算！" : "配合後のファミリア"}
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+          <ResultStatCard base={base} combined={combined} combinedLv={combinedLv} willGrandMaster={willGrandMaster} />
+        </div>
 
         <div style={{ background: "#fff", borderRadius: 16, padding: "14px 16px", marginBottom: 18 }}>
           <div style={{ fontWeight: 900, color: "#5A3FA0", fontSize: 13.5, marginBottom: 8 }}>⚗️ 配合のルール</div>
@@ -1685,13 +1711,6 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
             </div>
           </div>
         )}
-
-        <div style={{ fontSize: 12, color: "#EAF7FB", fontWeight: 700, marginBottom: 8 }}>Masterのファミリアカード一覧</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18 }}>
-          {masterCards.map((c) => (
-            <CardTile key={c.id} card={c} selected={c.id === baseId || c.id === subId} onOpen={() => handleTap(c.id)} />
-          ))}
-        </div>
       </div>
     </div>
   );
@@ -1760,14 +1779,33 @@ function StatSlotCard({ label, accent, card }) {
 // The combined-result preview — ベース's own art/name (or the グランドマス
 // ター fusion's, if this pair matches a combo) with the summed stats.
 function ResultStatCard({ base, combined, combinedLv, willGrandMaster }) {
-  const displayLabel = willGrandMaster ? willGrandMaster.name : base.label;
-  const displayImg = willGrandMaster && willGrandMaster.img ? willGrandMaster.img : base.imgSrc;
-  const displayFilter = willGrandMaster && willGrandMaster.img ? "none" : base.variant && base.variant.filter === "none" ? "none" : base.variant ? base.variant.filter : "none";
   return (
     <div style={{ width: 220, background: "#fff", borderRadius: 16, padding: "12px 14px", boxShadow: "0 10px 22px rgba(11,61,98,0.3)", border: "2px solid #FFE27A" }}>
       <div style={{ textAlign: "center", fontSize: 11, fontWeight: 900, color: "#5C3A21", background: "#FFE27A", borderRadius: 999, padding: "2px 0", marginBottom: 8 }}>
         配合後のファミリア
       </div>
+      {base && combined ? (
+        <ResultStatCardBody base={base} combined={combined} combinedLv={combinedLv} willGrandMaster={willGrandMaster} />
+      ) : (
+        <div style={{ padding: "14px 0" }}>
+          <div style={{ width: 80, height: 80, margin: "0 auto 8px", borderRadius: 14, border: "2px dashed #d7ecf3" }} />
+          <div style={{ textAlign: "center", fontSize: 11, color: "#a8bcc9", fontWeight: 700, lineHeight: 1.6 }}>
+            ベースとサブを選ぶと
+            <br />
+            ここに表示されます
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResultStatCardBody({ base, combined, combinedLv, willGrandMaster }) {
+  const displayLabel = willGrandMaster ? willGrandMaster.name : base.label;
+  const displayImg = willGrandMaster && willGrandMaster.img ? willGrandMaster.img : base.imgSrc;
+  const displayFilter = willGrandMaster && willGrandMaster.img ? "none" : base.variant && base.variant.filter === "none" ? "none" : base.variant ? base.variant.filter : "none";
+  return (
+    <>
       <div
         style={{
           width: 80,
@@ -1800,7 +1838,7 @@ function ResultStatCard({ base, combined, combinedLv, willGrandMaster }) {
           </div>
         ))}
       </div>
-    </div>
+    </>
   );
 }
 
