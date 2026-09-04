@@ -996,21 +996,42 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
   const isGrowing = card.source === "growing";
   const currentStageIdx = isGrowing && card.variant ? stageIndex(card.variant.species, card.currentPct) : null;
   const lastStageIdx = card.variant ? stageCount(card.variant.species) - 1 : null;
+  // A グランドマスター card has grown one stage further than its species'
+  // own art goes — its own fusion art is a 6th slot in the growth row,
+  // appended after the plain Master stage rather than replacing it, so the
+  // history up to Master is still visible.
+  const hasGmSlot = !!(card.grandMaster && card.imgSrc && lastStageIdx !== null);
+  const gmSlotIdx = hasGmSlot ? lastStageIdx + 1 : null;
   const defaultHeroSrc = card.imgSrc || (isSchedule && card.variant ? stageImageAt(card.variant.species, lastStageIdx) : null);
   // Tapping a growth-stage thumbnail swaps the hero preview to that stage,
   // right in place — no separate overlay popup.
-  const heroSrc = previewStage !== null && card.variant ? stageImageAt(card.variant.species, previewStage) : defaultHeroSrc;
+  const heroSrc =
+    previewStage !== null
+      ? hasGmSlot && previewStage === gmSlotIdx
+        ? card.imgSrc
+        : card.variant
+        ? stageImageAt(card.variant.species, previewStage)
+        : null
+      : defaultHeroSrc;
   // Only show the growth-stages row once there's actually a growth story
   // to show — a still-unhatched egg (stage 0) has nothing to look back on.
   const showEvolutionRow = (isSchedule || (isGrowing && currentStageIdx > 0)) && card.variant;
   // A still-growing card only shows stages it has actually reached — no
-  // spoiling what it grows into next.
-  const stagesToShow = isGrowing ? currentStageIdx + 1 : (lastStageIdx || 0) + 1;
+  // spoiling what it grows into next. A グランドマスター card gets one more
+  // slot on top of its species' normal stage count.
+  const stagesToShow = (isGrowing ? currentStageIdx + 1 : (lastStageIdx || 0) + 1) + (hasGmSlot ? 1 : 0);
+  // The slot that actually represents "now" — the グランドマスター slot if
+  // this card has one, otherwise wherever its growth actually is.
+  const trueCurrentIdx = hasGmSlot ? gmSlotIdx : isGrowing ? currentStageIdx : lastStageIdx;
   // Which stage the hero box is actually showing right now, for the label.
-  const displayedStageIdx = previewStage !== null ? previewStage : (isGrowing ? currentStageIdx : lastStageIdx);
+  const displayedStageIdx = previewStage !== null ? previewStage : trueCurrentIdx;
+  const displayedStageLabel = hasGmSlot && displayedStageIdx === gmSlotIdx ? "グランドマスター" : stageLabel(displayedStageIdx);
 
   const pendingTotal = STAT_KEYS.reduce((sum, k) => sum + (pending[k] || 0), 0);
   const remainingPool = starsForStats - pendingTotal;
+  const overCapStats = STAT_KEYS.filter((k) => card.stats[k] + (pending[k] || 0) > capOf(k));
+  const overPool = pendingTotal > starsForStats;
+  const canConfirm = pendingTotal > 0 && !overPool && overCapStats.length === 0;
 
   function capOf(k) {
     return k === "hp" || k === "mp" ? STAT_MAX.hp : STAT_MAX.power;
@@ -1024,6 +1045,10 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
       return { ...prev, [k]: next };
     });
   }
+  function setExact(k, raw) {
+    const n = parseInt(raw, 10);
+    setPending((prev) => ({ ...prev, [k]: isNaN(n) || n < 0 ? 0 : n }));
+  }
   function startAllocating() {
     setPending({});
     setAllocating(true);
@@ -1034,6 +1059,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
     setConfirming(false);
   }
   async function confirmAllocation() {
+    if (!canConfirm) return;
     await onAllocate(card.id, pending);
     setPending({});
     setAllocating(false);
@@ -1124,9 +1150,9 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
             ›
           </button>
         </div>
-        {stageLabel(displayedStageIdx) && (
+        {displayedStageLabel && (
           <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, color: "#7c98aa", marginBottom: 2 }}>
-            {card.variant ? `${card.variant.name}（${stageLabel(displayedStageIdx)}）` : stageLabel(displayedStageIdx)}
+            {card.variant ? `${card.variant.name}（${displayedStageLabel}）` : displayedStageLabel}
           </div>
         )}
         <div style={{ textAlign: "center", fontSize: 15, fontWeight: 900, color: card.isMaster ? "#E0A83E" : "#0B3D62", marginBottom: 14 }}>
@@ -1138,8 +1164,9 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
             <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", margin: "12px 0 6px" }}>成長の様子（タップで上に表示）</div>
             <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
               {Array.from({ length: stagesToShow }).map((_, i) => {
-                const isCurrent = isGrowing ? i === currentStageIdx : i === lastStageIdx;
+                const isCurrent = i === trueCurrentIdx;
                 const isPreviewed = previewStage === i;
+                const isGmThumb = hasGmSlot && i === gmSlotIdx;
                 return (
                   <div
                     key={i}
@@ -1158,7 +1185,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                     }}
                   >
                     <img
-                      src={stageImageAt(card.variant.species, i)}
+                      src={isGmThumb ? card.imgSrc : stageImageAt(card.variant.species, i)}
                       alt=""
                       style={{ width: "100%", height: "100%", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }}
                     />
@@ -1182,7 +1209,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
         </div>
 
         {allocating && (
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#4a6c85", marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: remainingPool < 0 ? "#D9455F" : "#4a6c85", marginBottom: 8 }}>
             使える★：残り {remainingPool} 個
           </div>
         )}
@@ -1190,11 +1217,12 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
           {STAT_KEYS.map((k) => {
             const delta = pending[k] || 0;
+            const rowOverCap = card.stats[k] + delta > capOf(k);
             return (
               <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F5F9FB", borderRadius: 10, padding: "8px 10px" }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#0B3D62" }}>{STAT_LABELS[k]}</div>
                 {allocating ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                     <div style={{ fontSize: 16, fontWeight: 900, color: "#0B3D62", minWidth: 26, textAlign: "right" }}>{card.stats[k]}</div>
                     <button
                       onClick={() => bump(k, -1)}
@@ -1203,7 +1231,27 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                     >
                       －
                     </button>
-                    <div style={{ fontSize: 12.5, fontWeight: 800, color: delta > 0 ? "#E0A83E" : "#c2d2da", minWidth: 24, textAlign: "center" }}>+{delta}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 800, color: rowOverCap ? "#D9455F" : delta > 0 ? "#E0A83E" : "#c2d2da" }}>+</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        value={delta}
+                        onChange={(e) => setExact(k, e.target.value)}
+                        style={{
+                          width: 44,
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: rowOverCap ? "#D9455F" : "#0B3D62",
+                          border: `1px solid ${rowOverCap ? "#D9455F" : "#BFE3F0"}`,
+                          borderRadius: 6,
+                          padding: "3px 4px",
+                          textAlign: "center",
+                          fontFamily: "inherit",
+                        }}
+                      />
+                    </div>
                     <button
                       onClick={() => bump(k, 1)}
                       disabled={remainingPool <= 0 || card.stats[k] + delta >= capOf(k)}
@@ -1221,7 +1269,9 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                       ＋
                     </button>
                     <div style={{ fontSize: 12, color: "#7c98aa" }}>→</div>
-                    <div style={{ fontSize: 16, fontWeight: 900, color: delta > 0 ? "#E0A83E" : "#0B3D62", minWidth: 28 }}>{card.stats[k] + delta}</div>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: rowOverCap ? "#D9455F" : delta > 0 ? "#E0A83E" : "#0B3D62", minWidth: 28 }}>
+                      {card.stats[k] + delta}
+                    </div>
                   </div>
                 ) : (
                   <div style={{ fontSize: 16, fontWeight: 900, color: "#0B3D62" }}>{card.stats[k]}</div>
@@ -1230,6 +1280,14 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
             );
           })}
         </div>
+
+        {allocating && (overPool || overCapStats.length > 0) && (
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: "#D9455F", marginTop: -8, marginBottom: 14 }}>
+            {overPool
+              ? `★が足りません（使える★は残り ${starsForStats} 個です）`
+              : `${overCapStats.map((k) => STAT_LABELS[k]).join("・")}が上限を超えています`}
+          </div>
+        )}
 
         {allocating && (
           <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
@@ -1240,17 +1298,17 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
               キャンセル
             </button>
             <button
-              onClick={() => setConfirming(true)}
-              disabled={pendingTotal <= 0}
+              onClick={() => canConfirm && setConfirming(true)}
+              disabled={!canConfirm}
               style={{
                 flex: 1,
                 border: "none",
-                background: pendingTotal > 0 ? "#14588C" : "#c2d2da",
+                background: canConfirm ? "#14588C" : "#c2d2da",
                 color: "#fff",
                 fontWeight: 800,
                 borderRadius: 12,
                 padding: "10px 0",
-                cursor: pendingTotal > 0 ? "pointer" : "default",
+                cursor: canConfirm ? "pointer" : "default",
               }}
             >
               決定
