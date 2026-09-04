@@ -3,7 +3,7 @@ import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
-import { getVariant, finalFormImage, stageImage, stageIndex, stageLabel, eggLabel, computeCardStats, combineStats, combineLevel, levelFromPct, stageImageAt, stageCount, getGrandMasterCombo, STAT_LABELS, STAT_KEYS, STAT_MAX, MASTER_LEVEL } from "./mascots.js";
+import { getVariant, finalFormImage, stageImage, stageIndex, stageLabel, eggLabel, speciesLabel, computeCardStats, combineStats, combineLevel, levelFromPct, stageImageAt, stageCount, getGrandMasterCombo, STAT_LABELS, STAT_KEYS, STAT_MAX, MASTER_LEVEL } from "./mascots.js";
 import { todayPendingSubjects, computeOverallStats } from "./progress.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
@@ -285,7 +285,7 @@ export default function ProfileRoot() {
     const gm = override && override.grandMaster;
     if (!gm) return { variant, label: fallbackLabel, imgSrc: fallbackImgSrc, grandMaster: false };
     return {
-      variant: gm.img ? { ...variant, filter: "none" } : variant,
+      variant,
       label: gm.name,
       imgSrc: gm.img,
       grandMaster: true,
@@ -1020,16 +1020,14 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
   const isGrowing = card.source === "growing";
   const currentStageIdx = isGrowing && card.variant ? stageIndex(card.variant.species, card.currentPct) : null;
   const lastStageIdx = card.variant ? stageCount(card.variant.species) - 1 : null;
-  // A グランドマスター card has grown one stage further than its species'
-  // own art goes — its own fusion art is the last slot in the growth row.
-  const hasGmSlot = !!(card.grandMaster && card.imgSrc && lastStageIdx !== null);
   const defaultHeroSrc = card.imgSrc || (isSchedule && card.variant ? stageImageAt(card.variant.species, lastStageIdx) : null);
 
   // The growth row shows this card's own stages, then — for each 配合
   // material that was absorbed into it — that material's own full stage
-  // history too, and finally the グランドマスター art if this card has one.
-  // A still-unhatched egg (stage 0) shows nothing here, to avoid spoiling
-  // which species it'll become.
+  // history too. The グランドマスター result itself isn't in this row; it
+  // has its own recipe row below (ベース＋サブ＝結果). A still-unhatched egg
+  // (stage 0) shows nothing here, to avoid spoiling which species it'll
+  // become.
   const baseCount = card.variant && !(isGrowing && currentStageIdx === 0) ? (isGrowing ? currentStageIdx : lastStageIdx) + 1 : 0;
   const historyThumbs = [];
   for (let i = 0; i < baseCount; i++) {
@@ -1054,29 +1052,40 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
       });
     }
   });
-  let gmThumbIdx = null;
-  if (hasGmSlot) {
-    gmThumbIdx = historyThumbs.length;
-    historyThumbs.push({
-      src: card.imgSrc,
-      filter: "none",
-      cardBg: card.variant.cardBg,
-      variantName: card.variant.name,
-      stageText: "グランドマスター",
-    });
-  }
   const showEvolutionRow = historyThumbs.length > 0;
-  // The slot that actually represents "now" — the グランドマスター slot if
-  // this card has one, otherwise this card's own last stage (never a
-  // combinedFrom material's stage, even though those come after it in the
-  // list — absorbed materials are history, not the current form).
-  const trueCurrentIdx = gmThumbIdx !== null ? gmThumbIdx : baseCount > 0 ? baseCount - 1 : null;
+  // The slot that actually represents "now" among the plain growth stages
+  // — this card's own last stage. For a グランドマスター card, none of
+  // these represents "now" (that's the fusion result, shown separately),
+  // so nothing here gets the "current" ring.
+  const trueCurrentIdx = card.grandMaster ? null : baseCount > 0 ? baseCount - 1 : null;
   // Tapping a thumbnail swaps the hero preview to it, right in place — no
   // separate overlay popup.
-  const displayedThumb = previewStage !== null ? historyThumbs[previewStage] : trueCurrentIdx !== null ? historyThumbs[trueCurrentIdx] : null;
-  const heroSrc = previewStage !== null && historyThumbs[previewStage] ? historyThumbs[previewStage].src : defaultHeroSrc;
-  const heroFilter = displayedThumb ? displayedThumb.filter : card.variant ? card.variant.filter : "none";
-  const bubbleText = displayedThumb ? `${displayedThumb.variantName}（${displayedThumb.stageText}）` : "";
+  const previewedThumb = previewStage !== null ? historyThumbs[previewStage] : null;
+  const heroSrc = previewedThumb ? previewedThumb.src : defaultHeroSrc;
+  // The current form's own bespoke art (グランドマスター fusion art, or a
+  // schedule-awarded card's finalFormImage) needs no color filter — it's
+  // already fully painted. Anything else (species growth-stage templates)
+  // still needs its variant's tint.
+  const heroFilter = previewedThumb ? previewedThumb.filter : card.grandMaster ? "none" : card.variant ? card.variant.filter : "none";
+  const nowStageText = card.grandMaster ? "グランドマスター" : trueCurrentIdx !== null ? stageLabel(trueCurrentIdx) : "";
+  const bubbleText = previewedThumb
+    ? `${previewedThumb.variantName}（${previewedThumb.stageText}）`
+    : card.variant && nowStageText
+    ? `${card.variant.name}（${nowStageText}）`
+    : "";
+
+  // 配合の記録：ベース＋サブ＝グランドマスター結果. Finds which absorbed
+  // material's species, combined with this card's own original species,
+  // actually produced the current fusion name (a card can absorb several
+  // materials over time, but only one combo sets the name).
+  const triggeringEntry =
+    card.grandMaster && card.variant
+      ? (card.combinedFrom || []).find((cf) => {
+          if (!cf.variant) return false;
+          const combo = getGrandMasterCombo(card.variant.species, cf.variant.species);
+          return combo && combo.name === card.label;
+        })
+      : null;
 
   const pendingTotal = STAT_KEYS.reduce((sum, k) => sum + (pending[k] || 0), 0);
   const remainingPool = starsForStats - pendingTotal;
@@ -1207,6 +1216,29 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
         <div style={{ textAlign: "center", fontSize: 15, fontWeight: 900, color: card.isMaster ? "#E0A83E" : "#0B3D62", marginBottom: 14 }}>
           Lv.{card.lv} {card.grandMaster ? "（Grand Master）" : card.isMaster ? "（Master）" : ""}
         </div>
+
+        {triggeringEntry && (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>配合の記録</div>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "center", gap: 8, marginBottom: 14 }}>
+              <RecipeTile
+                src={stageImageAt(card.variant.species, lastStageIdx)}
+                filter={card.variant.filter}
+                cardBg={card.variant.cardBg}
+                label={speciesLabel(card.variant.species)}
+              />
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#7c98aa", marginTop: 24 }}>＋</div>
+              <RecipeTile
+                src={stageImageAt(triggeringEntry.variant.species, stageCount(triggeringEntry.variant.species) - 1)}
+                filter={triggeringEntry.variant.filter}
+                cardBg={triggeringEntry.variant.cardBg}
+                label={speciesLabel(triggeringEntry.variant.species)}
+              />
+              <div style={{ fontSize: 18, fontWeight: 900, color: "#7c98aa", marginTop: 24 }}>＝</div>
+              <RecipeTile src={card.imgSrc} filter="none" cardBg={card.variant.cardBg} label={card.label} />
+            </div>
+          </>
+        )}
 
         {showEvolutionRow && (
           <>
@@ -1455,6 +1487,36 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// One tile in the ベース＋サブ＝結果 recipe row — a small square image with
+// its species/fusion name underneath.
+function RecipeTile({ src, filter, cardBg, label }) {
+  return (
+    <div style={{ width: 68, textAlign: "center" }}>
+      <div
+        style={{
+          width: 68,
+          height: 68,
+          borderRadius: 10,
+          background: cardBg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 4,
+          boxShadow: "0 4px 10px rgba(11,61,98,0.2)",
+          boxSizing: "border-box",
+        }}
+      >
+        {src ? (
+          <img src={src} alt={label} style={{ width: "100%", height: "100%", objectFit: "contain", filter: filter === "none" ? "none" : filter }} />
+        ) : (
+          <span style={{ fontSize: 26 }}>⚗️</span>
+        )}
+      </div>
+      <div style={{ fontSize: 10.5, fontWeight: 700, color: "#4a6c85", marginTop: 3, lineHeight: 1.2 }}>{label}</div>
     </div>
   );
 }

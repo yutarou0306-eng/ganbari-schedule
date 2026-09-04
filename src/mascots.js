@@ -415,6 +415,12 @@ export function eggLabel(variant) {
   return `${colorWord}エッグ`;
 }
 
+// The bare species word (e.g. "ドラゴン"), no color — used in the 配合の記録
+// recipe display ("ドラゴン + ドラゴン = エンペラードラゴン").
+export function speciesLabel(species) {
+  return SPECIES_SUFFIX[species] || "";
+}
+
 /* ---------------- RPG-style stats (LV-based) ---------------- */
 // Every collected card has a Level and 6 stats. A schedule's own progress
 // maps straight onto Level — 100% complete (Master) = Lv.20 — and each
