@@ -317,6 +317,7 @@ export default function ProfileRoot() {
         lv,
         isMaster: true,
         grandMaster: disp.grandMaster,
+        combinedFrom: (override && override.combinedFrom) || [],
         stats,
         label: disp.label,
         // The name the kid gave it — independent of label, which switches
@@ -375,6 +376,7 @@ export default function ProfileRoot() {
         lv,
         isMaster: override ? true : reachedMaster,
         grandMaster: disp.grandMaster,
+        combinedFrom: (override && override.combinedFrom) || [],
         stats,
         stamps: s.stamps,
       };
@@ -394,6 +396,7 @@ export default function ProfileRoot() {
     stars: null,
     lv: typeof c.lv === "number" ? c.lv : MASTER_LEVEL,
     isMaster: true,
+    combinedFrom: c.combinedFrom || [],
     stats: applyStatAllocation(`bred:${c.id}`, c.stats),
     label: c.name,
     fromTitle: c.parentLabel,
@@ -411,7 +414,9 @@ export default function ProfileRoot() {
   // consumed — removed from the collection entirely. No third card is
   // created. If both sides are still their original, un-fused species and
   // that pair has a グランドマスター combo entry, the base's name/art also
-  // switch to the fusion result.
+  // switch to the fusion result. The sub's own schedule info and growth
+  // history are kept (combinedFrom) so the detail view can still show them
+  // afterwards, alongside anything the sub had itself already absorbed.
   async function handleFinalizeBreed(baseId, subId) {
     const base = allCards.find((c) => c.id === baseId);
     const sub = allCards.find((c) => c.id === subId);
@@ -421,15 +426,34 @@ export default function ProfileRoot() {
     const combo =
       base.variant && sub.variant && !base.grandMaster ? getGrandMasterCombo(base.variant.species, sub.variant.species) : null;
     const existingGm = profile.cardOverrides && profile.cardOverrides[base.scheduleId] && profile.cardOverrides[base.scheduleId].grandMaster;
+    const existingCombined =
+      base.source === "bred"
+        ? ((profile.bredCards || []).find((c) => c.id === base.bredId) || {}).combinedFrom || []
+        : (profile.cardOverrides && profile.cardOverrides[base.scheduleId] && profile.cardOverrides[base.scheduleId].combinedFrom) || [];
+    const subOwnRecord = sub.variant
+      ? [
+          {
+            variant: sub.variant,
+            stageIdx: sub.source === "growing" ? stageIndex(sub.variant.species, sub.currentPct) : stageCount(sub.variant.species) - 1,
+            fromTitle: sub.fromTitle,
+            startDate: sub.startDate,
+            endDate: sub.endDate,
+            stars: sub.source === "schedule" ? sub.stars : sub.stamps,
+            earnedAt: sub.earnedAt || "",
+            label: sub.givenName || sub.label,
+          },
+        ]
+      : [];
+    const combinedFrom = [...existingCombined, ...(sub.combinedFrom || []), ...subOwnRecord];
 
     let next = { ...profile };
     if (base.source === "schedule" || base.source === "growing") {
       next.cardOverrides = {
         ...(next.cardOverrides || {}),
-        [base.scheduleId]: { lv: newLv, stats: newStats, grandMaster: combo || existingGm || null },
+        [base.scheduleId]: { lv: newLv, stats: newStats, grandMaster: combo || existingGm || null, combinedFrom },
       };
     } else if (base.source === "bred") {
-      next.bredCards = (next.bredCards || []).map((c) => (c.id === base.bredId ? { ...c, lv: newLv, stats: newStats } : c));
+      next.bredCards = (next.bredCards || []).map((c) => (c.id === base.bredId ? { ...c, lv: newLv, stats: newStats, combinedFrom } : c));
     }
     if (sub.source === "schedule" || sub.source === "growing") {
       next.consumedScheduleCards = [...(next.consumedScheduleCards || []), sub.scheduleId];
@@ -997,35 +1021,62 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
   const currentStageIdx = isGrowing && card.variant ? stageIndex(card.variant.species, card.currentPct) : null;
   const lastStageIdx = card.variant ? stageCount(card.variant.species) - 1 : null;
   // A グランドマスター card has grown one stage further than its species'
-  // own art goes — its own fusion art is a 6th slot in the growth row,
-  // appended after the plain Master stage rather than replacing it, so the
-  // history up to Master is still visible.
+  // own art goes — its own fusion art is the last slot in the growth row.
   const hasGmSlot = !!(card.grandMaster && card.imgSrc && lastStageIdx !== null);
-  const gmSlotIdx = hasGmSlot ? lastStageIdx + 1 : null;
   const defaultHeroSrc = card.imgSrc || (isSchedule && card.variant ? stageImageAt(card.variant.species, lastStageIdx) : null);
-  // Tapping a growth-stage thumbnail swaps the hero preview to that stage,
-  // right in place — no separate overlay popup.
-  const heroSrc =
-    previewStage !== null
-      ? hasGmSlot && previewStage === gmSlotIdx
-        ? card.imgSrc
-        : card.variant
-        ? stageImageAt(card.variant.species, previewStage)
-        : null
-      : defaultHeroSrc;
-  // Only show the growth-stages row once there's actually a growth story
-  // to show — a still-unhatched egg (stage 0) has nothing to look back on.
-  const showEvolutionRow = (isSchedule || (isGrowing && currentStageIdx > 0)) && card.variant;
-  // A still-growing card only shows stages it has actually reached — no
-  // spoiling what it grows into next. A グランドマスター card gets one more
-  // slot on top of its species' normal stage count.
-  const stagesToShow = (isGrowing ? currentStageIdx + 1 : (lastStageIdx || 0) + 1) + (hasGmSlot ? 1 : 0);
+
+  // The growth row shows this card's own stages, then — for each 配合
+  // material that was absorbed into it — that material's own full stage
+  // history too, and finally the グランドマスター art if this card has one.
+  // A still-unhatched egg (stage 0) shows nothing here, to avoid spoiling
+  // which species it'll become.
+  const baseCount = card.variant && !(isGrowing && currentStageIdx === 0) ? (isGrowing ? currentStageIdx : lastStageIdx) + 1 : 0;
+  const historyThumbs = [];
+  for (let i = 0; i < baseCount; i++) {
+    historyThumbs.push({
+      src: stageImageAt(card.variant.species, i),
+      filter: card.variant.filter,
+      cardBg: card.variant.cardBg,
+      variantName: card.variant.name,
+      stageText: stageLabel(i),
+    });
+  }
+  (card.combinedFrom || []).forEach((cf) => {
+    if (!cf.variant) return;
+    const n = (cf.stageIdx != null ? cf.stageIdx : stageCount(cf.variant.species) - 1) + 1;
+    for (let i = 0; i < n; i++) {
+      historyThumbs.push({
+        src: stageImageAt(cf.variant.species, i),
+        filter: cf.variant.filter,
+        cardBg: cf.variant.cardBg,
+        variantName: cf.variant.name,
+        stageText: stageLabel(i),
+      });
+    }
+  });
+  let gmThumbIdx = null;
+  if (hasGmSlot) {
+    gmThumbIdx = historyThumbs.length;
+    historyThumbs.push({
+      src: card.imgSrc,
+      filter: "none",
+      cardBg: card.variant.cardBg,
+      variantName: card.variant.name,
+      stageText: "グランドマスター",
+    });
+  }
+  const showEvolutionRow = historyThumbs.length > 0;
   // The slot that actually represents "now" — the グランドマスター slot if
-  // this card has one, otherwise wherever its growth actually is.
-  const trueCurrentIdx = hasGmSlot ? gmSlotIdx : isGrowing ? currentStageIdx : lastStageIdx;
-  // Which stage the hero box is actually showing right now, for the label.
-  const displayedStageIdx = previewStage !== null ? previewStage : trueCurrentIdx;
-  const displayedStageLabel = hasGmSlot && displayedStageIdx === gmSlotIdx ? "グランドマスター" : stageLabel(displayedStageIdx);
+  // this card has one, otherwise this card's own last stage (never a
+  // combinedFrom material's stage, even though those come after it in the
+  // list — absorbed materials are history, not the current form).
+  const trueCurrentIdx = gmThumbIdx !== null ? gmThumbIdx : baseCount > 0 ? baseCount - 1 : null;
+  // Tapping a thumbnail swaps the hero preview to it, right in place — no
+  // separate overlay popup.
+  const displayedThumb = previewStage !== null ? historyThumbs[previewStage] : trueCurrentIdx !== null ? historyThumbs[trueCurrentIdx] : null;
+  const heroSrc = previewStage !== null && historyThumbs[previewStage] ? historyThumbs[previewStage].src : defaultHeroSrc;
+  const heroFilter = displayedThumb ? displayedThumb.filter : card.variant ? card.variant.filter : "none";
+  const bubbleText = displayedThumb ? `${displayedThumb.variantName}（${displayedThumb.stageText}）` : "";
 
   const pendingTotal = STAT_KEYS.reduce((sum, k) => sum + (pending[k] || 0), 0);
   const remainingPool = starsForStats - pendingTotal;
@@ -1121,7 +1172,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
               <img
                 src={heroSrc}
                 alt={card.label}
-                style={{ width: "100%", height: "100%", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }}
+                style={{ width: "100%", height: "100%", objectFit: "contain", filter: heroFilter === "none" ? "none" : heroFilter }}
               />
             ) : (
               <span style={{ fontSize: 100 }}>⚗️</span>
@@ -1150,10 +1201,8 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
             ›
           </button>
         </div>
-        {displayedStageLabel && (
-          <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, color: "#7c98aa", marginBottom: 2 }}>
-            {card.variant ? `${card.variant.name}（${displayedStageLabel}）` : displayedStageLabel}
-          </div>
+        {bubbleText && (
+          <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, color: "#7c98aa", marginBottom: 2 }}>{bubbleText}</div>
         )}
         <div style={{ textAlign: "center", fontSize: 15, fontWeight: 900, color: card.isMaster ? "#E0A83E" : "#0B3D62", marginBottom: 14 }}>
           Lv.{card.lv} {card.grandMaster ? "（Grand Master）" : card.isMaster ? "（Master）" : ""}
@@ -1162,20 +1211,19 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
         {showEvolutionRow && (
           <>
             <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", margin: "12px 0 6px" }}>成長の様子（タップで上に表示）</div>
-            <div style={{ display: "flex", gap: 6, marginBottom: 14 }}>
-              {Array.from({ length: stagesToShow }).map((_, i) => {
+            <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+              {historyThumbs.map((thumb, i) => {
                 const isCurrent = i === trueCurrentIdx;
                 const isPreviewed = previewStage === i;
-                const isGmThumb = hasGmSlot && i === gmSlotIdx;
                 return (
                   <div
                     key={i}
                     onClick={() => setPreviewStage(isPreviewed ? null : i)}
                     style={{
-                      flex: 1,
+                      width: "calc(16.6% - 5px)",
                       aspectRatio: "1 / 1",
                       borderRadius: 8,
-                      background: card.variant.cardBg,
+                      background: thumb.cardBg,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -1185,9 +1233,9 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                     }}
                   >
                     <img
-                      src={isGmThumb ? card.imgSrc : stageImageAt(card.variant.species, i)}
+                      src={thumb.src}
                       alt=""
-                      style={{ width: "100%", height: "100%", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }}
+                      style={{ width: "100%", height: "100%", objectFit: "contain", filter: thumb.filter === "none" ? "none" : thumb.filter }}
                     />
                   </div>
                 );
@@ -1361,6 +1409,24 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
             </div>
           </>
         )}
+
+        {(card.combinedFrom || []).map((cf, i) => (
+          <div key={i} style={{ marginTop: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>
+              配合で加わったスケジュール{cf.label ? `（${cf.label}）` : ""}
+            </div>
+            <div style={{ background: "#F5F9FB", borderRadius: 10, padding: "10px 12px", fontSize: 13, color: "#4a6c85", lineHeight: 1.8 }}>
+              <div style={{ fontWeight: 800, color: "#0B3D62" }}>{cf.fromTitle || "無題のスケジュール"}</div>
+              {cf.startDate && cf.endDate && (
+                <div>
+                  期間：{cf.startDate} 〜 {cf.endDate}
+                </div>
+              )}
+              {typeof cf.stars === "number" && <div>⭐ 獲得スタンプ：{cf.stars}個</div>}
+              {cf.earnedAt && <div>達成日：{cf.earnedAt}</div>}
+            </div>
+          </div>
+        ))}
       </div>
 
       {confirming && (
