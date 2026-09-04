@@ -3,7 +3,7 @@ import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
-import { getVariant, finalFormImage, stageImage, stageIndex, eggLabel, computeCardStats, combineStats, combineLevel, levelFromPct, stageImageAt, stageCount, STAT_LABELS, STAT_KEYS, STAT_MAX, MASTER_LEVEL } from "./mascots.js";
+import { getVariant, finalFormImage, stageImage, stageIndex, stageLabel, eggLabel, computeCardStats, combineStats, combineLevel, levelFromPct, stageImageAt, stageCount, STAT_LABELS, STAT_KEYS, STAT_MAX, MASTER_LEVEL } from "./mascots.js";
 import { todayPendingSubjects, computeOverallStats } from "./progress.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
@@ -720,7 +720,16 @@ export default function ProfileRoot() {
         (() => {
           const card = allCards.find((c) => c.id === openCardId);
           if (!card) return null;
-          return <CardDetailModal card={card} onClose={() => setOpenCardId(null)} />;
+          const idx = allCards.findIndex((c) => c.id === openCardId);
+          return (
+            <CardDetailModal
+              key={card.id}
+              card={card}
+              onClose={() => setOpenCardId(null)}
+              onPrev={allCards.length > 1 ? () => setOpenCardId(allCards[(idx - 1 + allCards.length) % allCards.length].id) : null}
+              onNext={allCards.length > 1 ? () => setOpenCardId(allCards[(idx + 1) % allCards.length].id) : null}
+            />
+          );
         })()}
     </div>
   );
@@ -890,7 +899,7 @@ function CardTile({ card, selected, onOpen }) {
 // evolved past the egg), the Level and 6 stats (read-only — both are
 // derived automatically from progress/Level, no manual editing), and
 // which schedule earned it.
-function CardDetailModal({ card, onClose }) {
+function CardDetailModal({ card, onClose, onPrev, onNext }) {
   const [previewStage, setPreviewStage] = useState(null); // stage index shown in the hero box, or null = current stage
   const isSchedule = card.source === "schedule";
   const isGrowing = card.source === "growing";
@@ -906,6 +915,8 @@ function CardDetailModal({ card, onClose }) {
   // A still-growing card only shows stages it has actually reached — no
   // spoiling what it grows into next.
   const stagesToShow = isGrowing ? currentStageIdx + 1 : (lastStageIdx || 0) + 1;
+  // Which stage the hero box is actually showing right now, for the label.
+  const displayedStageIdx = previewStage !== null ? previewStage : (isGrowing ? currentStageIdx : lastStageIdx);
 
   return (
     <div style={overlayStyle}>
@@ -921,35 +932,78 @@ function CardDetailModal({ card, onClose }) {
           </button>
         </div>
 
-        <div
-          onClick={() => setPreviewStage(null)}
-          style={{
-            width: "100%",
-            maxWidth: 300,
-            aspectRatio: "1 / 1",
-            margin: "10px auto 6px",
-            borderRadius: 20,
-            background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            boxShadow: "0 10px 24px rgba(11,61,98,0.3), inset 0 0 0 3px rgba(255,255,255,0.6)",
-            cursor: previewStage !== null ? "pointer" : "default",
-          }}
-        >
-          {heroSrc ? (
-            <img
-              src={heroSrc}
-              alt={card.label}
-              style={{ width: "100%", height: "100%", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }}
-            />
-          ) : (
-            <span style={{ fontSize: 100 }}>⚗️</span>
-          )}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "10px auto 6px", maxWidth: 300 }}>
+          <button
+            onClick={onPrev}
+            disabled={!onPrev}
+            aria-label="前のカード"
+            style={{
+              flexShrink: 0,
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              border: "none",
+              background: onPrev ? "#EAF4F9" : "transparent",
+              color: onPrev ? "#14588C" : "transparent",
+              fontSize: 16,
+              fontWeight: 900,
+              cursor: onPrev ? "pointer" : "default",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ‹
+          </button>
+          <div
+            style={{
+              flex: 1,
+              aspectRatio: "1 / 1",
+              borderRadius: 20,
+              background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 16,
+              boxShadow: "0 10px 24px rgba(11,61,98,0.3), inset 0 0 0 3px rgba(255,255,255,0.6)",
+              boxSizing: "border-box",
+            }}
+          >
+            {heroSrc ? (
+              <img
+                src={heroSrc}
+                alt={card.label}
+                style={{ width: "100%", height: "100%", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }}
+              />
+            ) : (
+              <span style={{ fontSize: 100 }}>⚗️</span>
+            )}
+          </div>
+          <button
+            onClick={onNext}
+            disabled={!onNext}
+            aria-label="次のカード"
+            style={{
+              flexShrink: 0,
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              border: "none",
+              background: onNext ? "#EAF4F9" : "transparent",
+              color: onNext ? "#14588C" : "transparent",
+              fontSize: 16,
+              fontWeight: 900,
+              cursor: onNext ? "pointer" : "default",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ›
+          </button>
         </div>
-        {previewStage !== null && (
-          <div style={{ textAlign: "center", fontSize: 11.5, color: "#7c98aa", marginBottom: 6 }}>タップで今の姿にもどる</div>
+        {stageLabel(displayedStageIdx) && (
+          <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, color: "#7c98aa", marginBottom: 2 }}>{stageLabel(displayedStageIdx)}</div>
         )}
         <div style={{ textAlign: "center", fontSize: 15, fontWeight: 900, color: card.isMaster ? "#E0A83E" : "#0B3D62", marginBottom: 14 }}>
           Lv.{card.lv} {card.isMaster ? "（Master）" : ""}
