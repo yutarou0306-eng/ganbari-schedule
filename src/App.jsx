@@ -955,6 +955,28 @@ export default function KidsScheduleApp() {
     });
   }
 
+  // Edits or deletes a previously-posted comment. Not gated by the parent
+  // PIN — same as posting, since grandparents/tutors reading via the share
+  // link don't have it either.
+  function handleEditParentComment(dKey, commentId, newText) {
+    const cleanText = (newText || "").trim();
+    if (!cleanText) return;
+    setParentComments((prev) => {
+      const list = (prev[dKey] || []).map((c) => (c.id === commentId ? { ...c, text: cleanText } : c));
+      return { ...prev, [dKey]: list };
+    });
+  }
+
+  function handleDeleteParentComment(dKey, commentId) {
+    setParentComments((prev) => {
+      const list = (prev[dKey] || []).filter((c) => c.id !== commentId);
+      const next = { ...prev };
+      if (list.length > 0) next[dKey] = list;
+      else delete next[dKey];
+      return next;
+    });
+  }
+
   function handleSaveNote(text, achv) {
     if (!noteModalDate) return;
     const dKey = dateKey(noteModalDate);
@@ -1178,6 +1200,8 @@ export default function KidsScheduleApp() {
           entries={buildRecordsList()}
           subjects={config.subjects}
           onAddComment={handleAddParentComment}
+          onEditComment={handleEditParentComment}
+          onDeleteComment={handleDeleteParentComment}
           onClose={() => setShowRecordsList(false)}
         />
       )}
@@ -2519,7 +2543,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
   );
 }
 
-function RecordsListModal({ entries, subjects, onAddComment, onClose }) {
+function RecordsListModal({ entries, subjects, onAddComment, onEditComment, onDeleteComment, onClose }) {
   // Remembered across entries for this viewing session only, so someone
   // replying to several days in a row doesn't have to retype their name
   // each time. Not persisted — next time they open this, it starts blank.
@@ -2541,6 +2565,8 @@ function RecordsListModal({ entries, subjects, onAddComment, onClose }) {
                 commenterName={commenterName}
                 onCommenterNameChange={setCommenterName}
                 onAddComment={onAddComment}
+                onEditComment={onEditComment}
+                onDeleteComment={onDeleteComment}
               />
             ))}
           </div>
@@ -2553,9 +2579,12 @@ function RecordsListModal({ entries, subjects, onAddComment, onClose }) {
   );
 }
 
-function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameChange, onAddComment }) {
+function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameChange, onAddComment, onEditComment, onDeleteComment }) {
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
+  const [editingId, setEditingId] = useState(null); // comment id currently being edited, or null
+  const [editText, setEditText] = useState("");
+  const [deletingId, setDeletingId] = useState(null); // comment id awaiting delete confirmation, or null
 
   const achvParts = [];
   if (e.achv) {
@@ -2577,6 +2606,24 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
     setReplyOpen(false);
   }
 
+  function startEdit(c) {
+    setEditingId(c.id);
+    setEditText(c.text);
+    setDeletingId(null);
+  }
+
+  function saveEdit(commentId) {
+    if (!editText.trim()) return;
+    onEditComment(e.dKey, commentId, editText);
+    setEditingId(null);
+    setEditText("");
+  }
+
+  function confirmDelete(commentId) {
+    onDeleteComment(e.dKey, commentId);
+    setDeletingId(null);
+  }
+
   return (
     <div style={styles.recordEntryCard}>
       <div style={styles.recordEntryDate}>
@@ -2593,7 +2640,53 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
         <div style={{ marginTop: 8 }}>
           {e.comments.map((c) => (
             <div key={c.id} style={styles.recordEntryParentComment}>
-              <span style={{ fontWeight: 800 }}>{c.name}</span>：{c.text}
+              {editingId === c.id ? (
+                <div>
+                  <div style={{ fontWeight: 800, marginBottom: 4 }}>{c.name}</div>
+                  <textarea
+                    value={editText}
+                    onChange={(ev) => setEditText(ev.target.value)}
+                    rows={2}
+                    style={styles.replyTextarea}
+                    autoFocus
+                  />
+                  <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                    <button style={styles.replyCancelBtn} onClick={() => setEditingId(null)}>
+                      やめる
+                    </button>
+                    <button style={styles.replySubmitBtn} onClick={() => saveEdit(c.id)}>
+                      保存する
+                    </button>
+                  </div>
+                </div>
+              ) : deletingId === c.id ? (
+                <div>
+                  <div style={{ fontWeight: 800 }}>{c.name}</div>
+                  <div style={{ marginBottom: 6 }}>このコメントを削除しますか？</div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button style={styles.replyCancelBtn} onClick={() => setDeletingId(null)}>
+                      やめる
+                    </button>
+                    <button style={{ ...styles.replySubmitBtn, background: "#E0526B" }} onClick={() => confirmDelete(c.id)}>
+                      削除する
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div>
+                    <span style={{ fontWeight: 800 }}>{c.name}</span>：{c.text}
+                  </div>
+                  <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+                    <button style={styles.commentEditBtn} onClick={() => startEdit(c)}>
+                      編集
+                    </button>
+                    <button style={styles.commentEditBtn} onClick={() => setDeletingId(c.id)}>
+                      削除
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -3387,6 +3480,7 @@ const styles = {
   },
   replyCancelBtn: { flex: 1, padding: "8px 0", borderRadius: 10, border: "none", background: "#E5EEF2", color: "#4a6c85", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 13.5 },
   replySubmitBtn: { flex: 1, padding: "8px 0", borderRadius: 10, border: "none", background: "#3E6FBF", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 13.5 },
+  commentEditBtn: { border: "none", background: "none", color: "#B5651D", fontWeight: 700, fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: 0, textDecoration: "underline" },
   modalBtns: { display: "flex", gap: 10 },
   modalCancel: { flex: 1, padding: "12px 0", borderRadius: 12, border: "2px solid #d7ecf3", background: "#fff", color: "#5a7d94", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
   modalConfirm: { flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#14588C", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 17 },
