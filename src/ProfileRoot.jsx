@@ -1155,8 +1155,8 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
   }
 
   return (
-    <div style={overlayStyle}>
-      <div style={{ ...modalCardStyle, maxWidth: 440, maxHeight: "85vh", overflowY: "auto", textAlign: "left" }}>
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={{ ...modalCardStyle, maxWidth: 440, maxHeight: "85vh", overflowY: "auto", textAlign: "left" }} onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
           <h3 style={{ margin: 0, fontSize: 19, color: "#0B3D62" }}>{card.givenName || card.label}</h3>
           <button
@@ -1303,7 +1303,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                       setPreviewStage(isPreviewed ? null : i);
                     }}
                     style={{
-                      width: "calc(16.6% - 5px)",
+                      width: "calc(20% - 5px)",
                       aspectRatio: "1 / 1",
                       borderRadius: 8,
                       background: thumb.cardBg,
@@ -1514,8 +1514,8 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
       </div>
 
       {confirming && (
-        <div style={overlayStyle}>
-          <div style={{ ...modalCardStyle, maxWidth: 320 }}>
+        <div style={overlayStyle} onClick={() => setConfirming(false)}>
+          <div style={{ ...modalCardStyle, maxWidth: 320 }} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ margin: "0 0 12px", fontSize: 17, color: "#0B3D62" }}>これで良いですか？</h3>
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16, textAlign: "left" }}>
               {STAT_KEYS.filter((k) => (pending[k] || 0) > 0).map((k) => (
