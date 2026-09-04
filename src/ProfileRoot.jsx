@@ -1604,6 +1604,8 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
   const sub = masterCards.find((c) => c.id === subId);
   const combined = base && sub ? combineStats(base.stats, sub.stats) : null;
   const combinedLv = base && sub ? combineLevel(base.lv, sub.lv) : null;
+  const willGrandMaster =
+    base && sub && base.variant && sub.variant && !base.grandMaster ? getGrandMasterCombo(base.variant.species, sub.variant.species) : null;
 
   return (
     <div style={{ minHeight: "100vh", background: bg, fontFamily: "'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', sans-serif", padding: "28px 16px" }}>
@@ -1622,33 +1624,33 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
         </p>
 
         {(base || sub) && (
-          <div style={{ display: "flex", gap: 14, marginBottom: 18, alignItems: "center", justifyContent: "center" }}>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 11, color: "#FFE27A", fontWeight: 800, marginBottom: 4 }}>ベース</div>
-              {base ? <MiniCard card={base} /> : <EmptySlot />}
+          <>
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-start", justifyContent: "center", marginBottom: 6 }}>
+              <StatSlotCard label="ベース" accent="#FFE27A" card={base} />
+              <div style={{ color: "#fff", fontSize: 22, fontWeight: 900, marginTop: 50, flexShrink: 0 }}>＋</div>
+              <StatSlotCard label="サブ" accent="#9FD8EE" card={sub} />
             </div>
-            <div style={{ color: "#fff", fontSize: 22, fontWeight: 900 }}>＋</div>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 11, color: "#EAF7FB", fontWeight: 800, marginBottom: 4 }}>サブ</div>
-              {sub ? <MiniCard card={sub} /> : <EmptySlot />}
-            </div>
-          </div>
+
+            {combined && (
+              <>
+                <div style={{ textAlign: "center", color: "#EAF7FB", fontSize: 22, fontWeight: 900, margin: "4px 0" }}>↓</div>
+                <div style={{ textAlign: "center", color: "#EAF7FB", fontSize: 12.5, fontWeight: 700, marginBottom: 10 }}>ステータスを合算！</div>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+                  <ResultStatCard base={base} combined={combined} combinedLv={combinedLv} willGrandMaster={willGrandMaster} />
+                </div>
+              </>
+            )}
+          </>
         )}
 
-        {combined && (
-          <div style={{ background: "#fff", borderRadius: 16, padding: 16, marginBottom: 18 }}>
-            <div style={{ textAlign: "center", fontWeight: 900, color: "#5A3FA0", fontSize: 15, marginBottom: 4 }}>配合後の予測</div>
-            <div style={{ textAlign: "center", fontWeight: 900, color: "#0B3D62", fontSize: 16, marginBottom: 10 }}>Lv.{combinedLv}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-              {STAT_KEYS.map((k) => (
-                <div key={k} style={{ background: "#F5F9FB", borderRadius: 10, padding: "6px 2px", textAlign: "center" }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#7c98aa" }}>{STAT_LABELS[k]}</div>
-                  <div style={{ fontSize: 15, fontWeight: 900, color: "#0B3D62" }}>{combined[k]}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <div style={{ background: "#fff", borderRadius: 16, padding: "14px 16px", marginBottom: 18 }}>
+          <div style={{ fontWeight: 900, color: "#5A3FA0", fontSize: 13.5, marginBottom: 8 }}>⚗️ 配合のルール</div>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: "#4a6c85", lineHeight: 1.9 }}>
+            <li>ベースのLVとステータスに、サブの分がすべて合算されます</li>
+            <li>サブに選んだファミリアカードは配合で消費され、なくなります</li>
+            <li>組み合わせによっては、より強い「グランドマスター」の姿に変化することがあります（変化しない場合はベースの見た目のまま）</li>
+          </ul>
+        </div>
 
         {base && sub && !confirming && (
           <button
@@ -1695,32 +1697,111 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
   );
 }
 
-function MiniCard({ card }) {
+// Stat-icon shown before each stat row on the 配合 cards — decorative only.
+const STAT_ICONS = { hp: "❤️", mp: "💧", power: "⚔️", defense: "🛡️", speed: "💨", wisdom: "✨" };
+
+// One side of the 配合 picker — the ベース or サブ slot, showing the full
+// stat sheet for whichever card is selected there (or an empty placeholder
+// prompting a pick from the list below).
+function StatSlotCard({ label, accent, card }) {
   return (
-    <div
-      style={{
-        width: 70,
-        height: 70,
-        borderRadius: 12,
-        background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 6,
-        margin: "0 auto",
-      }}
-    >
-      {card.imgSrc ? (
-        <img src={card.imgSrc} alt={card.label} style={{ width: "100%", height: "100%", objectFit: "contain", filter: card.variant.filter === "none" ? "none" : card.variant.filter }} />
+    <div style={{ flex: 1, minWidth: 0, background: "#fff", borderRadius: 16, padding: "10px 8px", boxShadow: "0 8px 18px rgba(11,61,98,0.25)" }}>
+      <div style={{ textAlign: "center", fontSize: 11, fontWeight: 900, color: "#5C3A21", background: accent, borderRadius: 999, padding: "2px 0", marginBottom: 8 }}>
+        {label}
+      </div>
+      {card ? (
+        <>
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              margin: "0 auto 6px",
+              borderRadius: 12,
+              background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 5,
+            }}
+          >
+            {card.imgSrc ? (
+              <img src={card.imgSrc} alt={card.label} style={{ width: "100%", height: "100%", objectFit: "contain", filter: card.variant && card.variant.filter === "none" ? "none" : card.variant ? card.variant.filter : "none" }} />
+            ) : (
+              <span style={{ fontSize: 24 }}>⚗️</span>
+            )}
+          </div>
+          <div style={{ textAlign: "center", fontSize: 11.5, fontWeight: 800, color: "#0B3D62", marginBottom: 2 }}>{card.label}</div>
+          <div style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: "#E0A83E", marginBottom: 6 }}>Lv.{card.lv}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+            {STAT_KEYS.map((k) => (
+              <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "#4a6c85", background: "#F5F9FB", borderRadius: 6, padding: "2px 6px" }}>
+                <span>
+                  {STAT_ICONS[k]} {STAT_LABELS[k]}
+                </span>
+                <span style={{ fontWeight: 800, color: "#0B3D62" }}>{card.stats[k]}</span>
+              </div>
+            ))}
+          </div>
+        </>
       ) : (
-        <span style={{ fontSize: 24 }}>⚗️</span>
+        <div style={{ padding: "10px 0" }}>
+          <div style={{ width: 64, height: 64, margin: "0 auto 8px", borderRadius: 12, border: "2px dashed #d7ecf3" }} />
+          <div style={{ textAlign: "center", fontSize: 11, color: "#a8bcc9", fontWeight: 700, lineHeight: 1.6 }}>
+            下の一覧から
+            <br />
+            タップして選択
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-function EmptySlot() {
-  return <div style={{ width: 70, height: 70, borderRadius: 12, border: "2px dashed rgba(255,255,255,0.5)", margin: "0 auto" }} />;
+// The combined-result preview — ベース's own art/name (or the グランドマス
+// ター fusion's, if this pair matches a combo) with the summed stats.
+function ResultStatCard({ base, combined, combinedLv, willGrandMaster }) {
+  const displayLabel = willGrandMaster ? willGrandMaster.name : base.label;
+  const displayImg = willGrandMaster && willGrandMaster.img ? willGrandMaster.img : base.imgSrc;
+  const displayFilter = willGrandMaster && willGrandMaster.img ? "none" : base.variant && base.variant.filter === "none" ? "none" : base.variant ? base.variant.filter : "none";
+  return (
+    <div style={{ width: 220, background: "#fff", borderRadius: 16, padding: "12px 14px", boxShadow: "0 10px 22px rgba(11,61,98,0.3)", border: "2px solid #FFE27A" }}>
+      <div style={{ textAlign: "center", fontSize: 11, fontWeight: 900, color: "#5C3A21", background: "#FFE27A", borderRadius: 999, padding: "2px 0", marginBottom: 8 }}>
+        配合後のファミリア
+      </div>
+      <div
+        style={{
+          width: 80,
+          height: 80,
+          margin: "0 auto 6px",
+          borderRadius: 14,
+          background: base.variant ? base.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 6,
+        }}
+      >
+        {displayImg ? (
+          <img src={displayImg} alt={displayLabel} style={{ width: "100%", height: "100%", objectFit: "contain", filter: displayFilter }} />
+        ) : (
+          <span style={{ fontSize: 30 }}>⚗️</span>
+        )}
+      </div>
+      <div style={{ textAlign: "center", fontSize: 13, fontWeight: 900, color: "#0B3D62", marginBottom: 2 }}>{displayLabel}</div>
+      {willGrandMaster && <div style={{ textAlign: "center", fontSize: 10.5, fontWeight: 800, color: "#E0A83E", marginBottom: 2 }}>⭐ グランドマスターに変化！</div>}
+      <div style={{ textAlign: "center", fontSize: 12, fontWeight: 800, color: "#E0A83E", marginBottom: 8 }}>Lv.{combinedLv}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 5 }}>
+        {STAT_KEYS.map((k) => (
+          <div key={k} style={{ background: "#F5F9FB", borderRadius: 8, padding: "4px 6px", textAlign: "center" }}>
+            <div style={{ fontSize: 9.5, fontWeight: 700, color: "#7c98aa" }}>
+              {STAT_ICONS[k]} {STAT_LABELS[k]}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 900, color: "#0B3D62" }}>{combined[k]}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 const iconBtnStyle = {
