@@ -1670,15 +1670,6 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
           <ResultStatCard base={base} combined={combined} combinedLv={combinedLv} willGrandMaster={willGrandMaster} />
         </div>
 
-        <div style={{ background: "#fff", borderRadius: 16, padding: "14px 16px", marginBottom: 18 }}>
-          <div style={{ fontWeight: 900, color: "#5A3FA0", fontSize: 13.5, marginBottom: 8 }}>⚗️ 配合のルール</div>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: "#4a6c85", lineHeight: 1.9 }}>
-            <li>ベースのLVとステータスに、サブの分がすべて合算されます</li>
-            <li>サブに選んだファミリアカードは配合で消費され、なくなります</li>
-            <li>組み合わせによっては、より強い「グランドマスター」の姿に変化することがあります（変化しない場合はベースの見た目のまま）</li>
-          </ul>
-        </div>
-
         {base && sub && !confirming && (
           <button
             onClick={() => setConfirming(true)}
@@ -1731,8 +1722,9 @@ function StatSlotCard({ label, accent, card }) {
       </div>
       <div
         style={{
-          width: 92,
-          height: 92,
+          width: "100%",
+          maxWidth: 130,
+          aspectRatio: "1 / 1",
           margin: "0 auto 6px",
           borderRadius: 12,
           background: card ? (card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)") : "#fff",
@@ -1791,14 +1783,15 @@ function ResultStatCard({ base, combined, combinedLv, willGrandMaster }) {
       : "none"
     : "none";
   return (
-    <div style={{ width: 260, background: "#fff", borderRadius: 16, padding: "12px 14px", boxShadow: "0 10px 22px rgba(11,61,98,0.3)", border: "2px solid #FFE27A" }}>
+    <div style={{ width: "100%", maxWidth: 290, background: "#fff", borderRadius: 16, padding: "12px 14px", boxShadow: "0 10px 22px rgba(11,61,98,0.3)", border: "2px solid #FFE27A", boxSizing: "border-box" }}>
       <div style={{ textAlign: "center", fontSize: 11, fontWeight: 900, color: "#5C3A21", background: "#FFE27A", borderRadius: 999, padding: "2px 0", marginBottom: 8 }}>
         配合後のファミリア
       </div>
       <div
         style={{
-          width: 190,
-          height: 190,
+          width: "100%",
+          maxWidth: 240,
+          aspectRatio: "1 / 1",
           margin: "0 auto 8px",
           borderRadius: 14,
           background: ready ? (base.variant ? base.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)") : "#fff",
