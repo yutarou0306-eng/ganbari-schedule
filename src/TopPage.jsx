@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { getKnownSchedules, upsertKnownSchedule, removeKnownSchedule } from "./registry.js";
-import { generateScheduleId } from "./scheduleId.js";
 import { generateProfileId } from "./profileId.js";
 import { getKnownProfiles } from "./profileRegistry.js";
 import { supabase } from "./db.js";
@@ -80,7 +79,7 @@ function formatRange(s, e) {
 }
 
 export default function TopPage() {
-  const [tab, setTab] = useState("create"); // create | active | done
+  const [tab, setTab] = useState("active"); // active | done
   const [schedules, setSchedules] = useState(getKnownSchedules());
   const [profiles, setProfiles] = useState(getKnownProfiles());
   const [refreshing, setRefreshing] = useState(false);
@@ -124,11 +123,6 @@ export default function TopPage() {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  function handleCreate(themeKey) {
-    const id = generateScheduleId();
-    window.location.href = `${window.location.pathname}?id=${id}&theme=${themeKey}`;
-  }
 
   function handleOpen(id) {
     window.location.href = `${window.location.pathname}?id=${id}`;
@@ -350,15 +344,23 @@ export default function TopPage() {
         >
           🐚 がんばりスケジュール
         </h1>
-        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 15, marginBottom: 22 }}>
-          作る・見る・振り返る、全部ここから
-          <a
-            href={`${window.location.pathname}?guide=1`}
-            style={{ color: "#FFE9A8", textDecoration: "underline", marginLeft: 4 }}
-          >
-            （使い方ガイド）
+        <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 13, marginBottom: 4 }}>
+          <a href={`${window.location.pathname}?guide=1`} style={{ color: "#FFE9A8", textDecoration: "underline" }}>
+            使い方ガイド
           </a>
         </p>
+        <h2
+          style={{
+            fontFamily: "'Kaisei Decol', serif",
+            color: "#fff",
+            textAlign: "center",
+            fontSize: 21,
+            textShadow: "0 2px 8px rgba(11,61,98,0.5)",
+            margin: "18px 0 14px",
+          }}
+        >
+          まずはスタンプ帳を作ろう！
+        </h2>
 
         <button
           onClick={handleCreateProfile}
@@ -367,10 +369,10 @@ export default function TopPage() {
             width: "100%",
             border: "none",
             borderRadius: 16,
-            padding: "15px 0",
+            padding: "17px 0",
             marginBottom: profiles.length > 0 ? 10 : 20,
             fontWeight: 900,
-            fontSize: 15.5,
+            fontSize: 17,
             color: "#5C3A21",
             cursor: "pointer",
             fontFamily: "inherit",
@@ -415,6 +417,68 @@ export default function TopPage() {
 
         <div
           style={{
+            background: "rgba(255,255,255,0.9)",
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 18,
+          }}
+        >
+          <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 14, marginBottom: 10 }}>🔍 スタンプ帳を探す</div>
+          <input
+            value={findName}
+            onChange={(e) => {
+              setFindName(e.target.value);
+              setFindStatus("idle");
+            }}
+            placeholder="なまえ（例：美月）"
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "2px solid #BFE3F0",
+              fontSize: 14,
+              fontFamily: "inherit",
+              marginBottom: 8,
+              boxSizing: "border-box",
+            }}
+          />
+          <BirthdateSelects
+            value={findBirthdate}
+            onChange={(v) => {
+              setFindBirthdate(v);
+              setFindStatus("idle");
+            }}
+          />
+          <button
+            onClick={handleFindProfile}
+            disabled={!findName.trim() || !findBirthdate || findStatus === "searching"}
+            style={{
+              width: "100%",
+              border: "none",
+              borderRadius: 12,
+              padding: "11px 0",
+              fontWeight: 800,
+              fontSize: 14,
+              color: "#fff",
+              cursor: findName.trim() && findBirthdate ? "pointer" : "default",
+              fontFamily: "inherit",
+              background: findName.trim() && findBirthdate ? "#14588C" : "#c7d8e0",
+            }}
+          >
+            {findStatus === "searching" ? "さがしています…" : "さがす"}
+          </button>
+          {findStatus === "notfound" && (
+            <p style={{ color: "#E0526B", fontSize: 13, marginTop: 8, marginBottom: 0 }}>
+              見つかりませんでした。なまえ・生年月日が正しいか確認してください。
+            </p>
+          )}
+          <p style={{ color: "#7c98aa", fontSize: 11.5, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
+            ※ 名前と生年月日で同じ名前の子も区別できます。かんたんな確認のためのものなので、パスワードのような強いセキュリティではありません。
+          </p>
+        </div>
+
+        <div
+          style={{
             background: "rgba(11,61,98,0.35)",
             borderRadius: 20,
             padding: 10,
@@ -426,9 +490,8 @@ export default function TopPage() {
           </div>
           <div style={{ display: "flex", gap: 6 }}>
             {[
-              ["create", "① 作る"],
-              ["active", "② 見る"],
-              ["done", "③ 完了"],
+              ["active", "① 見る"],
+              ["done", "② 完了"],
             ].map(([key, label]) => (
               <button
                 key={key}
@@ -459,131 +522,14 @@ export default function TopPage() {
           <br />
           ※共有リンクを開いたことがあるスケジュールも表示されます。
           <br />
-          ※作成されたスケジュールをスタンプ帳に連携すると、スタンプ帳から確認できます。
+          ※新しいスケジュールの作成は、スタンプ帳の中からできます。
         </p>
-
-        {tab === "create" && (
-          <div
-            style={{
-              background: "linear-gradient(180deg,#FFFBF3,#FFF7EC)",
-              borderRadius: 22,
-              padding: 26,
-              textAlign: "center",
-              boxShadow: "0 16px 34px rgba(11,61,98,0.3)",
-            }}
-          >
-            <p style={{ color: "#4a6c85", fontSize: 15.5, marginBottom: 18, lineHeight: 1.7 }}>
-              新しいスケジュールを作ります。作ったあとに出てくる「共有リンク」を、一緒に使うご家族に送ってください。
-            </p>
-            <button
-              onClick={() => handleCreate("girl")}
-              style={{
-                width: "100%",
-                padding: "16px 0",
-                borderRadius: 16,
-                border: "none",
-                background: "linear-gradient(135deg,#FFB6C9,#F4C95D)",
-                color: "#fff",
-                fontWeight: 900,
-                fontSize: 17,
-                cursor: "pointer",
-                boxShadow: "0 10px 20px rgba(255,143,163,0.4)",
-                fontFamily: "inherit",
-                marginBottom: 12,
-              }}
-            >
-              🎀 新しいスケジュールを作る（女の子用）
-            </button>
-            <button
-              onClick={() => handleCreate("boy")}
-              style={{
-                width: "100%",
-                padding: "16px 0",
-                borderRadius: 16,
-                border: "none",
-                background: "linear-gradient(135deg,#8B5E34,#C89B3C)",
-                color: "#fff",
-                fontWeight: 900,
-                fontSize: 17,
-                cursor: "pointer",
-                boxShadow: "0 10px 20px rgba(139,94,52,0.4)",
-                fontFamily: "inherit",
-              }}
-            >
-              🐉 新しいスケジュールを作る（男の子用）
-            </button>
-          </div>
-        )}
-
-        {tab === "create" && (
-          <div
-            style={{
-              background: "rgba(255,255,255,0.9)",
-              borderRadius: 16,
-              padding: 16,
-              marginTop: 16,
-            }}
-          >
-            <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 14, marginBottom: 10 }}>🔍 スタンプ帳を探す</div>
-            <input
-              value={findName}
-              onChange={(e) => {
-                setFindName(e.target.value);
-                setFindStatus("idle");
-              }}
-              placeholder="なまえ（例：美月）"
-              style={{
-                width: "100%",
-                padding: "10px 12px",
-                borderRadius: 10,
-                border: "2px solid #BFE3F0",
-                fontSize: 14,
-                fontFamily: "inherit",
-                marginBottom: 8,
-                boxSizing: "border-box",
-              }}
-            />
-            <BirthdateSelects
-              value={findBirthdate}
-              onChange={(v) => {
-                setFindBirthdate(v);
-                setFindStatus("idle");
-              }}
-            />
-            <button
-              onClick={handleFindProfile}
-              disabled={!findName.trim() || findStatus === "searching"}
-              style={{
-                width: "100%",
-                border: "none",
-                borderRadius: 12,
-                padding: "11px 0",
-                fontWeight: 800,
-                fontSize: 14,
-                color: "#fff",
-                cursor: findName.trim() ? "pointer" : "default",
-                fontFamily: "inherit",
-                background: findName.trim() ? "#14588C" : "#c7d8e0",
-              }}
-            >
-              {findStatus === "searching" ? "さがしています…" : "さがす"}
-            </button>
-            {findStatus === "notfound" && (
-              <p style={{ color: "#E0526B", fontSize: 13, marginTop: 8, marginBottom: 0 }}>
-                見つかりませんでした。なまえ・生年月日が正しいか確認してください。
-              </p>
-            )}
-            <p style={{ color: "#7c98aa", fontSize: 11.5, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
-              ※ かんたんな確認のためのものなので、パスワードのような強いセキュリティではありません。
-            </p>
-          </div>
-        )}
 
         {tab === "active" && (
           <>
             <ScheduleList
               items={active}
-              emptyText='まだ進行中のスケジュールはありません。「① 作る」から作ってみましょう。'
+              emptyText="まだ進行中のスケジュールはありません。上の「🌟 スタンプ帳をつくる」から作ってみましょう。"
               onOpen={handleOpen}
               onEdit={handleEdit}
               onDelete={(s) => setDeleteTarget(s)}
@@ -621,7 +567,7 @@ export default function TopPage() {
               />
               <button
                 onClick={handleFindSchedules}
-                disabled={!findSchedName.trim() || findSchedStatus === "searching"}
+                disabled={!findSchedName.trim() || !findSchedBirthdate || findSchedStatus === "searching"}
                 style={{
                   width: "100%",
                   border: "none",
@@ -630,9 +576,9 @@ export default function TopPage() {
                   fontWeight: 800,
                   fontSize: 14,
                   color: "#fff",
-                  cursor: findSchedName.trim() ? "pointer" : "default",
+                  cursor: findSchedName.trim() && findSchedBirthdate ? "pointer" : "default",
                   fontFamily: "inherit",
-                  background: findSchedName.trim() ? "#14588C" : "#c7d8e0",
+                  background: findSchedName.trim() && findSchedBirthdate ? "#14588C" : "#c7d8e0",
                 }}
               >
                 {findSchedStatus === "searching" ? "さがしています…" : "さがす"}
