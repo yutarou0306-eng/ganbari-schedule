@@ -319,6 +319,9 @@ export default function ProfileRoot() {
         grandMaster: disp.grandMaster,
         stats,
         label: disp.label,
+        // The name the kid gave it — independent of label, which switches
+        // to the Grand Master fusion's own name once combined.
+        givenName: s.mascotName || variant.name,
         fromTitle: s.title,
         earnedAt: s.awardedCard.earnedAt || "",
         startDate: s.startDate,
@@ -364,6 +367,7 @@ export default function ProfileRoot() {
         imgSrc: disp.imgSrc,
         // Still an egg — don't give away which species it'll hatch into.
         label: disp.label,
+        givenName: hatched ? s.mascotName || variant.name : null,
         fromTitle: s.title,
         startDate: s.startDate,
         endDate: s.endDate,
@@ -1040,7 +1044,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
     <div style={overlayStyle}>
       <div style={{ ...modalCardStyle, maxWidth: 440, maxHeight: "85vh", overflowY: "auto", textAlign: "left" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
-          <h3 style={{ margin: 0, fontSize: 19, color: "#0B3D62" }}>{card.label}</h3>
+          <h3 style={{ margin: 0, fontSize: 19, color: "#0B3D62" }}>{card.givenName || card.label}</h3>
           <button
             onClick={onClose}
             aria-label="閉じる"
@@ -1121,7 +1125,9 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
           </button>
         </div>
         {stageLabel(displayedStageIdx) && (
-          <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, color: "#7c98aa", marginBottom: 2 }}>{stageLabel(displayedStageIdx)}</div>
+          <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, color: "#7c98aa", marginBottom: 2 }}>
+            {card.variant ? `${card.variant.name}（${stageLabel(displayedStageIdx)}）` : stageLabel(displayedStageIdx)}
+          </div>
         )}
         <div style={{ textAlign: "center", fontSize: 15, fontWeight: 900, color: card.isMaster ? "#E0A83E" : "#0B3D62", marginBottom: 14 }}>
           Lv.{card.lv} {card.grandMaster ? "（Grand Master）" : card.isMaster ? "（Master）" : ""}
