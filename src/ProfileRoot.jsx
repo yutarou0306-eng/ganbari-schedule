@@ -130,7 +130,8 @@ export default function ProfileRoot() {
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [gateTarget, setGateTarget] = useState(null); // "rewards" | "editProfile" | null
+  const [gateTarget, setGateTarget] = useState(null); // "rewards" | "editProfile" | "createSchedule" | null
+  const [pendingCreateTheme, setPendingCreateTheme] = useState(null); // themeKey chosen before the gate, for "createSchedule"
   const [showGatePin, setShowGatePin] = useState(false);
   const [showGateConfirm, setShowGateConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -213,8 +214,9 @@ export default function ProfileRoot() {
     window.location.href = window.location.pathname;
   }
 
-  function requestParentGate(target) {
+  function requestParentGate(target, extra) {
     setGateTarget(target);
+    if (extra !== undefined) setPendingCreateTheme(extra);
     if (profile.pin && profile.pin.length > 0) {
       setShowGatePin(true);
     } else {
@@ -225,14 +227,20 @@ export default function ProfileRoot() {
   function handleGateSuccess() {
     setShowGatePin(false);
     setShowGateConfirm(false);
-    if (gateTarget) setView(gateTarget);
+    if (gateTarget === "createSchedule") {
+      if (pendingCreateTheme) handleCreateSchedule(pendingCreateTheme);
+    } else if (gateTarget) {
+      setView(gateTarget);
+    }
     setGateTarget(null);
+    setPendingCreateTheme(null);
   }
 
   function handleGateCancel() {
     setShowGatePin(false);
     setShowGateConfirm(false);
     setGateTarget(null);
+    setPendingCreateTheme(null);
   }
 
   const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
@@ -781,10 +789,10 @@ export default function ProfileRoot() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
-          <button onClick={() => handleCreateSchedule("girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
+          <button onClick={() => requestParentGate("createSchedule", "girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
             🎀 新しいスケジュールを作る（女の子用）
           </button>
-          <button onClick={() => handleCreateSchedule("boy")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#8B5E34,#C89B3C)" }}>
+          <button onClick={() => requestParentGate("createSchedule", "boy")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#8B5E34,#C89B3C)" }}>
             🐉 新しいスケジュールを作る（男の子用）
           </button>
         </div>
@@ -833,7 +841,7 @@ export default function ProfileRoot() {
           <div style={modalCardStyle}>
             <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>保護者の方へ</h3>
             <p style={{ fontSize: 15, color: "#4a6c85", lineHeight: 1.6, marginBottom: 20 }}>
-              ここから先は{gateTarget === "rewards" ? "景品リストを編集" : "プロフィールの設定を変更"}できます。保護者の方が操作していますか？
+              ここから先は{gateTarget === "rewards" ? "景品リストを編集" : gateTarget === "createSchedule" ? "新しいスケジュールを作成" : "プロフィールの設定を変更"}できます。保護者の方が操作していますか？
             </p>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={handleGateCancel} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
