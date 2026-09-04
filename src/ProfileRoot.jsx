@@ -293,11 +293,20 @@ export default function ProfileRoot() {
   // mascotVariant assigned (e.g. older data from before that existed),
   // rather than silently disappearing from this list.
   const growingCards = schedules
-    .filter((s) => !s.awardedCard)
+    .filter((s) => !s.awardedCard && !(profile.consumedScheduleCards || []).includes(s.id))
     .map((s) => {
       const variant = getVariant(s.theme, s.mascotVariant);
-      const lv = levelFromPct(s.currentPct);
       const hatched = stageIndex(variant.species, s.currentPct) > 0;
+      // A schedule can reach 100% progress without hitting the 30日/50スタンプ
+      // threshold that awards an official card — it's still visually at the
+      // Master stage, so it should be breedable too, not stuck forever just
+      // because it was never "awarded". Once it's been used as a ベース in
+      // 配合, its boosted Lv/stats are stored the same way an awarded card's
+      // are (keyed by schedule id), so we check for that override here too.
+      const reachedMaster = stageIndex(variant.species, s.currentPct) >= stageCount(variant.species) - 1;
+      const override = (profile.cardOverrides && profile.cardOverrides[s.id]) || null;
+      const lv = override ? override.lv : levelFromPct(s.currentPct);
+      const stats = override ? override.stats : computeCardStats(variant.species, lv);
       return {
         id: `growing:${s.id}`,
         source: "growing",
@@ -312,8 +321,8 @@ export default function ProfileRoot() {
         endDate: s.endDate,
         currentPct: s.currentPct,
         lv,
-        isMaster: false,
-        stats: computeCardStats(variant.species, lv),
+        isMaster: override ? true : reachedMaster,
+        stats,
         stamps: s.stamps,
       };
     });
@@ -356,12 +365,12 @@ export default function ProfileRoot() {
     const newStats = combineStats(base.stats, sub.stats);
 
     let next = { ...profile };
-    if (base.source === "schedule") {
+    if (base.source === "schedule" || base.source === "growing") {
       next.cardOverrides = { ...(next.cardOverrides || {}), [base.scheduleId]: { lv: newLv, stats: newStats } };
     } else if (base.source === "bred") {
       next.bredCards = (next.bredCards || []).map((c) => (c.id === base.bredId ? { ...c, lv: newLv, stats: newStats } : c));
     }
-    if (sub.source === "schedule") {
+    if (sub.source === "schedule" || sub.source === "growing") {
       next.consumedScheduleCards = [...(next.consumedScheduleCards || []), sub.scheduleId];
     } else if (sub.source === "bred") {
       next.bredCards = (next.bredCards || []).filter((c) => c.id !== sub.bredId);
@@ -920,7 +929,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext }) {
 
   return (
     <div style={overlayStyle}>
-      <div style={{ ...modalCardStyle, maxWidth: 360, maxHeight: "85vh", overflowY: "auto", textAlign: "left" }}>
+      <div style={{ ...modalCardStyle, maxWidth: 440, maxHeight: "85vh", overflowY: "auto", textAlign: "left" }}>
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 4 }}>
           <h3 style={{ margin: 0, fontSize: 19, color: "#0B3D62" }}>{card.label}</h3>
           <button
@@ -932,7 +941,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext }) {
           </button>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 6, margin: "10px auto 6px", maxWidth: 300 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "10px auto 6px" }}>
           <button
             onClick={onPrev}
             disabled={!onPrev}
