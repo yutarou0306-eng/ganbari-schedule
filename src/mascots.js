@@ -431,27 +431,21 @@ export const STAT_KEYS = ["hp", "mp", "power", "defense", "speed", "wisdom"];
 export const LEVEL_MAX = 999;
 export const MASTER_LEVEL = 20; // 100%進捗 = Lv.20 = 一枚のカード単体で到達できる最大レベル
 
-const HP_HIGH = 60,
-  HP_MID = 25;
-const ST_HIGH = 15,
-  ST_MID = 6,
-  ST_AVG = 9;
-
-// species key -> Master-level (Lv.20) base stats. "pegasus" carries the
+// species key -> Master-level (Lv.20) base stats. Official values supplied
+// by the user (each species' stats sum to 500). "pegasus" carries the
 // ユニコーン archetype (treated as the same creature — see mascots
-// feature notes), and the original flavor-only fairy/cat get a flat,
-// unfavored spread.
+// feature notes).
 export const SPECIES_BASE_STATS = {
-  dragon: { hp: HP_HIGH, mp: HP_MID, power: ST_HIGH, defense: ST_MID, speed: ST_MID, wisdom: ST_MID }, // HP・ちから高め
-  tiger: { hp: HP_HIGH, mp: HP_MID, power: ST_HIGH, defense: ST_MID, speed: ST_HIGH, wisdom: ST_MID }, // HP・ちから・はやさ高め
-  phoenix: { hp: HP_MID, mp: HP_HIGH, power: ST_MID, defense: ST_MID, speed: ST_MID, wisdom: ST_HIGH }, // MP・かしこさ高め
-  fenrir: { hp: HP_MID, mp: HP_HIGH, power: ST_MID, defense: ST_HIGH, speed: ST_MID, wisdom: ST_MID }, // MP・しゅび高め
-  griffon: { hp: HP_HIGH, mp: HP_MID, power: ST_MID, defense: ST_MID, speed: ST_MID, wisdom: ST_HIGH }, // HP・かしこさ高め
-  pegasus: { hp: HP_HIGH, mp: HP_MID, power: ST_MID, defense: ST_HIGH, speed: ST_MID, wisdom: ST_HIGH }, // (ユニコーン) HP・しゅび・かしこさ高め
-  swamp: { hp: HP_MID, mp: HP_HIGH, power: ST_MID, defense: ST_MID, speed: ST_HIGH, wisdom: ST_MID }, // MP・はやさ高め
-  mermaid: { hp: HP_MID, mp: HP_HIGH, power: ST_MID, defense: ST_HIGH, speed: ST_MID, wisdom: ST_HIGH }, // MP・しゅび・かしこさ高め
-  fairy: { hp: HP_MID + 5, mp: HP_MID + 5, power: ST_AVG, defense: ST_AVG, speed: ST_AVG, wisdom: ST_AVG }, // 平均型
-  cat: { hp: HP_MID + 5, mp: HP_MID + 5, power: ST_AVG, defense: ST_AVG, speed: ST_AVG, wisdom: ST_AVG }, // 平均型
+  dragon: { hp: 160, mp: 70, power: 80, defense: 70, speed: 60, wisdom: 60 },
+  tiger: { hp: 190, mp: 40, power: 100, defense: 80, speed: 60, wisdom: 30 },
+  phoenix: { hp: 135, mp: 80, power: 65, defense: 55, speed: 85, wisdom: 80 },
+  fenrir: { hp: 150, mp: 70, power: 85, defense: 75, speed: 65, wisdom: 55 },
+  griffon: { hp: 130, mp: 80, power: 65, defense: 55, speed: 80, wisdom: 90 },
+  pegasus: { hp: 115, mp: 90, power: 55, defense: 70, speed: 70, wisdom: 100 },
+  swamp: { hp: 130, mp: 110, power: 55, defense: 65, speed: 50, wisdom: 90 },
+  mermaid: { hp: 110, mp: 105, power: 50, defense: 65, speed: 70, wisdom: 100 },
+  fairy: { hp: 110, mp: 110, power: 65, defense: 60, speed: 50, wisdom: 105 },
+  cat: { hp: 100, mp: 140, power: 40, defense: 40, speed: 60, wisdom: 120 },
 };
 // fairyGreen/swampGreen are pre-recolored art variants of fairy/swamp (see
 // STAGE_FILES) — same creature, same stat archetype, just different asset.
@@ -494,4 +488,60 @@ export function combineStats(statsA, statsB) {
 // Combining (配合) two cards sums their Levels too, capped at LEVEL_MAX.
 export function combineLevel(lvA, lvB) {
   return Math.min(LEVEL_MAX, Math.max(0, lvA || 0) + Math.max(0, lvB || 0));
+}
+
+// グランドマスター (Grand Master) 配合結果一覧 — combining two Master-tier
+// cards that are still their ORIGINAL species (not already the result of a
+// previous 配合) produces a brand-new named creature instead of just a
+// stat-boosted copy of the ベース. Keyed [ベースの species][融合させた側の
+// species]. Only the boy-side 5 species are filled in for now — girl-side
+// combos will be added the same way once that table is supplied. `img` is
+// null until the matching artwork has been uploaded; the card falls back to
+// the usual ⚗️ placeholder in that case (same as any other 配合 card with no
+// unique art), so entries can be filled in with art later with no code
+// changes needed elsewhere.
+export const GRAND_MASTER_COMBOS = {
+  dragon: {
+    dragon: { name: "エンペラードラゴン", img: "/gm-dragon-dragon.png" },
+    phoenix: { name: "フレイムドラゴン", img: "/gm-dragon-phoenix.png" },
+    tiger: { name: "タイガードラゴン", img: null },
+    fenrir: { name: "フロストドラゴン", img: null },
+    griffon: { name: "スカイドラゴン", img: null },
+  },
+  phoenix: {
+    dragon: { name: "ドラゴンフェニックス", img: "/gm-phoenix-dragon.png" },
+    phoenix: { name: "エンペラーフェニックス", img: "/gm-phoenix-phoenix.png" },
+    tiger: { name: "タイガーフェニックス", img: null },
+    fenrir: { name: "フロストファイア・フェニックス", img: null },
+    griffon: { name: "グリフォンフェニックス", img: null },
+  },
+  tiger: {
+    dragon: { name: "ドラゴンタイガー", img: "/gm-tiger-dragon.png" },
+    phoenix: { name: "フレイムタイガー", img: "/gm-tiger-phoenix.png" },
+    tiger: { name: "キングタイガー", img: null },
+    fenrir: { name: "フェンリルタイガー", img: "/gm-tiger-fenrir.png" },
+    griffon: { name: "ウィングタイガー", img: null },
+  },
+  fenrir: {
+    dragon: { name: "ドラゴニック・フェンリル", img: "/gm-fenrir-dragon.png" },
+    phoenix: { name: "ブレイズフェンリル", img: "/gm-fenrir-phoenix.png" },
+    tiger: { name: "サンダーフェンリル", img: null },
+    fenrir: { name: "ロードフェンリル", img: null },
+    griffon: { name: "ストームフェンリル", img: null },
+  },
+  griffon: {
+    dragon: { name: "ドラゴングリフォン", img: "/gm-griffon-dragon.png" },
+    phoenix: { name: "ソーラーグリフォン", img: null },
+    tiger: { name: "タイガーグリフォン", img: null },
+    fenrir: { name: "フロストグリフォン", img: null },
+    griffon: { name: "ロイヤルグリフォン", img: null },
+  },
+};
+
+// Looks up the Grand Master fusion result for a (ベース種族, 融合種族) pair,
+// or null if that pair has no entry yet (e.g. girl-side species, or a base
+// that's already the result of a previous 配合 and so has no plain species).
+export function getGrandMasterCombo(baseSpecies, fusionSpecies) {
+  const row = GRAND_MASTER_COMBOS[baseSpecies];
+  return (row && row[fusionSpecies]) || null;
 }

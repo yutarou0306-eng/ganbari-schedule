@@ -3,7 +3,7 @@ import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
-import { getVariant, finalFormImage, stageImage, stageIndex, stageLabel, eggLabel, computeCardStats, combineStats, combineLevel, levelFromPct, stageImageAt, stageCount, STAT_LABELS, STAT_KEYS, STAT_MAX, MASTER_LEVEL } from "./mascots.js";
+import { getVariant, finalFormImage, stageImage, stageIndex, stageLabel, eggLabel, computeCardStats, combineStats, combineLevel, levelFromPct, stageImageAt, stageCount, getGrandMasterCombo, STAT_LABELS, STAT_KEYS, STAT_MAX, MASTER_LEVEL } from "./mascots.js";
 import { todayPendingSubjects, computeOverallStats } from "./progress.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
@@ -252,6 +252,22 @@ export default function ProfileRoot() {
   // and each one's stats depend on how many stars it was earned with, so
   // two cards that look the same (same species+color) can still have
   // different stats.
+  // If this card was used as a ベース in a 配合 that matched a Grand Master
+  // combo, its name/art switch to the fusion result — the new art has no
+  // hue-rotate tint (it's bespoke, pre-colored artwork, same idea as the
+  // fairyGreen/swampGreen variants), so filter is forced off when real art
+  // exists. Without art yet, it falls back to the usual ⚗️ placeholder.
+  function applyGrandMaster(override, variant, fallbackLabel, fallbackImgSrc) {
+    const gm = override && override.grandMaster;
+    if (!gm) return { variant, label: fallbackLabel, imgSrc: fallbackImgSrc, grandMaster: false };
+    return {
+      variant: gm.img ? { ...variant, filter: "none" } : variant,
+      label: gm.name,
+      imgSrc: gm.img,
+      grandMaster: true,
+    };
+  }
+
   const myCards = schedules
     .filter((s) => s.awardedCard && !(profile.consumedScheduleCards || []).includes(s.id))
     .map((s) => {
@@ -265,18 +281,20 @@ export default function ProfileRoot() {
       const override = (profile.cardOverrides && profile.cardOverrides[s.id]) || null;
       const lv = override ? override.lv : MASTER_LEVEL;
       const stats = override ? override.stats : computeCardStats(variant.species, lv);
+      const disp = applyGrandMaster(override, variant, s.mascotName || variant.name, finalFormImage(cardTheme, s.awardedCard.variant));
       return {
         id: `sched:${s.id}`,
         source: "schedule",
         scheduleId: s.id,
         theme: cardTheme,
-        variant,
-        imgSrc: finalFormImage(cardTheme, s.awardedCard.variant),
+        variant: disp.variant,
+        imgSrc: disp.imgSrc,
         stars,
         lv,
         isMaster: true,
+        grandMaster: disp.grandMaster,
         stats,
-        label: s.mascotName || variant.name,
+        label: disp.label,
         fromTitle: s.title,
         earnedAt: s.awardedCard.earnedAt || "",
         startDate: s.startDate,
@@ -307,21 +325,28 @@ export default function ProfileRoot() {
       const override = (profile.cardOverrides && profile.cardOverrides[s.id]) || null;
       const lv = override ? override.lv : levelFromPct(s.currentPct);
       const stats = override ? override.stats : computeCardStats(variant.species, lv);
+      const disp = applyGrandMaster(
+        override,
+        variant,
+        hatched ? s.mascotName || variant.name : eggLabel(variant),
+        stageImage(variant.species, s.currentPct)
+      );
       return {
         id: `growing:${s.id}`,
         source: "growing",
         scheduleId: s.id,
         theme: s.theme,
-        variant,
-        imgSrc: stageImage(variant.species, s.currentPct),
+        variant: disp.variant,
+        imgSrc: disp.imgSrc,
         // Still an egg — don't give away which species it'll hatch into.
-        label: hatched ? s.mascotName || variant.name : eggLabel(variant),
+        label: disp.label,
         fromTitle: s.title,
         startDate: s.startDate,
         endDate: s.endDate,
         currentPct: s.currentPct,
         lv,
         isMaster: override ? true : reachedMaster,
+        grandMaster: disp.grandMaster,
         stats,
         stamps: s.stamps,
       };
@@ -356,17 +381,25 @@ export default function ProfileRoot() {
   // 配合 (breeding): ベース (base) keeps existing as one card, upgraded
   // in place with the combined Lv/stats; サブ (sub, the material) is
   // consumed — removed from the collection entirely. No third card is
-  // created.
+  // created. If both sides are still their original, un-fused species and
+  // that pair has a グランドマスター combo entry, the base's name/art also
+  // switch to the fusion result.
   async function handleFinalizeBreed(baseId, subId) {
     const base = allCards.find((c) => c.id === baseId);
     const sub = allCards.find((c) => c.id === subId);
     if (!base || !sub || !base.isMaster || !sub.isMaster) return;
     const newLv = combineLevel(base.lv, sub.lv);
     const newStats = combineStats(base.stats, sub.stats);
+    const combo =
+      base.variant && sub.variant && !base.grandMaster ? getGrandMasterCombo(base.variant.species, sub.variant.species) : null;
+    const existingGm = profile.cardOverrides && profile.cardOverrides[base.scheduleId] && profile.cardOverrides[base.scheduleId].grandMaster;
 
     let next = { ...profile };
     if (base.source === "schedule" || base.source === "growing") {
-      next.cardOverrides = { ...(next.cardOverrides || {}), [base.scheduleId]: { lv: newLv, stats: newStats } };
+      next.cardOverrides = {
+        ...(next.cardOverrides || {}),
+        [base.scheduleId]: { lv: newLv, stats: newStats, grandMaster: combo || existingGm || null },
+      };
     } else if (base.source === "bred") {
       next.bredCards = (next.bredCards || []).map((c) => (c.id === base.bredId ? { ...c, lv: newLv, stats: newStats } : c));
     }
@@ -1015,7 +1048,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext }) {
           <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 700, color: "#7c98aa", marginBottom: 2 }}>{stageLabel(displayedStageIdx)}</div>
         )}
         <div style={{ textAlign: "center", fontSize: 15, fontWeight: 900, color: card.isMaster ? "#E0A83E" : "#0B3D62", marginBottom: 14 }}>
-          Lv.{card.lv} {card.isMaster ? "（Master）" : ""}
+          Lv.{card.lv} {card.grandMaster ? "（Grand Master）" : card.isMaster ? "（Master）" : ""}
         </div>
 
         {showEvolutionRow && (
