@@ -236,6 +236,30 @@ export default function ProfileRoot() {
 
   const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
 
+  // ⭐ ステータス割り振り用のプール。景品交換用の available（totalEarned -
+  // totalSpent、下の方で計算）とは完全に別勘定 — ステータスに振っても交換
+  // できる★は減らないし、景品と交換してもステータスに振れる★は減らない。
+  // どちらも totalEarned から独立に差し引かれる。
+  const totalAllocatedStars = Object.values(profile.statAllocations || {}).reduce(
+    (sum, alloc) => sum + STAT_KEYS.reduce((s2, k) => s2 + (alloc[k] || 0), 0),
+    0
+  );
+  const starsForStats = totalEarned - totalAllocatedStars;
+
+  // Adds a card's saved stat-point allocation (if any) on top of its
+  // computed base stats, capped the same way computeCardStats/combineStats
+  // already cap everything else.
+  function applyStatAllocation(cardId, stats) {
+    const alloc = (profile.statAllocations || {})[cardId];
+    if (!alloc) return stats;
+    const out = { ...stats };
+    STAT_KEYS.forEach((k) => {
+      const cap = k === "hp" || k === "mp" ? STAT_MAX.hp : STAT_MAX.power;
+      out[k] = Math.min(cap, out[k] + (alloc[k] || 0));
+    });
+    return out;
+  }
+
   // Schedules that still have at least one of today's stamps un-pressed —
   // surfaced at the top of the page as a reminder.
   const pendingSchedules = schedules.filter((s) => s.pendingToday && s.pendingToday.length > 0);
@@ -280,7 +304,7 @@ export default function ProfileRoot() {
       // upgraded in place and are stored as an override.
       const override = (profile.cardOverrides && profile.cardOverrides[s.id]) || null;
       const lv = override ? override.lv : MASTER_LEVEL;
-      const stats = override ? override.stats : computeCardStats(variant.species, lv);
+      const stats = applyStatAllocation(`sched:${s.id}`, override ? override.stats : computeCardStats(variant.species, lv));
       const disp = applyGrandMaster(override, variant, s.mascotName || variant.name, finalFormImage(cardTheme, s.awardedCard.variant));
       return {
         id: `sched:${s.id}`,
@@ -324,7 +348,7 @@ export default function ProfileRoot() {
       const reachedMaster = stageIndex(variant.species, s.currentPct) >= stageCount(variant.species) - 1;
       const override = (profile.cardOverrides && profile.cardOverrides[s.id]) || null;
       const lv = override ? override.lv : levelFromPct(s.currentPct);
-      const stats = override ? override.stats : computeCardStats(variant.species, lv);
+      const stats = applyStatAllocation(`growing:${s.id}`, override ? override.stats : computeCardStats(variant.species, lv));
       const disp = applyGrandMaster(
         override,
         variant,
@@ -366,7 +390,7 @@ export default function ProfileRoot() {
     stars: null,
     lv: typeof c.lv === "number" ? c.lv : MASTER_LEVEL,
     isMaster: true,
-    stats: c.stats,
+    stats: applyStatAllocation(`bred:${c.id}`, c.stats),
     label: c.name,
     fromTitle: c.parentLabel,
     earnedAt: c.createdAt || "",
@@ -408,6 +432,19 @@ export default function ProfileRoot() {
     } else if (sub.source === "bred") {
       next.bredCards = (next.bredCards || []).filter((c) => c.id !== sub.bredId);
     }
+    await saveProfile(next);
+  }
+
+  // ⭐ ステータス割り振りの確定処理 — 既存の割り振り分に今回の増分を足し込む
+  // （上書きではなく加算）。カードは常に card.id（例: "sched:abc123"）で
+  // 引く。
+  async function handleAllocateStats(cardId, deltas) {
+    const current = (profile.statAllocations && profile.statAllocations[cardId]) || {};
+    const merged = { ...current };
+    STAT_KEYS.forEach((k) => {
+      merged[k] = (merged[k] || 0) + (deltas[k] || 0);
+    });
+    const next = { ...profile, statAllocations: { ...(profile.statAllocations || {}), [cardId]: merged } };
     await saveProfile(next);
   }
 
@@ -627,6 +664,9 @@ export default function ProfileRoot() {
         </button>
 
         <SectionTitle>🎴 集めたファミリアカード</SectionTitle>
+        <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 8 }}>
+          ステータスに割り振れる★：残り {starsForStats} 個（景品と交換できる★とは別に減ります）
+        </div>
         <div style={{ marginBottom: 6 }}>
           {allCards.length === 0 ? (
             <div style={emptyCardStyle}>まだファミリアカードがありません。スケジュールを最後まで達成するとファミリアカードがもらえます。</div>
@@ -770,6 +810,8 @@ export default function ProfileRoot() {
               onClose={() => setOpenCardId(null)}
               onPrev={allCards.length > 1 ? () => setOpenCardId(allCards[(idx - 1 + allCards.length) % allCards.length].id) : null}
               onNext={allCards.length > 1 ? () => setOpenCardId(allCards[(idx + 1) % allCards.length].id) : null}
+              starsForStats={starsForStats}
+              onAllocate={handleAllocateStats}
             />
           );
         })()}
@@ -941,8 +983,11 @@ function CardTile({ card, selected, onOpen }) {
 // evolved past the egg), the Level and 6 stats (read-only — both are
 // derived automatically from progress/Level, no manual editing), and
 // which schedule earned it.
-function CardDetailModal({ card, onClose, onPrev, onNext }) {
+function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAllocate }) {
   const [previewStage, setPreviewStage] = useState(null); // stage index shown in the hero box, or null = current stage
+  const [allocating, setAllocating] = useState(false); // editing pending stat deltas
+  const [pending, setPending] = useState({}); // { statKey: delta } — not yet saved
+  const [confirming, setConfirming] = useState(false); // showing the final "これで良いですか？" check
   const isSchedule = card.source === "schedule";
   const isGrowing = card.source === "growing";
   const currentStageIdx = isGrowing && card.variant ? stageIndex(card.variant.species, card.currentPct) : null;
@@ -959,6 +1004,37 @@ function CardDetailModal({ card, onClose, onPrev, onNext }) {
   const stagesToShow = isGrowing ? currentStageIdx + 1 : (lastStageIdx || 0) + 1;
   // Which stage the hero box is actually showing right now, for the label.
   const displayedStageIdx = previewStage !== null ? previewStage : (isGrowing ? currentStageIdx : lastStageIdx);
+
+  const pendingTotal = STAT_KEYS.reduce((sum, k) => sum + (pending[k] || 0), 0);
+  const remainingPool = starsForStats - pendingTotal;
+
+  function capOf(k) {
+    return k === "hp" || k === "mp" ? STAT_MAX.hp : STAT_MAX.power;
+  }
+  function bump(k, delta) {
+    setPending((prev) => {
+      const next = (prev[k] || 0) + delta;
+      const displayed = card.stats[k] + next;
+      if (delta > 0 && (remainingPool <= 0 || displayed > capOf(k))) return prev;
+      if (next < 0) return prev;
+      return { ...prev, [k]: next };
+    });
+  }
+  function startAllocating() {
+    setPending({});
+    setAllocating(true);
+  }
+  function cancelAllocating() {
+    setPending({});
+    setAllocating(false);
+    setConfirming(false);
+  }
+  async function confirmAllocation() {
+    await onAllocate(card.id, pending);
+    setPending({});
+    setAllocating(false);
+    setConfirming(false);
+  }
 
   return (
     <div style={overlayStyle}>
@@ -1087,15 +1163,94 @@ function CardDetailModal({ card, onClose, onPrev, onNext }) {
           </>
         )}
 
-        <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>ステータス</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
-          {STAT_KEYS.map((k) => (
-            <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F5F9FB", borderRadius: 10, padding: "8px 10px" }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0B3D62" }}>{STAT_LABELS[k]}</div>
-              <div style={{ fontSize: 16, fontWeight: 900, color: "#0B3D62" }}>{card.stats[k]}</div>
-            </div>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa" }}>ステータス</div>
+          {card.isMaster && !allocating && (
+            <button
+              onClick={startAllocating}
+              style={{ border: "none", background: "#FFE9A8", color: "#5C3A21", fontSize: 11.5, fontWeight: 800, borderRadius: 999, padding: "4px 10px", cursor: "pointer" }}
+            >
+              ⭐ ステータスに割り振る
+            </button>
+          )}
         </div>
+
+        {allocating && (
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#4a6c85", marginBottom: 8 }}>
+            使える★：残り {remainingPool} 個
+          </div>
+        )}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+          {STAT_KEYS.map((k) => {
+            const delta = pending[k] || 0;
+            return (
+              <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#F5F9FB", borderRadius: 10, padding: "8px 10px" }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#0B3D62" }}>{STAT_LABELS[k]}</div>
+                {allocating ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: "#0B3D62", minWidth: 26, textAlign: "right" }}>{card.stats[k]}</div>
+                    <button
+                      onClick={() => bump(k, -1)}
+                      disabled={delta <= 0}
+                      style={{ width: 24, height: 24, borderRadius: "50%", border: "none", background: delta > 0 ? "#DCEBF2" : "#EEF3F5", color: delta > 0 ? "#14588C" : "#c2d2da", fontWeight: 900, cursor: delta > 0 ? "pointer" : "default" }}
+                    >
+                      －
+                    </button>
+                    <div style={{ fontSize: 12.5, fontWeight: 800, color: delta > 0 ? "#E0A83E" : "#c2d2da", minWidth: 24, textAlign: "center" }}>+{delta}</div>
+                    <button
+                      onClick={() => bump(k, 1)}
+                      disabled={remainingPool <= 0 || card.stats[k] + delta >= capOf(k)}
+                      style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: "50%",
+                        border: "none",
+                        background: remainingPool > 0 && card.stats[k] + delta < capOf(k) ? "#DCEBF2" : "#EEF3F5",
+                        color: remainingPool > 0 && card.stats[k] + delta < capOf(k) ? "#14588C" : "#c2d2da",
+                        fontWeight: 900,
+                        cursor: remainingPool > 0 && card.stats[k] + delta < capOf(k) ? "pointer" : "default",
+                      }}
+                    >
+                      ＋
+                    </button>
+                    <div style={{ fontSize: 12, color: "#7c98aa" }}>→</div>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: delta > 0 ? "#E0A83E" : "#0B3D62", minWidth: 28 }}>{card.stats[k] + delta}</div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 16, fontWeight: 900, color: "#0B3D62" }}>{card.stats[k]}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {allocating && (
+          <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
+            <button
+              onClick={cancelAllocating}
+              style={{ flex: 1, border: "none", background: "#EEF3F5", color: "#4a6c85", fontWeight: 800, borderRadius: 12, padding: "10px 0", cursor: "pointer" }}
+            >
+              キャンセル
+            </button>
+            <button
+              onClick={() => setConfirming(true)}
+              disabled={pendingTotal <= 0}
+              style={{
+                flex: 1,
+                border: "none",
+                background: pendingTotal > 0 ? "#14588C" : "#c2d2da",
+                color: "#fff",
+                fontWeight: 800,
+                borderRadius: 12,
+                padding: "10px 0",
+                cursor: pendingTotal > 0 ? "pointer" : "default",
+              }}
+            >
+              決定
+            </button>
+          </div>
+        )}
 
         {isGrowing ? (
           <>
@@ -1143,14 +1298,37 @@ function CardDetailModal({ card, onClose, onPrev, onNext }) {
           </>
         )}
       </div>
+
+      {confirming && (
+        <div style={overlayStyle}>
+          <div style={{ ...modalCardStyle, maxWidth: 320 }}>
+            <h3 style={{ margin: "0 0 12px", fontSize: 17, color: "#0B3D62" }}>これで良いですか？</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16, textAlign: "left" }}>
+              {STAT_KEYS.filter((k) => (pending[k] || 0) > 0).map((k) => (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#0B3D62" }}>
+                  <span style={{ fontWeight: 700 }}>{STAT_LABELS[k]}</span>
+                  <span>
+                    +{pending[k]}（{card.stats[k]} → {card.stats[k] + pending[k]}）
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#E0A83E", marginBottom: 16 }}>⭐ {pendingTotal}個 使います</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setConfirming(false)} style={modalBtnStyle}>
+                いいえ
+              </button>
+              <button onClick={confirmAllocation} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
+                はい
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-
-// Preview + confirm for combining two selected cards (配合). Stats sum,
-// capped per-stat by mascots.js — no unique art for the result, so this
-// just shows the two parents' mini stat blocks and the combined total.
 function BreedPage({ masterCards, onFinalize, onClose }) {
   const [baseId, setBaseId] = useState(null);
   const [subId, setSubId] = useState(null);
