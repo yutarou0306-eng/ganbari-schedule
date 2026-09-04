@@ -89,10 +89,6 @@ export default function TopPage() {
   const [findName, setFindName] = useState("");
   const [findBirthdate, setFindBirthdate] = useState("2015-01-01");
   const [findStatus, setFindStatus] = useState("idle"); // idle | searching | notfound
-  const [findSchedName, setFindSchedName] = useState("");
-  const [findSchedBirthdate, setFindSchedBirthdate] = useState("2015-01-01");
-  const [findSchedStatus, setFindSchedStatus] = useState("idle"); // idle | searching | notfound | found
-  const [foundSchedules, setFoundSchedules] = useState([]);
 
   // Refresh cached progress numbers from Supabase in one batched query.
   useEffect(() => {
@@ -192,46 +188,6 @@ export default function TopPage() {
       window.location.href = `${window.location.pathname}?profile=${data[0].id}`;
     } catch (e) {
       setFindStatus("notfound");
-    }
-  }
-
-  async function handleFindSchedules() {
-    const name = findSchedName.trim();
-    if (!name) return;
-    setFindSchedStatus("searching");
-    try {
-      let profQuery = supabase.from("profiles").select("id, blob").eq("blob->>name", name);
-      if (findSchedBirthdate) profQuery = profQuery.eq("blob->>birthdate", findSchedBirthdate);
-      const { data: profData, error: profErr } = await profQuery;
-      if (profErr || !profData || profData.length === 0) {
-        setFindSchedStatus("notfound");
-        setFoundSchedules([]);
-        return;
-      }
-      const profileId = profData[0].id;
-      const { data: schedData } = await supabase
-        .from("schedules")
-        .select("id, blob")
-        .eq("blob->config->>profileId", profileId);
-      const list = (schedData || [])
-        .filter((row) => row.blob && row.blob.config)
-        .map((row) => {
-          const cfg = row.blob.config;
-          const stats = computeOverallStats(cfg, row.blob.completions);
-          return { id: row.id, title: cfg.title, startDate: cfg.startDate, endDate: cfg.endDate, pct: stats.pct };
-        });
-      if (list.length === 0) {
-        setFindSchedStatus("notfound");
-        setFoundSchedules([]);
-        return;
-      }
-      list.forEach((item) => upsertKnownSchedule(item));
-      setSchedules(getKnownSchedules());
-      setFoundSchedules(list);
-      setFindSchedStatus("found");
-    } catch (e) {
-      setFindSchedStatus("notfound");
-      setFoundSchedules([]);
     }
   }
 
@@ -472,9 +428,6 @@ export default function TopPage() {
               見つかりませんでした。なまえ・生年月日が正しいか確認してください。
             </p>
           )}
-          <p style={{ color: "#7c98aa", fontSize: 11.5, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
-            ※ 名前と生年月日で同じ名前の子も区別できます。かんたんな確認のためのものなので、パスワードのような強いセキュリティではありません。
-          </p>
         </div>
 
         <div
@@ -526,78 +479,16 @@ export default function TopPage() {
         </p>
 
         {tab === "active" && (
-          <>
-            <ScheduleList
-              items={active}
-              emptyText="まだ進行中のスケジュールはありません。上の「🌟 スタンプ帳をつくる」から作ってみましょう。"
-              onOpen={handleOpen}
-              onEdit={handleEdit}
-              onDelete={(s) => setDeleteTarget(s)}
-              onShare={handleShare}
-              copiedId={copiedId}
-              refreshing={refreshing}
-            />
-
-            <div style={{ background: "rgba(255,255,255,0.9)", borderRadius: 16, padding: 16, marginTop: 16 }}>
-              <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 14, marginBottom: 10 }}>🔍 スケジュールをさがす</div>
-              <input
-                value={findSchedName}
-                onChange={(e) => {
-                  setFindSchedName(e.target.value);
-                  setFindSchedStatus("idle");
-                }}
-                placeholder="なまえ（例：美月）"
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 10,
-                  border: "2px solid #BFE3F0",
-                  fontSize: 14,
-                  fontFamily: "inherit",
-                  marginBottom: 8,
-                  boxSizing: "border-box",
-                }}
-              />
-              <BirthdateSelects
-                value={findSchedBirthdate}
-                onChange={(v) => {
-                  setFindSchedBirthdate(v);
-                  setFindSchedStatus("idle");
-                }}
-              />
-              <button
-                onClick={handleFindSchedules}
-                disabled={!findSchedName.trim() || !findSchedBirthdate || findSchedStatus === "searching"}
-                style={{
-                  width: "100%",
-                  border: "none",
-                  borderRadius: 12,
-                  padding: "11px 0",
-                  fontWeight: 800,
-                  fontSize: 14,
-                  color: "#fff",
-                  cursor: findSchedName.trim() && findSchedBirthdate ? "pointer" : "default",
-                  fontFamily: "inherit",
-                  background: findSchedName.trim() && findSchedBirthdate ? "#14588C" : "#c7d8e0",
-                }}
-              >
-                {findSchedStatus === "searching" ? "さがしています…" : "さがす"}
-              </button>
-              {findSchedStatus === "notfound" && (
-                <p style={{ color: "#E0526B", fontSize: 13, marginTop: 8, marginBottom: 0 }}>
-                  見つかりませんでした。なまえ・生年月日が正しいか、スタンプ帳にスケジュールが紐づいているか確認してください。
-                </p>
-              )}
-              {findSchedStatus === "found" && (
-                <p style={{ color: "#3F8A5C", fontSize: 13, marginTop: 8, marginBottom: 0, fontWeight: 700 }}>
-                  見つかりました！上の一覧に追加されました。
-                </p>
-              )}
-              <p style={{ color: "#7c98aa", fontSize: 11.5, marginTop: 8, marginBottom: 0, lineHeight: 1.5 }}>
-                ※「🌟 スタンプ帳」から作った・紐づけたスケジュールのみ見つかります。
-              </p>
-            </div>
-          </>
+          <ScheduleList
+            items={active}
+            emptyText="まだ進行中のスケジュールはありません。上の「🌟 スタンプ帳をつくる」から作ってみましょう。"
+            onOpen={handleOpen}
+            onEdit={handleEdit}
+            onDelete={(s) => setDeleteTarget(s)}
+            onShare={handleShare}
+            copiedId={copiedId}
+            refreshing={refreshing}
+          />
         )}
 
         {tab === "done" && (
