@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { pickRandomVariant, getVariant, finalFormImage, stageImage, stageIndex, stageImageAt, stageCount, computeCardStats, STAT_LABELS, STAT_KEYS, MASTER_LEVEL } from "./mascots.js";
+import { pickRandomVariant, getVariant, finalFormImage, stageImage, stageIndex, stageImageAt, stageCount, stageLabel, computeCardStats, STAT_LABELS, STAT_KEYS, MASTER_LEVEL } from "./mascots.js";
 import { computeOverallStats } from "./progress.js";
 import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 import { supabase } from "./db.js";
@@ -1235,6 +1235,7 @@ export default function KidsScheduleApp() {
           filter={evolution.filter}
           cardBg={evolution.cardBg}
           isFinal={evolution.isFinal}
+          stageIdx={evolution.idx}
           mascotName={config.mascotName}
           onClose={() => setEvolution(null)}
         />
@@ -2804,7 +2805,7 @@ function EvolutionNoticeModal({ mascotName, onTalk, onLeave }) {
 // spinning ray-of-light burst and a bounce-in pop. Pure CSS animation on
 // the same stage art already used elsewhere — see the .evo* keyframes in
 // GlobalStyle — so it needs no extra art assets.
-function EvolutionCelebration({ fromSrc, toSrc, filter, cardBg, isFinal, mascotName, onClose }) {
+function EvolutionCelebration({ fromSrc, toSrc, filter, cardBg, isFinal, stageIdx, mascotName, onClose }) {
   const [phase, setPhase] = useState("charge"); // charge -> flash -> reveal
   useEffect(() => {
     const t1 = setTimeout(() => setPhase("flash"), 1300);
@@ -2867,7 +2868,12 @@ function EvolutionCelebration({ fromSrc, toSrc, filter, cardBg, isFinal, mascotN
             {phase === "flash" && <div className="evoFlash" />}
           </div>
           {phase === "reveal" && mascotName && (
-            <div style={{ ...styles.cardGetName, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)", fontSize: 20, marginTop: 14 }}>{mascotName}</div>
+            <div style={{ ...styles.cardGetName, color: "#fff", textShadow: "0 2px 8px rgba(0,0,0,0.5)", fontSize: 20, marginTop: 14 }}>
+              {mascotName}
+              {stageLabel(stageIdx) && (
+                <span style={{ fontSize: 14, fontWeight: 700, opacity: 0.85, marginLeft: 6 }}>（{stageLabel(stageIdx)}）</span>
+              )}
+            </div>
           )}
         </div>
         {phase === "reveal" && (

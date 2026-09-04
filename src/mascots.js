@@ -84,6 +84,15 @@ export function stageCount(species) {
   return files.length;
 }
 
+// Japanese name for a growth-stage index — shown next to the mascot's name
+// at evolution time. Index 0 (egg) has no label; hatching (egg → baby) has
+// its own celebration copy ("たまごが かえったよ！") instead of this.
+const STAGE_LABELS = ["", "幼年期", "青年期", "成熟期", "マスター"];
+
+export function stageLabel(index) {
+  return STAGE_LABELS[index] || "";
+}
+
 export const DRAGON_VARIANTS = [
   {
     key: "blue",
@@ -417,7 +426,7 @@ export function eggLabel(variant) {
 // (配合) two Master (Lv.20+) cards sums their Levels (and stats) into one
 // stronger card, which is how higher levels happen.
 export const STAT_MAX = { hp: 999, mp: 999, power: 255, defense: 255, speed: 255, wisdom: 255 };
-export const STAT_LABELS = { hp: "HP", mp: "MP", power: "ちから", defense: "しゅび", speed: "はやさ", wisdom: "かしこさ" };
+export const STAT_LABELS = { hp: "HP", mp: "MP", power: "力", defense: "守備", speed: "早さ", wisdom: "賢さ" };
 export const STAT_KEYS = ["hp", "mp", "power", "defense", "speed", "wisdom"];
 export const LEVEL_MAX = 999;
 export const MASTER_LEVEL = 20; // 100%進捗 = Lv.20 = 一枚のカード単体で到達できる最大レベル
