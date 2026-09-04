@@ -1770,6 +1770,7 @@ function StatSlotCard({ label, accent, card }) {
 // The combined-result preview — ベース's own art/name (or the グランドマス
 // ター fusion's, if this pair matches a combo) with the summed stats.
 function ResultStatCard({ base, combined, combinedLv, willGrandMaster }) {
+  const [expanded, setExpanded] = useState(false);
   const ready = !!(base && combined);
   const displayLabel = ready ? (willGrandMaster ? willGrandMaster.name : base.label) : null;
   const displayImg = ready ? (willGrandMaster && willGrandMaster.img ? willGrandMaster.img : base.imgSrc) : null;
@@ -1784,10 +1785,11 @@ function ResultStatCard({ base, combined, combinedLv, willGrandMaster }) {
     : "none";
   return (
     <div style={{ width: "100%", maxWidth: 440, background: "#fff", borderRadius: 16, padding: "12px 14px", boxShadow: "0 10px 22px rgba(11,61,98,0.3)", border: "2px solid #FFE27A", boxSizing: "border-box" }}>
-      <div style={{ textAlign: "center", fontSize: 11, fontWeight: 900, color: "#5C3A21", background: "#FFE27A", borderRadius: 999, padding: "2px 0", marginBottom: 8 }}>
+      <div style={{ textAlign: "center", fontSize: 12, fontWeight: 900, color: "#5C3A21", background: "#FFE27A", borderRadius: 999, padding: "3px 0", marginBottom: 8 }}>
         配合後のファミリア
       </div>
       <div
+        onClick={ready && displayImg ? () => setExpanded(true) : undefined}
         style={{
           width: "100%",
           maxWidth: 340,
@@ -1801,6 +1803,7 @@ function ResultStatCard({ base, combined, combinedLv, willGrandMaster }) {
           justifyContent: "center",
           padding: ready ? 10 : 0,
           boxSizing: "border-box",
+          cursor: ready && displayImg ? "pointer" : "default",
         }}
       >
         {ready &&
@@ -1810,25 +1813,58 @@ function ResultStatCard({ base, combined, combinedLv, willGrandMaster }) {
             <span style={{ fontSize: 60 }}>⚗️</span>
           ))}
       </div>
-      <div style={{ textAlign: "center", fontSize: 13, fontWeight: 900, color: ready ? "#0B3D62" : "#c2d2da", marginBottom: 2 }}>
+      <div style={{ textAlign: "center", fontSize: 16, fontWeight: 900, color: ready ? "#0B3D62" : "#c2d2da", marginBottom: 3 }}>
         {ready ? displayLabel : "ベースとサブを選ぶとここに表示されます"}
       </div>
       {ready && willGrandMaster && (
-        <div style={{ textAlign: "center", fontSize: 10.5, fontWeight: 800, color: "#E0A83E", marginBottom: 2 }}>⭐ グランドマスターに変化！</div>
+        <div style={{ textAlign: "center", fontSize: 12.5, fontWeight: 800, color: "#E0A83E", marginBottom: 3 }}>⭐ グランドマスターに変化！</div>
       )}
-      <div style={{ textAlign: "center", fontSize: 12, fontWeight: 800, color: ready ? "#E0A83E" : "#c2d2da", marginBottom: 8 }}>
+      <div style={{ textAlign: "center", fontSize: 14.5, fontWeight: 800, color: ready ? "#E0A83E" : "#c2d2da", marginBottom: 10 }}>
         {ready ? `Lv.${combinedLv}` : "Lv.—"}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 5 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
         {STAT_KEYS.map((k) => (
-          <div key={k} style={{ background: "#F5F9FB", borderRadius: 8, padding: "4px 6px", textAlign: "center" }}>
-            <div style={{ fontSize: 9.5, fontWeight: 700, color: "#7c98aa" }}>
+          <div key={k} style={{ background: "#F5F9FB", borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: "#7c98aa" }}>
               {STAT_ICONS[k]} {STAT_LABELS[k]}
             </div>
-            <div style={{ fontSize: 14, fontWeight: 900, color: ready ? "#0B3D62" : "#c2d2da" }}>{ready ? combined[k] : "—"}</div>
+            <div style={{ fontSize: 17, fontWeight: 900, color: ready ? "#0B3D62" : "#c2d2da" }}>{ready ? combined[k] : "—"}</div>
           </div>
         ))}
       </div>
+
+      {expanded && (
+        <div
+          onClick={() => setExpanded(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(11,61,98,0.85)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 2000,
+            padding: 24,
+          }}
+        >
+          <div
+            style={{
+              width: "min(92vw, 92vh, 520px)",
+              aspectRatio: "1 / 1",
+              borderRadius: 20,
+              background: base.variant ? base.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 18,
+              boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+              boxSizing: "border-box",
+            }}
+          >
+            <img src={displayImg} alt={displayLabel} style={{ width: "100%", height: "100%", objectFit: "contain", filter: displayFilter }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
