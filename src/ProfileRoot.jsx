@@ -1790,7 +1790,7 @@ function ResultStatCard({ base, combined, combinedLv, willGrandMaster }) {
       <div
         style={{
           width: "100%",
-          maxWidth: 240,
+          maxWidth: 340,
           aspectRatio: "1 / 1",
           margin: "0 auto 8px",
           borderRadius: 14,
