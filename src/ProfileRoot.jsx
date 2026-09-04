@@ -1303,7 +1303,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                       setPreviewStage(isPreviewed ? null : i);
                     }}
                     style={{
-                      width: "calc(20% - 5px)",
+                      width: "calc((100% - 24px) / 5)",
                       aspectRatio: "1 / 1",
                       borderRadius: 8,
                       background: thumb.cardBg,
@@ -1311,6 +1311,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                       alignItems: "center",
                       justifyContent: "center",
                       padding: 3,
+                      boxSizing: "border-box",
                       boxShadow: isPreviewed ? "0 0 0 2px #3E6FBF" : isCurrent ? "0 0 0 2px #FFE27A" : "none",
                       cursor: "pointer",
                     }}
