@@ -123,6 +123,7 @@ export default function ProfileRoot() {
   const [exists, setExists] = useState(false);
   const [profile, setProfile] = useState(freshProfile());
   const [schedules, setSchedules] = useState([]); // [{id, title, theme, stamps}]
+  const [showAllSchedules, setShowAllSchedules] = useState(false); // 「つながっているスケジュール」を5件超えて全部表示中か
   const [breedPage, setBreedPage] = useState(false); // 配合ページを表示中かどうか
   const [openCardId, setOpenCardId] = useState(null); // card.id currently open in the detail view
   const [view, setView] = useState("main"); // main | editProfile | rewards
@@ -628,7 +629,7 @@ export default function ProfileRoot() {
             <div style={emptyCardStyle}>まだスケジュールがありません。下のボタンから作ってみましょう。</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {schedules.map((s) => (
+              {(showAllSchedules ? schedules : schedules.slice(0, 5)).map((s) => (
                 <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
                   <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
                     <span style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14.5 }}>
@@ -638,6 +639,24 @@ export default function ProfileRoot() {
                   </div>
                 </a>
               ))}
+              {!showAllSchedules && schedules.length > 5 && (
+                <button
+                  onClick={() => setShowAllSchedules(true)}
+                  style={{
+                    border: "none",
+                    background: "#EAF4F9",
+                    color: "#14588C",
+                    fontWeight: 800,
+                    fontSize: 13.5,
+                    borderRadius: 12,
+                    padding: "10px 0",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  すべて見る（{schedules.length}件）
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1013,6 +1032,7 @@ function CardTile({ card, selected, onOpen }) {
 // which schedule earned it.
 function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAllocate }) {
   const [previewStage, setPreviewStage] = useState(null); // stage index shown in the hero box, or null = current stage
+  const [previewRecipe, setPreviewRecipe] = useState(null); // "base" | "sub" | null — which 配合の記録 tile (if any) is previewed
   const [allocating, setAllocating] = useState(false); // editing pending stat deltas
   const [pending, setPending] = useState({}); // { statKey: delta } — not yet saved
   const [confirming, setConfirming] = useState(false); // showing the final "これで良いですか？" check
@@ -1058,21 +1078,6 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
   // these represents "now" (that's the fusion result, shown separately),
   // so nothing here gets the "current" ring.
   const trueCurrentIdx = card.grandMaster ? null : baseCount > 0 ? baseCount - 1 : null;
-  // Tapping a thumbnail swaps the hero preview to it, right in place — no
-  // separate overlay popup.
-  const previewedThumb = previewStage !== null ? historyThumbs[previewStage] : null;
-  const heroSrc = previewedThumb ? previewedThumb.src : defaultHeroSrc;
-  // The current form's own bespoke art (グランドマスター fusion art, or a
-  // schedule-awarded card's finalFormImage) needs no color filter — it's
-  // already fully painted. Anything else (species growth-stage templates)
-  // still needs its variant's tint.
-  const heroFilter = previewedThumb ? previewedThumb.filter : card.grandMaster ? "none" : card.variant ? card.variant.filter : "none";
-  const nowStageText = card.grandMaster ? "グランドマスター" : trueCurrentIdx !== null ? stageLabel(trueCurrentIdx) : "";
-  const bubbleText = previewedThumb
-    ? `${previewedThumb.variantName}（${previewedThumb.stageText}）`
-    : card.variant && nowStageText
-    ? `${card.variant.name}（${nowStageText}）`
-    : "";
 
   // 配合の記録：ベース＋サブ＝グランドマスター結果. Finds which absorbed
   // material's species, combined with this card's own original species,
@@ -1086,6 +1091,29 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
           return combo && combo.name === card.label;
         })
       : null;
+
+  // Tapping a growth-stage thumbnail OR a 配合の記録 tile swaps the hero
+  // preview, right in place — no separate overlay popup. Only one of the
+  // two preview mechanisms is active at a time.
+  const nowStageText = card.grandMaster ? "グランドマスター" : trueCurrentIdx !== null ? stageLabel(trueCurrentIdx) : "";
+  const previewedThumb = previewStage !== null ? historyThumbs[previewStage] : null;
+  let heroSrc = defaultHeroSrc;
+  let heroFilter = card.grandMaster ? "none" : card.variant ? card.variant.filter : "none";
+  let bubbleText = card.variant && nowStageText ? `${card.variant.name}（${nowStageText}）` : "";
+  if (previewRecipe === "base" && card.variant) {
+    heroSrc = stageImageAt(card.variant.species, lastStageIdx);
+    heroFilter = card.variant.filter;
+    bubbleText = `${card.variant.name}（${stageLabel(lastStageIdx)}）`;
+  } else if (previewRecipe === "sub" && triggeringEntry) {
+    const subLastIdx = stageCount(triggeringEntry.variant.species) - 1;
+    heroSrc = stageImageAt(triggeringEntry.variant.species, subLastIdx);
+    heroFilter = triggeringEntry.variant.filter;
+    bubbleText = `${triggeringEntry.variant.name}（${stageLabel(subLastIdx)}）`;
+  } else if (previewedThumb) {
+    heroSrc = previewedThumb.src;
+    heroFilter = previewedThumb.filter;
+    bubbleText = `${previewedThumb.variantName}（${previewedThumb.stageText}）`;
+  }
 
   const pendingTotal = STAT_KEYS.reduce((sum, k) => sum + (pending[k] || 0), 0);
   const remainingPool = starsForStats - pendingTotal;
@@ -1219,13 +1247,18 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
 
         {triggeringEntry && (
           <>
-            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>配合の記録</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#7c98aa", marginBottom: 6 }}>配合の記録（タップで上に表示）</div>
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "center", gap: 8, marginBottom: 14 }}>
               <RecipeTile
                 src={stageImageAt(card.variant.species, lastStageIdx)}
                 filter={card.variant.filter}
                 cardBg={card.variant.cardBg}
                 label={speciesLabel(card.variant.species)}
+                selected={previewRecipe === "base"}
+                onClick={() => {
+                  setPreviewStage(null);
+                  setPreviewRecipe(previewRecipe === "base" ? null : "base");
+                }}
               />
               <div style={{ fontSize: 18, fontWeight: 900, color: "#7c98aa", marginTop: 24 }}>＋</div>
               <RecipeTile
@@ -1233,9 +1266,24 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                 filter={triggeringEntry.variant.filter}
                 cardBg={triggeringEntry.variant.cardBg}
                 label={speciesLabel(triggeringEntry.variant.species)}
+                selected={previewRecipe === "sub"}
+                onClick={() => {
+                  setPreviewStage(null);
+                  setPreviewRecipe(previewRecipe === "sub" ? null : "sub");
+                }}
               />
               <div style={{ fontSize: 18, fontWeight: 900, color: "#7c98aa", marginTop: 24 }}>＝</div>
-              <RecipeTile src={card.imgSrc} filter="none" cardBg={card.variant.cardBg} label={card.label} />
+              <RecipeTile
+                src={card.imgSrc}
+                filter="none"
+                cardBg={card.variant.cardBg}
+                label={card.label}
+                selected={previewRecipe === "result"}
+                onClick={() => {
+                  setPreviewStage(null);
+                  setPreviewRecipe(previewRecipe === "result" ? null : "result");
+                }}
+              />
             </div>
           </>
         )}
@@ -1250,7 +1298,10 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                 return (
                   <div
                     key={i}
-                    onClick={() => setPreviewStage(isPreviewed ? null : i)}
+                    onClick={() => {
+                      setPreviewRecipe(null);
+                      setPreviewStage(isPreviewed ? null : i);
+                    }}
                     style={{
                       width: "calc(16.6% - 5px)",
                       aspectRatio: "1 / 1",
@@ -1288,7 +1339,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
           )}
         </div>
 
-        {allocating && (
+        {card.isMaster && (
           <div style={{ fontSize: 12, fontWeight: 700, color: remainingPool < 0 ? "#D9455F" : "#4a6c85", marginBottom: 8 }}>
             使える★：残り {remainingPool} 個
           </div>
@@ -1318,6 +1369,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                         inputMode="numeric"
                         min={0}
                         value={delta}
+                        onFocus={(e) => e.target.select()}
                         onChange={(e) => setExact(k, e.target.value)}
                         style={{
                           width: 44,
@@ -1493,9 +1545,9 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
 
 // One tile in the ベース＋サブ＝結果 recipe row — a small square image with
 // its species/fusion name underneath.
-function RecipeTile({ src, filter, cardBg, label }) {
+function RecipeTile({ src, filter, cardBg, label, selected, onClick }) {
   return (
-    <div style={{ width: 68, textAlign: "center" }}>
+    <div style={{ width: 68, textAlign: "center", cursor: onClick ? "pointer" : "default" }} onClick={onClick}>
       <div
         style={{
           width: 68,
@@ -1506,7 +1558,7 @@ function RecipeTile({ src, filter, cardBg, label }) {
           alignItems: "center",
           justifyContent: "center",
           padding: 4,
-          boxShadow: "0 4px 10px rgba(11,61,98,0.2)",
+          boxShadow: selected ? "0 0 0 2px #3E6FBF, 0 4px 10px rgba(11,61,98,0.2)" : "0 4px 10px rgba(11,61,98,0.2)",
           boxSizing: "border-box",
         }}
       >
