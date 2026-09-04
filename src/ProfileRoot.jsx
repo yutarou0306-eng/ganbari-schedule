@@ -1753,13 +1753,13 @@ function StatSlotCard({ label, accent, card }) {
       <div style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: card ? "#E0A83E" : "#c2d2da", marginBottom: 6 }}>
         {card ? `Lv.${card.lv}` : "Lv.—"}
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {STAT_KEYS.map((k) => (
-          <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "#4a6c85", background: "#F5F9FB", borderRadius: 6, padding: "2px 6px" }}>
+          <div key={k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, color: "#4a6c85", background: "#F5F9FB", borderRadius: 6, padding: "3px 7px" }}>
             <span>
               {STAT_ICONS[k]} {STAT_LABELS[k]}
             </span>
-            <span style={{ fontWeight: 800, color: card ? "#0B3D62" : "#c2d2da" }}>{card ? card.stats[k] : "—"}</span>
+            <span style={{ fontWeight: 800, fontSize: 14, color: card ? "#0B3D62" : "#c2d2da" }}>{card ? card.stats[k] : "—"}</span>
           </div>
         ))}
       </div>
@@ -1783,7 +1783,7 @@ function ResultStatCard({ base, combined, combinedLv, willGrandMaster }) {
       : "none"
     : "none";
   return (
-    <div style={{ width: "100%", maxWidth: 290, background: "#fff", borderRadius: 16, padding: "12px 14px", boxShadow: "0 10px 22px rgba(11,61,98,0.3)", border: "2px solid #FFE27A", boxSizing: "border-box" }}>
+    <div style={{ width: "100%", maxWidth: 440, background: "#fff", borderRadius: 16, padding: "12px 14px", boxShadow: "0 10px 22px rgba(11,61,98,0.3)", border: "2px solid #FFE27A", boxSizing: "border-box" }}>
       <div style={{ textAlign: "center", fontSize: 11, fontWeight: 900, color: "#5C3A21", background: "#FFE27A", borderRadius: 999, padding: "2px 0", marginBottom: 8 }}>
         配合後のファミリア
       </div>
