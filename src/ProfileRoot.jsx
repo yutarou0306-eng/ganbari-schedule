@@ -269,6 +269,10 @@ export default function ProfileRoot() {
   // was actually earned/done on each one.
   const completedSchedules = schedules.filter((s) => s.completed);
 
+  // Still-in-progress schedules — shown in "つながっているスケジュール".
+  // Completed ones are checked via 完了したスケジュール instead, not here.
+  const activeSchedules = schedules.filter((s) => !s.completed);
+
   // Cards earned across every schedule linked to this stamp book, grouped
   // by theme+color so getting the same dragon/pegasus twice shows as
   // "ブルードラゴン ×2" instead of two separate entries.
@@ -625,11 +629,11 @@ export default function ProfileRoot() {
 
         <SectionTitle>📅 つながっているスケジュール</SectionTitle>
         <div style={{ marginBottom: 18 }}>
-          {schedules.length === 0 ? (
+          {activeSchedules.length === 0 ? (
             <div style={emptyCardStyle}>まだスケジュールがありません。下のボタンから作ってみましょう。</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {(showAllSchedules ? schedules : schedules.slice(0, 5)).map((s) => (
+              {(showAllSchedules ? activeSchedules : activeSchedules.slice(0, 5)).map((s) => (
                 <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
                   <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
                     <span style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14.5 }}>
@@ -639,7 +643,7 @@ export default function ProfileRoot() {
                   </div>
                 </a>
               ))}
-              {!showAllSchedules && schedules.length > 5 && (
+              {!showAllSchedules && activeSchedules.length > 5 && (
                 <button
                   onClick={() => setShowAllSchedules(true)}
                   style={{
@@ -654,7 +658,7 @@ export default function ProfileRoot() {
                     fontFamily: "inherit",
                   }}
                 >
-                  すべて見る（{schedules.length}件）
+                  すべて見る（{activeSchedules.length}件）
                 </button>
               )}
             </div>
