@@ -134,6 +134,14 @@ export const DRAGON_VARIANTS = [
   },
 ];
 
+// 女の子側は、色ごとの専用絵ができるまでの当面の対応として、同じ種族内の
+// 色違いをすべて同じ絵（filter: "none"）にし、カード背景色（cardBg）だけ
+// で区別している。人型の種族（フェアリー・マジカルキャット・スワンプ
+// プリンセス・マーメイド）はCSSのhue-rotateフィルターで色を変えると肌の
+// 色まで変わってしまい見た目が損なわれる（実際に確認済み — 例: レッド
+// マーメイドの肌が青くなる）ため、ペガサスも含めて統一的にこの方式に
+// している。色ごとの専用絵ができ次第、その色だけ species を専用のものに
+// 差し替えていく（fairyGreen/swampGreenがすでにその方式）。
 const PEGASUS_VARIANTS = [
   {
     key: "rainbow",
@@ -146,28 +154,28 @@ const PEGASUS_VARIANTS = [
     key: "sunset",
     species: "pegasus",
     name: "サンセットペガサス",
-    filter: "hue-rotate(-40deg) saturate(2) brightness(1.05)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#FFB37B,#FF6F91)",
   },
   {
     key: "starlight",
     species: "pegasus",
     name: "スターライトペガサス",
-    filter: "hue-rotate(160deg) saturate(2)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#9AC8FF,#33459E)",
   },
   {
     key: "blossom",
     species: "pegasus",
     name: "ブロッサムペガサス",
-    filter: "hue-rotate(60deg) saturate(2)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#FFC1E3,#D6438D)",
   },
   {
     key: "emerald",
     species: "pegasus",
     name: "エメラルドペガサス",
-    filter: "hue-rotate(-110deg) saturate(2)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#8CE6C0,#137A55)",
   },
 ];
@@ -177,14 +185,14 @@ const FAIRY_VARIANTS = [
     key: "fairy-red",
     species: "fairy",
     name: "レッドフェアリー",
-    filter: "hue-rotate(-30deg) saturate(0.45) brightness(1.2) contrast(0.9)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#FFE0E0,#F2A8A8)",
   },
   {
     key: "fairy-blue",
     species: "fairy",
     name: "ブルーフェアリー",
-    filter: "hue-rotate(180deg) saturate(0.45) brightness(1.2) contrast(0.9)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#DCEEFF,#A8C8F2)",
   },
   {
@@ -201,21 +209,21 @@ const CAT_VARIANTS = [
     key: "cat-blue",
     species: "cat",
     name: "ブルーマジカルキャット",
-    filter: "saturate(0.45) brightness(1.2) contrast(0.9)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#DCEEFF,#A8C8F2)",
   },
   {
     key: "cat-red",
     species: "cat",
     name: "レッドマジカルキャット",
-    filter: "hue-rotate(110deg) saturate(0.45) brightness(1.2) contrast(0.9)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#FFE0E0,#F2A8A8)",
   },
   {
     key: "cat-green",
     species: "cat",
     name: "グリーンマジカルキャット",
-    filter: "hue-rotate(230deg) saturate(0.45) brightness(1.2) contrast(0.9)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#E0F5DC,#A8D9A0)",
   },
 ];
@@ -321,14 +329,14 @@ const SWAMP_VARIANTS = [
     key: "swamp-gold",
     species: "swamp",
     name: "ゴールドスワンプリンセス",
-    filter: "saturate(1.5)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#FFE9A8,#C98A12)",
   },
   {
     key: "swamp-blue",
     species: "swamp",
     name: "ブルースワンプリンセス",
-    filter: "hue-rotate(207deg) saturate(0.45) brightness(1.2) contrast(0.9)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#DCEEFF,#A8C8F2)",
   },
   {
@@ -345,21 +353,21 @@ const MERMAID_VARIANTS = [
     key: "mermaid-green",
     species: "mermaid",
     name: "グリーンマーメイド",
-    filter: "saturate(0.45) brightness(1.2) contrast(0.9)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#E0F5DC,#A8D9A0)",
   },
   {
     key: "mermaid-blue",
     species: "mermaid",
     name: "ブルーマーメイド",
-    filter: "hue-rotate(68deg) saturate(0.45) brightness(1.2) contrast(0.9)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#DCEEFF,#A8C8F2)",
   },
   {
     key: "mermaid-red",
     species: "mermaid",
     name: "レッドマーメイド",
-    filter: "hue-rotate(188deg) saturate(0.45) brightness(1.2) contrast(0.9)",
+    filter: "none",
     cardBg: "linear-gradient(135deg,#FFE0E0,#F2A8A8)",
   },
 ];
