@@ -2,9 +2,9 @@ import React from "react";
 
 const oceanBg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
 
-function Section({ emoji, title, children }) {
+function Section({ id, emoji, title, children }) {
   return (
-    <div style={{ background: "#fff", borderRadius: 18, padding: "18px 20px", marginBottom: 14, boxShadow: "0 10px 22px rgba(11,61,98,0.2)" }}>
+    <div id={id} style={{ background: "#fff", borderRadius: 18, padding: "18px 20px", marginBottom: 14, boxShadow: "0 10px 22px rgba(11,61,98,0.2)", scrollMarginTop: 16 }}>
       <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 17, marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
         <span style={{ fontSize: 20 }}>{emoji}</span>
         {title}
@@ -77,25 +77,63 @@ export default function GuidePage() {
           使い方ガイド
         </p>
 
-        <Section emoji="📖" title="どんなアプリ？">
+        <div style={{ background: "#fff", borderRadius: 18, padding: "16px 20px", marginBottom: 14, boxShadow: "0 10px 22px rgba(11,61,98,0.2)" }}>
+          <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 15.5, marginBottom: 10 }}>📋 もくじ</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {[
+              { href: "#guide-intro", emoji: "📖", label: "どんなアプリ？" },
+              { href: "#guide-step1", emoji: "🌟", label: "1. スケジュールを作る" },
+              { href: "#guide-step2", emoji: "🎁", label: "2. ご褒美を決める" },
+              { href: "#guide-step3", emoji: "✅", label: "3. 毎日スタンプを押す" },
+              { href: "#guide-step4", emoji: "🥚", label: "4. 卵が育つ・進化する" },
+              { href: "#guide-step5", emoji: "📝", label: "5. メモ・コメント" },
+              { href: "#guide-step6", emoji: "🎀", label: "6. スタンプ帳（複数のスケジュールをまとめる）" },
+              { href: "#guide-step7", emoji: "⚗️", label: "7. ファミリア配合（Master同士を組み合わせる）" },
+              { href: "#guide-step8", emoji: "⭐", label: "8. ステータスに★を割り振る" },
+              { href: "#guide-parent", emoji: "🔒", label: "保護者だけができること" },
+              { href: "#guide-homescreen", emoji: "📱", label: "ホーム画面にアプリのように追加する" },
+            ].map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                style={{ color: "#14588C", fontSize: 14, fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", gap: 8 }}
+              >
+                <span style={{ fontSize: 16 }}>{item.emoji}</span>
+                {item.label}
+              </a>
+            ))}
+          </div>
+        </div>
+
+        <Section id="guide-intro" emoji="📖" title="どんなアプリ？">
           子どもの毎日の練習・お手伝いなどを、スタンプを貯めて記録する習慣化アプリです。ログイン不要で、共有リンクを開くだけで使えます。全部達成すると好きな色のドラゴンやペガサス、フェアリー、マジカルキャットが育っていきます。
         </Section>
 
-        <Section emoji="🌟" title="1. スケジュールを作る">
+        <Section id="guide-step1" emoji="🌟" title="1. スケジュールを作る">
           <Step n={1}>トップページの「新しいスケジュールを作る（女の子用／男の子用）」から作成します。</Step>
           <Step n={2}>タイトル、期間（開始日を選ぶと自動で1か月後の前日までが入ります）、やること（教科・習い事など）を設定します。</Step>
-          <Step n={3}>保護者用の暗証番号やご褒美（全部達成のお楽しみ）も、ここで設定できます（あとから修正も可能）。</Step>
+          <Step n={3}>保護者用の暗証番号も、ここで設定できます（あとから修正も可能）。</Step>
           <Step n={4}>作ったスケジュールは「共有（AirDropなど）」「LINEでシェア」「リンクをコピー」からお子さんの端末に送れます。</Step>
         </Section>
 
-        <Section emoji="✅" title="2. 毎日スタンプを押す">
+        <Section id="guide-step2" emoji="🎁" title="2. ご褒美を決める">
+          スケジュール作成時に、全部達成（100%）したときのご褒美（お楽しみ）を設定できます。
+          <br />
+          <br />
+          このご褒美は、何が良いかを親子で話し合って決めることをおすすめします。お子さん自身が「これが欲しい・やりたい」と思えるものを一緒に選ぶことで、最後まで続けるモチベーションになります。あとから内容を修正することもできます。
+          <br />
+          <br />
+          これとは別に、スタンプ帳には「貯めたスタンプ」を使って景品と交換できる機能があります。こちらも、何と交換できるようにするかをお子さんと話し合って決めたうえで、保護者が景品リストとして登録する形にしてください。
+        </Section>
+
+        <Section id="guide-step3" emoji="✅" title="3. 毎日スタンプを押す">
           今日のマスは「本スタンプ」です。押すとその日の記録として残ります。今日以外の日は自由に「仮スタンプ（練習用）」で遊べます。
           <br />
           <br />
           もし前の日に押し忘れがあった場合、保護者が🔒マークからロックを解除すると、過去の日にも本スタンプを押せるようになります。1回押すと記録、もう1回押すと押し忘れていた別の日を1日分「取り戻す」演出が出ます。
         </Section>
 
-        <Section emoji="🥚" title="3. 卵が育つ・進化する">
+        <Section id="guide-step4" emoji="🥚" title="4. 卵が育つ・進化する">
           スケジュールを作ると、ランダムな色の卵が割り当てられます（男の子用はドラゴン・バトルタイガー・フェニックス・フェンリル・グリフォン、女の子用はペガサス（ユニコーン）・フェアリー・マジカルキャット・スワンプリンセス・マーメイドの、あわせて全10種類）。達成率が上がるごとに卵→赤ちゃん→…→マスターへと成長します。
           <br />
           <br />
@@ -105,7 +143,7 @@ export default function GuidePage() {
           スケジュールが30日以上・スタンプ50個以上のときに100%達成すると、育ったキャラのカードがもらえます。
         </Section>
 
-        <Section emoji="📝" title="4. メモ・コメント">
+        <Section id="guide-step5" emoji="📝" title="5. メモ・コメント">
           各日付の「📝メモ」から、お子さんが「やったこと・感想」を書けます。
           <br />
           <br />
@@ -115,7 +153,7 @@ export default function GuidePage() {
           書いたコメントは、それぞれに付いている「編集」「削除」から直せます（削除は誤って消さないよう、一度確認が入ります）。
         </Section>
 
-        <Section emoji="🎀" title="5. スタンプ帳（複数のスケジュールをまとめる）">
+        <Section id="guide-step6" emoji="🎀" title="6. スタンプ帳（複数のスケジュールをまとめる）">
           トップページの「スタンプ帳をつくる」から、お子さんの名前や生年月日を登録できます。作ったスタンプ帳に複数のスケジュールを紐づけると、貯めたスタンプの合計や、達成してもらった育成キャラのカード（🎴集めたカード）が1か所にまとまります。
           <br />
           <br />
@@ -125,7 +163,7 @@ export default function GuidePage() {
           景品と交換する仕組みもあり、貯めたスタンプを使って登録した景品と交換できます。
         </Section>
 
-        <Section emoji="⚗️" title="6. ファミリア配合（Master同士を組み合わせる）">
+        <Section id="guide-step7" emoji="⚗️" title="7. ファミリア配合（Master同士を組み合わせる）">
           Masterまで育ったカードが2枚以上あると、「⚗️配合する」からファミリア配合のページを開けます。
           <br />
           <br />
@@ -135,14 +173,14 @@ export default function GuidePage() {
           男の子用の5種族（ドラゴン・バトルタイガー・フェニックス・フェンリル・グリフォン）どうしの組み合わせによっては、より強い「グランドマスター」という新しい姿・名前に変化することがあります（変化しない組み合わせは、ベースの見た目のまま強くなります）。カードをタップすると、配合の記録（誰と誰を組み合わせたか）や、これまでの成長の様子もまとめて見られます。
         </Section>
 
-        <Section emoji="⭐" title="7. ステータスに★を割り振る">
+        <Section id="guide-step8" emoji="⭐" title="8. ステータスに★を割り振る">
           Master（グランドマスターを含む）まで育ったカードは、これまでに貯めた★をHP・MP・力・守備・早さ・賢さに割り振って、さらに強くできます。
           <br />
           <br />
           カードの詳細画面にある「⭐ステータスに割り振る」から、＋／－ボタンや数字入力でステータスごとに増やす数を決め、「決定」→最終確認で反映されます。ここで使う★は、景品交換で使う★とは別に数えられるので、どちらを使ってももう片方が減ることはありません。
         </Section>
 
-        <Section emoji="🔒" title="保護者だけができること">
+        <Section id="guide-parent" emoji="🔒" title="保護者だけができること">
           スケジュール画面右上の🔒（または鍵アイコン）から暗証番号を入れて解除すると、以下ができます。
           <br />
           <br />
@@ -157,7 +195,7 @@ export default function GuidePage() {
           ※「見る」一覧の🗑ボタンは、その端末の表示から外すだけです。スケジュール自体を完全に削除したい場合は、スケジュールを開いてその中の「🗑削除する」から行ってください（どのスタンプ帳にも紐づいていないスケジュールは、この一覧の🗑から直接完全に削除されます）。
         </Section>
 
-        <Section emoji="📱" title="ホーム画面にアプリのように追加する">
+        <Section id="guide-homescreen" emoji="📱" title="ホーム画面にアプリのように追加する">
           ブラウザのブックマークではなく、アイコンをホーム画面に置いてアプリのように開けます。
           <br />
           <br />
