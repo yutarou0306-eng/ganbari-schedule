@@ -574,7 +574,7 @@ export const GRAND_MASTER_COMBOS = {
   },
   mermaid: {
     pegasus: { name: "ユニコーンマーメイド", img: "/gm-mermaid-pegasus.png" },
-    fairy: { name: "フェアリーマーメイド", img: null },
+    fairy: { name: "フェアリーマーメイド", img: "/gm-mermaid-fairy.png" },
     cat: { name: "ミスティックマーメイド", img: "/gm-mermaid-cat.png" },
     swamp: { name: "スワンマーメイド", img: "/gm-mermaid-swamp.png" },
     mermaid: { name: "マーメイドクイーン", img: "/gm-mermaid-mermaid.png" },
