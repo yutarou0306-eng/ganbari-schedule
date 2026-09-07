@@ -552,32 +552,32 @@ export const GRAND_MASTER_COMBOS = {
     mermaid: { name: "アクアユニコーン", img: "/gm-pegasus-mermaid.png" },
   },
   fairy: {
-    pegasus: { name: "ユニコーンフェアリー", img: null },
+    pegasus: { name: "ユニコーンフェアリー", img: "/gm-fairy-pegasus.png" },
     fairy: { name: "フェアリークイーン", img: "/gm-fairy-fairy.png" },
     cat: { name: "キャットフェアリー", img: "/gm-fairy-cat.png" },
     swamp: { name: "スワンフェアリー", img: "/gm-fairy-swamp.png" },
     mermaid: { name: "マーメイドフェアリー", img: "/gm-fairy-mermaid.png" },
   },
   cat: {
-    pegasus: { name: "ユニコーンキャット", img: null },
+    pegasus: { name: "ユニコーンキャット", img: "/gm-cat-pegasus.png" },
     fairy: { name: "フェアリーキャット", img: "/gm-cat-fairy.png" },
     cat: { name: "アークメイジキャット", img: "/gm-cat-cat.png" },
     swamp: { name: "スワンキャット", img: "/gm-cat-swamp.png" },
     mermaid: { name: "アクアキャット", img: "/gm-cat-mermaid.png" },
   },
   swamp: {
-    pegasus: { name: "ユニコーンスワン", img: null },
+    pegasus: { name: "ユニコーンスワン", img: "/gm-swamp-pegasus.png" },
     fairy: { name: "フェアリースワン", img: "/gm-swamp-fairy.png" },
     cat: { name: "ミスティックスワン", img: "/gm-swamp-cat.png" },
     swamp: { name: "スワンクイーン", img: "/gm-swamp-swamp.png" },
     mermaid: { name: "アクアスワン", img: "/gm-swamp-mermaid.png" },
   },
   mermaid: {
-    pegasus: { name: "ユニコーンマーメイド", img: null },
+    pegasus: { name: "ユニコーンマーメイド", img: "/gm-mermaid-pegasus.png" },
     fairy: { name: "フェアリーマーメイド", img: null },
     cat: { name: "ミスティックマーメイド", img: "/gm-mermaid-cat.png" },
     swamp: { name: "スワンマーメイド", img: "/gm-mermaid-swamp.png" },
-    mermaid: { name: "マーメイドクイーン", img: null },
+    mermaid: { name: "マーメイドクイーン", img: "/gm-mermaid-mermaid.png" },
   },
 };
 
