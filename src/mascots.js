@@ -26,6 +26,8 @@ const STAGE_FILES = {
   // hue-rotate used for fairy's other colors) — see the "green" variant
   // below for why.
   fairyGreen: ["/fairy-green-egg.png", "/fairy-green-baby.png", "/fairy-green-infant.png", "/fairy-green-adult.png", "/fairy-green-master.png"],
+  fairyBlue: ["/fairy-blue-egg.png", "/fairy-blue-baby.png", "/fairy-blue-infant.png", "/fairy-blue-adult.png", "/fairy-blue-master.png"],
+  fairyRed: ["/fairy-red-egg.png", "/fairy-red-baby.png", "/fairy-red-infant.png", "/fairy-red-adult.png", "/fairy-red-master.png"],
   cat: ["/cat-egg.png", "/cat-baby.png", "/cat-infant.png", "/cat-adult.png", "/cat-master.png"],
   tiger: ["/tiger-egg.png", "/tiger-baby.png", "/tiger-infant.png", "/tiger-adult.png", "/tiger-master.png"],
   phoenix: ["/phoenix-egg.png", "/phoenix-baby.png", "/phoenix-infant.png", "/phoenix-adult.png", "/phoenix-master.png"],
@@ -183,14 +185,14 @@ const PEGASUS_VARIANTS = [
 const FAIRY_VARIANTS = [
   {
     key: "fairy-red",
-    species: "fairy",
+    species: "fairyRed",
     name: "レッドフェアリー",
     filter: "none",
     cardBg: "linear-gradient(135deg,#FFE0E0,#F2A8A8)",
   },
   {
     key: "fairy-blue",
-    species: "fairy",
+    species: "fairyBlue",
     name: "ブルーフェアリー",
     filter: "none",
     cardBg: "linear-gradient(135deg,#DCEEFF,#A8C8F2)",
@@ -406,6 +408,8 @@ const SPECIES_SUFFIX = {
   pegasus: "ペガサス",
   fairy: "フェアリー",
   fairyGreen: "フェアリー",
+  fairyBlue: "フェアリー",
+  fairyRed: "フェアリー",
   cat: "マジカルキャット",
   tiger: "タイガー",
   phoenix: "フェニックス",
@@ -467,6 +471,8 @@ export const SPECIES_BASE_STATS = {
 // fairyGreen/swampGreen are pre-recolored art variants of fairy/swamp (see
 // STAGE_FILES) — same creature, same stat archetype, just different asset.
 SPECIES_BASE_STATS.fairyGreen = SPECIES_BASE_STATS.fairy;
+SPECIES_BASE_STATS.fairyBlue = SPECIES_BASE_STATS.fairy;
+SPECIES_BASE_STATS.fairyRed = SPECIES_BASE_STATS.fairy;
 SPECIES_BASE_STATS.swampGreen = SPECIES_BASE_STATS.swamp;
 
 function capFor(statKey) {
@@ -589,10 +595,19 @@ export const GRAND_MASTER_COMBOS = {
   },
 };
 
+// Some colors have their own dedicated pre-colored art (fairyGreen,
+// fairyBlue, fairyRed, swampGreen etc.) instead of a CSS filter on the
+// plain species art — but for 配合 purposes they're still fundamentally
+// フェアリー/スワンプリンセス/etc., so this maps them back to the
+// GRAND_MASTER_COMBOS table's plain species keys.
+function canonicalSpecies(species) {
+  return species.replace(/(Green|Blue|Red)$/, "").replace(/^./, (c) => c.toLowerCase());
+}
+
 // Looks up the Grand Master fusion result for a (ベース種族, 融合種族) pair,
 // or null if that pair has no entry yet (e.g. girl-side species, or a base
 // that's already the result of a previous 配合 and so has no plain species).
 export function getGrandMasterCombo(baseSpecies, fusionSpecies) {
-  const row = GRAND_MASTER_COMBOS[baseSpecies];
-  return (row && row[fusionSpecies]) || null;
+  const row = GRAND_MASTER_COMBOS[canonicalSpecies(baseSpecies)];
+  return (row && row[canonicalSpecies(fusionSpecies)]) || null;
 }
