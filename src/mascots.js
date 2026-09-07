@@ -503,12 +503,11 @@ export function combineLevel(lvA, lvB) {
 // cards that are still their ORIGINAL species (not already the result of a
 // previous 配合) produces a brand-new named creature instead of just a
 // stat-boosted copy of the ベース. Keyed [ベースの species][融合させた側の
-// species]. Only the boy-side 5 species are filled in for now — girl-side
-// combos will be added the same way once that table is supplied. `img` is
-// null until the matching artwork has been uploaded; the card falls back to
-// the usual ⚗️ placeholder in that case (same as any other 配合 card with no
-// unique art), so entries can be filled in with art later with no code
-// changes needed elsewhere.
+// species]. Covers all 10 species (5 boy + 5 girl). `img` is null until
+// the matching artwork has been uploaded; the card falls back to the usual
+// ⚗️ placeholder in that case (same as any other 配合 card with no unique
+// art), so entries can be filled in with art later with no code changes
+// needed elsewhere.
 export const GRAND_MASTER_COMBOS = {
   dragon: {
     dragon: { name: "エンペラードラゴン", img: "/gm-dragon-dragon.png" },
@@ -544,6 +543,41 @@ export const GRAND_MASTER_COMBOS = {
     tiger: { name: "タイガーグリフォン", img: "/gm-griffon-tiger.png" },
     fenrir: { name: "フロストグリフォン", img: "/gm-griffon-fenrir.png" },
     griffon: { name: "ロイヤルグリフォン", img: "/gm-griffon-griffon.png" },
+  },
+  pegasus: {
+    pegasus: { name: "ロイヤルユニコーン", img: null },
+    fairy: { name: "フェアリーユニコーン", img: "/gm-pegasus-fairy.png" },
+    cat: { name: "ミスティックユニコーン", img: null },
+    swamp: { name: "スワンユニコーン", img: null },
+    mermaid: { name: "アクアユニコーン", img: "/gm-pegasus-mermaid.png" },
+  },
+  fairy: {
+    pegasus: { name: "ユニコーンフェアリー", img: null },
+    fairy: { name: "フェアリークイーン", img: "/gm-fairy-fairy.png" },
+    cat: { name: "キャットフェアリー", img: "/gm-fairy-cat.png" },
+    swamp: { name: "スワンフェアリー", img: null },
+    mermaid: { name: "マーメイドフェアリー", img: "/gm-fairy-mermaid.png" },
+  },
+  cat: {
+    pegasus: { name: "ユニコーンキャット", img: null },
+    fairy: { name: "フェアリーキャット", img: "/gm-cat-fairy.png" },
+    cat: { name: "アークメイジキャット", img: "/gm-cat-cat.png" },
+    swamp: { name: "スワンキャット", img: null },
+    mermaid: { name: "アクアキャット", img: "/gm-cat-mermaid.png" },
+  },
+  swamp: {
+    pegasus: { name: "ユニコーンスワン", img: null },
+    fairy: { name: "フェアリースワン", img: "/gm-swamp-fairy.png" },
+    cat: { name: "ミスティックスワン", img: null },
+    swamp: { name: "スワンクイーン", img: null },
+    mermaid: { name: "アクアスワン", img: "/gm-swamp-mermaid.png" },
+  },
+  mermaid: {
+    pegasus: { name: "ユニコーンマーメイド", img: null },
+    fairy: { name: "フェアリーマーメイド", img: null },
+    cat: { name: "ミスティックマーメイド", img: null },
+    swamp: { name: "スワンマーメイド", img: null },
+    mermaid: { name: "マーメイドクイーン", img: null },
   },
 };
 
