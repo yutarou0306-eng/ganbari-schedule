@@ -11,6 +11,41 @@ const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFE
 // they forget their own. Intentionally not a secret kept from the parent.
 const MASTER_PIN = "5963";
 
+// 集めたファミリアカードの並び順：種族順 → 色順（ノーマル→赤→青→緑）→ Lv順（高い順）。
+// 種族順はmascots.jsでの定義順（男の子：ドラゴン→タイガー→フェニックス→フェンリル→
+// グリフォン、女の子：ペガサス→フェアリー→マジカルキャット→スワンプリンセス→
+// マーメイド）にそろえている。
+const CARD_SPECIES_ORDER = ["ドラゴン", "タイガー", "フェニックス", "フェンリル", "グリフォン", "ペガサス", "フェアリー", "マジカルキャット", "スワンプリンセス", "マーメイド"];
+
+function cardColorRank(variantName) {
+  if (!variantName) return 0;
+  if (variantName.includes("レッド")) return 1;
+  if (variantName.includes("ブルー")) return 2;
+  if (variantName.includes("グリーン")) return 3;
+  // ノーマル・ゴールド・レインボー・イエローなど、赤/青/緑以外の色はまとめて先頭に。
+  return 0;
+}
+
+function cardSortKey(c) {
+  if (c.variant && c.variant.species) {
+    const speciesIdx = CARD_SPECIES_ORDER.indexOf(speciesLabel(c.variant.species));
+    return [speciesIdx === -1 ? CARD_SPECIES_ORDER.length : speciesIdx, cardColorRank(c.variant.name), -c.lv];
+  }
+  // 配合で生まれた完全体カード（元の種族情報を持たない）は末尾にまとめる。
+  return [CARD_SPECIES_ORDER.length + 1, 0, -c.lv];
+}
+
+function sortCollectedCards(cards) {
+  cards.sort((a, b) => {
+    const ka = cardSortKey(a);
+    const kb = cardSortKey(b);
+    for (let i = 0; i < ka.length; i++) {
+      if (ka[i] !== kb[i]) return ka[i] - kb[i];
+    }
+    return 0;
+  });
+}
+
 // Counts by total stamp VALUE, matching computeOverallStats in progress.js
 // — a "取り戻す" double-tap is worth 2, since it's covering a missed day
 // as well as today's, not just counted as one stamp slot filled.
@@ -417,6 +452,7 @@ export default function ProfileRoot() {
   }));
 
   const allCards = [...myCards, ...growingCards, ...bredCards];
+  sortCollectedCards(allCards);
   const masterCards = allCards.filter((c) => c.isMaster);
 
   const totalSpent = (profile.redemptions || []).reduce((sum, r) => sum + r.cost, 0);
