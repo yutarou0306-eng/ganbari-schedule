@@ -1064,6 +1064,10 @@ function CardTile({ card, selected, roleLabel, onOpen }) {
 function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAllocate }) {
   const [previewStage, setPreviewStage] = useState(null); // stage index shown in the hero box, or null = current stage
   const [previewRecipe, setPreviewRecipe] = useState(null); // "base" | "sub" | null — which 配合の記録 tile (if any) is previewed
+  const [zoomed, setZoomed] = useState(false); // true = hero image shown fullscreen
+  useEffect(() => {
+    setZoomed(false);
+  }, [card.id]);
   const [allocating, setAllocating] = useState(false); // editing pending stat deltas
   const [pending, setPending] = useState({}); // { statKey: delta } — not yet saved
   const [confirming, setConfirming] = useState(false); // showing the final "これで良いですか？" check
@@ -1234,7 +1238,9 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
               padding: 16,
               boxShadow: "0 10px 24px rgba(11,61,98,0.3), inset 0 0 0 3px rgba(255,255,255,0.6)",
               boxSizing: "border-box",
+              cursor: heroSrc ? "zoom-in" : "default",
             }}
+            onClick={() => heroSrc && setZoomed(true)}
           >
             {heroSrc ? (
               <img
@@ -1569,6 +1575,58 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {zoomed && heroSrc && (
+        <div
+          onClick={() => setZoomed(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(11,61,98,0.85)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 2100,
+            padding: 24,
+            cursor: "zoom-out",
+          }}
+        >
+          <button
+            onClick={() => setZoomed(false)}
+            aria-label="閉じる"
+            style={{
+              position: "fixed",
+              top: 16,
+              right: 20,
+              border: "none",
+              background: "rgba(255,255,255,0.9)",
+              color: "#0B3D62",
+              fontSize: 20,
+              width: 36,
+              height: 36,
+              borderRadius: "50%",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            ✕
+          </button>
+          <img
+            src={heroSrc}
+            alt={card.label}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "100%",
+              maxHeight: "100%",
+              objectFit: "contain",
+              filter: heroFilter === "none" ? "none" : heroFilter,
+              cursor: "default",
+            }}
+          />
         </div>
       )}
     </div>
