@@ -1688,18 +1688,6 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
           </div>
         )}
 
-        <label style={{ ...styles.label, marginTop: 20 }}>保護者用 暗証番号（任意・数字4〜6桁）</label>
-        <input
-          type="password"
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 6))}
-          placeholder="設定しない場合は空欄でOK"
-          inputMode="numeric"
-          autoComplete="off"
-          style={styles.input}
-        />
-        <p style={styles.tinyNote}>暗証番号を入れると、スタンプを押すときに保護者の確認が必要になります。</p>
-
         <label style={{ ...styles.label, marginTop: 20 }}>🎁 全部達成したときのご褒美（任意）</label>
         <input
           value={reward}
