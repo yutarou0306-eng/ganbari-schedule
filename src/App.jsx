@@ -2801,7 +2801,7 @@ function HatchNamingModal({ theme, variantKey, defaultName, onSave, onSkip }) {
       <Confetti />
       <div style={styles.weekCelebrateCard}>
         <h2 style={styles.weekCelebrateTitle}>たまごが かえったよ！</h2>
-        <p style={styles.weekCelebrateSub}>なまえを つけてあげよう</p>
+        <p style={{ ...styles.weekCelebrateSub, fontSize: 22, fontWeight: 800, color: "#0B3D62" }}>なまえを つけてあげよう</p>
         <div style={styles.cardGetBox}>
           <div
             style={{
@@ -3166,8 +3166,8 @@ function GlobalStyle() {
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yuji+Syuku&family=Kaisei+Decol:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap');
       .hatchNameInput::placeholder {
-        color: #a9bdca;
-        font-weight: 700;
+        color: #d3dee4;
+        font-weight: 400;
         opacity: 1;
       }
       @keyframes confettiFall {
