@@ -5,10 +5,12 @@
 // later, kept as flavor-only species with average stats), and tiger /
 // phoenix / fenrir / griffon /
 // swamp princess / mermaid (3 colors each, added later still, each with
-// its own stat leanings). Most colors are produced with a CSS `filter` on
-// top of a single base art asset per species/stage rather than needing
-// separate art per color; a couple of "native" colors use no filter since
-// the base art is already that color.
+// its own stat leanings; mermaid's blue/red now have dedicated art too,
+// same as fairy — only mermaid-green still shares the plain "mermaid"
+// art, distinguished by cardBg alone). Most colors are produced with a
+// CSS `filter` on top of a single base art asset per species/stage
+// rather than needing separate art per color; a couple of "native"
+// colors use no filter since the base art is already that color.
 //
 // Shared by App.jsx (growth art + the "schedule complete" card reveal)
 // and ProfileRoot.jsx (the collected-cards list + breeding), so a
@@ -37,6 +39,9 @@ const STAGE_FILES = {
   // Same idea as fairyGreen — pre-recolored, skin left alone.
   swampGreen: ["/swamp-green-egg.png", "/swamp-green-baby.png", "/swamp-green-infant.png", "/swamp-green-adult.png", "/swamp-green-master.png"],
   mermaid: ["/mermaid-egg.png", "/mermaid-baby.png", "/mermaid-infant.png", "/mermaid-adult.png", "/mermaid-master.png"],
+  // Pre-recolored art, same idea as fairyGreen/fairyBlue/fairyRed above.
+  mermaidBlue: ["/mermaid-blue-egg.png", "/mermaid-blue-baby.png", "/mermaid-blue-infant.png", "/mermaid-blue-adult.png", "/mermaid-blue-master.png"],
+  mermaidRed: ["/mermaid-red-egg.png", "/mermaid-red-baby.png", "/mermaid-red-infant.png", "/mermaid-red-adult.png", "/mermaid-red-master.png"],
 };
 
 // Picks the growth-stage index (0 = still an egg, higher = further grown)
@@ -367,14 +372,14 @@ const MERMAID_VARIANTS = [
   },
   {
     key: "mermaid-blue",
-    species: "mermaid",
+    species: "mermaidBlue",
     name: "ブルーマーメイド",
     filter: "none",
     cardBg: "linear-gradient(135deg,#DCEEFF,#A8C8F2)",
   },
   {
     key: "mermaid-red",
-    species: "mermaid",
+    species: "mermaidRed",
     name: "レッドマーメイド",
     filter: "none",
     cardBg: "linear-gradient(135deg,#FFE0E0,#F2A8A8)",
@@ -425,6 +430,8 @@ const SPECIES_SUFFIX = {
   swamp: "スワンプリンセス",
   swampGreen: "スワンプリンセス",
   mermaid: "マーメイド",
+  mermaidBlue: "マーメイド",
+  mermaidRed: "マーメイド",
 };
 
 // The color-only part of a variant's name plus "エッグ" (e.g. "ブルー
@@ -481,6 +488,8 @@ SPECIES_BASE_STATS.fairyGreen = SPECIES_BASE_STATS.fairy;
 SPECIES_BASE_STATS.fairyBlue = SPECIES_BASE_STATS.fairy;
 SPECIES_BASE_STATS.fairyRed = SPECIES_BASE_STATS.fairy;
 SPECIES_BASE_STATS.swampGreen = SPECIES_BASE_STATS.swamp;
+SPECIES_BASE_STATS.mermaidBlue = SPECIES_BASE_STATS.mermaid;
+SPECIES_BASE_STATS.mermaidRed = SPECIES_BASE_STATS.mermaid;
 
 function capFor(statKey) {
   return statKey === "hp" || statKey === "mp" ? STAT_MAX.hp : STAT_MAX.power;
