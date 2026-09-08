@@ -1,12 +1,14 @@
 // Color variants for the growth mascots. 男の子用 has one species (dragon,
-// 5 colors). 女の子用 has many species — pegasus (5 colors, the
-// original — treated as "unicorn" for stats purposes, see STATS below;
-// three colors — starlight, sunset, emerald — now have dedicated art,
-// the other 2 (rainbow, blossom) still share the plain "pegasus" art
-// via cardBg only), fairy (4 colors,
-// all with dedicated art) / magical cat (3 colors, added later, kept as
-// flavor-only species with average stats — all 3 colors now have
-// dedicated art), and tiger / phoenix / fenrir
+// 5 colors). 女の子用 has many species — pegasus (4 colors — rainbow,
+// blue, red, green; the "blue/red/green" names are newer, friendlier
+// labels for what are internally still the starlight/sunset/emerald
+// keys+species from before, kept so already-saved cards keep resolving;
+// rainbow still shares the plain "pegasus" art via cardBg only, the
+// other 3 have dedicated art; a "blossom" 5th color existed briefly but
+// was dropped), fairy (4 colors,
+// all with dedicated art) / magical cat (4 colors — normal + blue/red/green,
+// all with
+// dedicated art; "normal" reuses the original plain "cat" art), and tiger / phoenix / fenrir
 // / griffon /
 // swamp princess (4 colors) / mermaid (4 colors), added later still,
 // each with its own stat leanings; mermaid's normal/green/blue/red and
@@ -176,30 +178,30 @@ const PEGASUS_VARIANTS = [
     cardBg: "linear-gradient(135deg,#FFD6E0,#C9B6FF,#B6E3FF)",
   },
   {
+    // key/species kept as "sunset" for backward compatibility with
+    // already-saved cards — only the displayed name/color changed to
+    // "red" per the user's request to simplify the naming.
     key: "sunset",
     species: "pegasusSunset",
-    name: "サンセットペガサス",
+    name: "レッドペガサス",
     filter: "none",
-    cardBg: "linear-gradient(135deg,#FFB37B,#FF6F91)",
+    cardBg: "linear-gradient(135deg,#FFE0E0,#F2A8A8)",
   },
   {
+    // key/species kept as "starlight" for backward compatibility — see
+    // note above.
     key: "starlight",
     species: "pegasusStarlight",
-    name: "スターライトペガサス",
+    name: "ブルーペガサス",
     filter: "none",
     cardBg: "linear-gradient(135deg,#9AC8FF,#33459E)",
   },
   {
-    key: "blossom",
-    species: "pegasus",
-    name: "ブロッサムペガサス",
-    filter: "none",
-    cardBg: "linear-gradient(135deg,#FFC1E3,#D6438D)",
-  },
-  {
+    // key/species kept as "emerald" for backward compatibility — see
+    // note above.
     key: "emerald",
     species: "pegasusEmerald",
-    name: "エメラルドペガサス",
+    name: "グリーンペガサス",
     filter: "none",
     cardBg: "linear-gradient(135deg,#8CE6C0,#137A55)",
   },
@@ -237,6 +239,13 @@ const FAIRY_VARIANTS = [
 ];
 
 const CAT_VARIANTS = [
+  {
+    key: "cat-normal",
+    species: "cat",
+    name: "マジカルキャット",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#E8D9FF,#9B72CF)",
+  },
   {
     key: "cat-blue",
     species: "catBlue",
