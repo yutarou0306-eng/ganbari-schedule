@@ -1,13 +1,16 @@
 // Color variants for the growth mascots. 男の子用 has one species (dragon,
 // 5 colors). 女の子用 has many species — pegasus (5 colors, the
-// original — treated as "unicorn" for stats purposes, see STATS below),
-// fairy (4 colors, all with dedicated art) / magical cat (3 colors, added
-// later, kept as flavor-only species with average stats), and tiger /
-// phoenix / fenrir / griffon /
-// swamp princess / mermaid (3 colors each, added later still, each with
-// its own stat leanings; mermaid's blue/red now have dedicated art too,
-// same as fairy — only mermaid-green still shares the plain "mermaid"
-// art, distinguished by cardBg alone). Most colors are produced with a
+// original — treated as "unicorn" for stats purposes, see STATS below;
+// three colors — starlight, sunset, emerald — now have dedicated art,
+// the other 2 (rainbow, blossom) still share the plain "pegasus" art
+// via cardBg only), fairy (4 colors,
+// all with dedicated art) / magical cat (3 colors, added later, kept as
+// flavor-only species with average stats), and tiger / phoenix / fenrir
+// / griffon /
+// swamp princess (3 colors) / mermaid (4 colors), added later still,
+// each with its own stat leanings; mermaid's normal/green/blue/red are
+// now all dedicated art, same as fairy, while swamp still only has
+// green as dedicated art. Most colors are produced with a
 // CSS `filter` on top of a single base art asset per species/stage
 // rather than needing separate art per color; a couple of "native"
 // colors use no filter since the base art is already that color.
@@ -20,10 +23,17 @@
 // pegasus have 6 hand-drawn stages; everything else has 5 (no separate
 // "kids" stage between infant and adult).
 const PEGASUS_STAGES = ["/pegasus-egg.png", "/pegasus-baby.png", "/pegasus-infant.png", "/pegasus-adult.png", "/pegasus-master.png"];
+const PEGASUS_STARLIGHT_STAGES = ["/pegasus-starlight-egg.png", "/pegasus-starlight-baby.png", "/pegasus-starlight-infant.png", "/pegasus-starlight-adult.png", "/pegasus-starlight-master.png"];
+const PEGASUS_SUNSET_STAGES = ["/pegasus-sunset-egg.png", "/pegasus-sunset-baby.png", "/pegasus-sunset-infant.png", "/pegasus-sunset-adult.png", "/pegasus-sunset-master.png"];
+const PEGASUS_EMERALD_STAGES = ["/pegasus-emerald-egg.png", "/pegasus-emerald-baby.png", "/pegasus-emerald-infant.png", "/pegasus-emerald-adult.png", "/pegasus-emerald-master.png"];
 
 const STAGE_FILES = {
   dragon: ["/egg.png", "/baby.png", "/infant.png", "/adult.png", "/master.png"],
   pegasus: PEGASUS_STAGES,
+  // スターライト・サンセット・エメラルドは専用絵ができている（他2色はpegasusの絵をcardBgのみで区別）。
+  pegasusStarlight: PEGASUS_STARLIGHT_STAGES,
+  pegasusSunset: PEGASUS_SUNSET_STAGES,
+  pegasusEmerald: PEGASUS_EMERALD_STAGES,
   // フェアリーは4色（ノーマル・レッド・ブルー・グリーン）すべて専用絵が
   // 揃っている（CSSのhue-rotateは使っていない）。
   fairy: ["/fairy-egg.png", "/fairy-baby.png", "/fairy-infant.png", "/fairy-adult.png", "/fairy-master.png"],
@@ -40,6 +50,7 @@ const STAGE_FILES = {
   swampGreen: ["/swamp-green-egg.png", "/swamp-green-baby.png", "/swamp-green-infant.png", "/swamp-green-adult.png", "/swamp-green-master.png"],
   mermaid: ["/mermaid-egg.png", "/mermaid-baby.png", "/mermaid-infant.png", "/mermaid-adult.png", "/mermaid-master.png"],
   // Pre-recolored art, same idea as fairyGreen/fairyBlue/fairyRed above.
+  mermaidGreen: ["/mermaid-green-egg.png", "/mermaid-green-baby.png", "/mermaid-green-infant.png", "/mermaid-green-adult.png", "/mermaid-green-master.png"],
   mermaidBlue: ["/mermaid-blue-egg.png", "/mermaid-blue-baby.png", "/mermaid-blue-infant.png", "/mermaid-blue-adult.png", "/mermaid-blue-master.png"],
   mermaidRed: ["/mermaid-red-egg.png", "/mermaid-red-baby.png", "/mermaid-red-infant.png", "/mermaid-red-adult.png", "/mermaid-red-master.png"],
 };
@@ -159,14 +170,14 @@ const PEGASUS_VARIANTS = [
   },
   {
     key: "sunset",
-    species: "pegasus",
+    species: "pegasusSunset",
     name: "サンセットペガサス",
     filter: "none",
     cardBg: "linear-gradient(135deg,#FFB37B,#FF6F91)",
   },
   {
     key: "starlight",
-    species: "pegasus",
+    species: "pegasusStarlight",
     name: "スターライトペガサス",
     filter: "none",
     cardBg: "linear-gradient(135deg,#9AC8FF,#33459E)",
@@ -180,7 +191,7 @@ const PEGASUS_VARIANTS = [
   },
   {
     key: "emerald",
-    species: "pegasus",
+    species: "pegasusEmerald",
     name: "エメラルドペガサス",
     filter: "none",
     cardBg: "linear-gradient(135deg,#8CE6C0,#137A55)",
@@ -364,8 +375,15 @@ const SWAMP_VARIANTS = [
 
 const MERMAID_VARIANTS = [
   {
-    key: "mermaid-green",
+    key: "mermaid-normal",
     species: "mermaid",
+    name: "マーメイド",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#FFE3F3,#B8E8E0)",
+  },
+  {
+    key: "mermaid-green",
+    species: "mermaidGreen",
     name: "グリーンマーメイド",
     filter: "none",
     cardBg: "linear-gradient(135deg,#E0F5DC,#A8D9A0)",
@@ -418,6 +436,9 @@ export function finalFormImage(themeKey, variantKey) {
 const SPECIES_SUFFIX = {
   dragon: "ドラゴン",
   pegasus: "ペガサス",
+  pegasusStarlight: "ペガサス",
+  pegasusSunset: "ペガサス",
+  pegasusEmerald: "ペガサス",
   fairy: "フェアリー",
   fairyGreen: "フェアリー",
   fairyBlue: "フェアリー",
@@ -430,6 +451,7 @@ const SPECIES_SUFFIX = {
   swamp: "スワンプリンセス",
   swampGreen: "スワンプリンセス",
   mermaid: "マーメイド",
+  mermaidGreen: "マーメイド",
   mermaidBlue: "マーメイド",
   mermaidRed: "マーメイド",
 };
@@ -488,8 +510,12 @@ SPECIES_BASE_STATS.fairyGreen = SPECIES_BASE_STATS.fairy;
 SPECIES_BASE_STATS.fairyBlue = SPECIES_BASE_STATS.fairy;
 SPECIES_BASE_STATS.fairyRed = SPECIES_BASE_STATS.fairy;
 SPECIES_BASE_STATS.swampGreen = SPECIES_BASE_STATS.swamp;
+SPECIES_BASE_STATS.mermaidGreen = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidBlue = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidRed = SPECIES_BASE_STATS.mermaid;
+SPECIES_BASE_STATS.pegasusStarlight = SPECIES_BASE_STATS.pegasus;
+SPECIES_BASE_STATS.pegasusSunset = SPECIES_BASE_STATS.pegasus;
+SPECIES_BASE_STATS.pegasusEmerald = SPECIES_BASE_STATS.pegasus;
 
 function capFor(statKey) {
   return statKey === "hp" || statKey === "mp" ? STAT_MAX.hp : STAT_MAX.power;
@@ -612,12 +638,13 @@ export const GRAND_MASTER_COMBOS = {
 };
 
 // Some colors have their own dedicated pre-colored art (fairyGreen,
-// fairyBlue, fairyRed, swampGreen etc.) instead of a CSS filter on the
-// plain species art — but for 配合 purposes they're still fundamentally
-// フェアリー/スワンプリンセス/etc., so this maps them back to the
-// GRAND_MASTER_COMBOS table's plain species keys.
+// fairyBlue, fairyRed, swampGreen, mermaidGreen/Blue/Red,
+// pegasusStarlight etc.) instead of a CSS filter on the plain species
+// art — but for 配合 purposes they're still fundamentally
+// フェアリー/スワンプリンセス/マーメイド/ペガサス etc., so this maps
+// them back to the GRAND_MASTER_COMBOS table's plain species keys.
 function canonicalSpecies(species) {
-  return species.replace(/(Green|Blue|Red)$/, "").replace(/^./, (c) => c.toLowerCase());
+  return species.replace(/(Green|Blue|Red|Starlight|Sunset|Emerald)$/, "").replace(/^./, (c) => c.toLowerCase());
 }
 
 // Looks up the Grand Master fusion result for a (ベース種族, 融合種族) pair,
