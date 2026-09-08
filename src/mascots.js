@@ -5,7 +5,9 @@
 // the other 2 (rainbow, blossom) still share the plain "pegasus" art
 // via cardBg only), fairy (4 colors,
 // all with dedicated art) / magical cat (3 colors, added later, kept as
-// flavor-only species with average stats), and tiger / phoenix / fenrir
+// flavor-only species with average stats — blue and green now have
+// dedicated art, red still shares the plain "cat" art via cardBg only),
+// and tiger / phoenix / fenrir
 // / griffon /
 // swamp princess (4 colors) / mermaid (4 colors), added later still,
 // each with its own stat leanings; mermaid's normal/green/blue/red and
@@ -42,6 +44,8 @@ const STAGE_FILES = {
   fairyBlue: ["/fairy-blue-egg.png", "/fairy-blue-baby.png", "/fairy-blue-infant.png", "/fairy-blue-adult.png", "/fairy-blue-master.png"],
   fairyRed: ["/fairy-red-egg.png", "/fairy-red-baby.png", "/fairy-red-infant.png", "/fairy-red-adult.png", "/fairy-red-master.png"],
   cat: ["/cat-egg.png", "/cat-baby.png", "/cat-infant.png", "/cat-adult.png", "/cat-master.png"],
+  catBlue: ["/cat-blue-egg.png", "/cat-blue-baby.png", "/cat-blue-infant.png", "/cat-blue-adult.png", "/cat-blue-master.png"],
+  catGreen: ["/cat-green-egg.png", "/cat-green-baby.png", "/cat-green-infant.png", "/cat-green-adult.png", "/cat-green-master.png"],
   tiger: ["/tiger-egg.png", "/tiger-baby.png", "/tiger-infant.png", "/tiger-adult.png", "/tiger-master.png"],
   phoenix: ["/phoenix-egg.png", "/phoenix-baby.png", "/phoenix-infant.png", "/phoenix-adult.png", "/phoenix-master.png"],
   fenrir: ["/fenrir-egg.png", "/fenrir-baby.png", "/fenrir-infant.png", "/fenrir-adult.png", "/fenrir-master.png"],
@@ -235,7 +239,7 @@ const FAIRY_VARIANTS = [
 const CAT_VARIANTS = [
   {
     key: "cat-blue",
-    species: "cat",
+    species: "catBlue",
     name: "ブルーマジカルキャット",
     filter: "none",
     cardBg: "linear-gradient(135deg,#DCEEFF,#A8C8F2)",
@@ -249,7 +253,7 @@ const CAT_VARIANTS = [
   },
   {
     key: "cat-green",
-    species: "cat",
+    species: "catGreen",
     name: "グリーンマジカルキャット",
     filter: "none",
     cardBg: "linear-gradient(135deg,#E0F5DC,#A8D9A0)",
@@ -454,6 +458,8 @@ const SPECIES_SUFFIX = {
   fairyBlue: "フェアリー",
   fairyRed: "フェアリー",
   cat: "マジカルキャット",
+  catBlue: "マジカルキャット",
+  catGreen: "マジカルキャット",
   tiger: "タイガー",
   phoenix: "フェニックス",
   fenrir: "フェンリル",
@@ -524,6 +530,8 @@ SPECIES_BASE_STATS.fairyRed = SPECIES_BASE_STATS.fairy;
 SPECIES_BASE_STATS.swampGreen = SPECIES_BASE_STATS.swamp;
 SPECIES_BASE_STATS.swampBlue = SPECIES_BASE_STATS.swamp;
 SPECIES_BASE_STATS.swampRed = SPECIES_BASE_STATS.swamp;
+SPECIES_BASE_STATS.catBlue = SPECIES_BASE_STATS.cat;
+SPECIES_BASE_STATS.catGreen = SPECIES_BASE_STATS.cat;
 SPECIES_BASE_STATS.mermaidGreen = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidBlue = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidRed = SPECIES_BASE_STATS.mermaid;
