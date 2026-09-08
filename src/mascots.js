@@ -1,8 +1,9 @@
 // Color variants for the growth mascots. 男の子用 has one species (dragon,
 // 5 colors). 女の子用 has many species — pegasus (5 colors, the
 // original — treated as "unicorn" for stats purposes, see STATS below),
-// fairy / magical cat (3 colors each, added later, kept as flavor-only
-// species with average stats), and tiger / phoenix / fenrir / griffon /
+// fairy (4 colors, all with dedicated art) / magical cat (3 colors, added
+// later, kept as flavor-only species with average stats), and tiger /
+// phoenix / fenrir / griffon /
 // swamp princess / mermaid (3 colors each, added later still, each with
 // its own stat leanings). Most colors are produced with a CSS `filter` on
 // top of a single base art asset per species/stage rather than needing
@@ -21,10 +22,9 @@ const PEGASUS_STAGES = ["/pegasus-egg.png", "/pegasus-baby.png", "/pegasus-infan
 const STAGE_FILES = {
   dragon: ["/egg.png", "/baby.png", "/infant.png", "/adult.png", "/master.png"],
   pegasus: PEGASUS_STAGES,
+  // フェアリーは4色（ノーマル・レッド・ブルー・グリーン）すべて専用絵が
+  // 揃っている（CSSのhue-rotateは使っていない）。
   fairy: ["/fairy-egg.png", "/fairy-baby.png", "/fairy-infant.png", "/fairy-adult.png", "/fairy-master.png"],
-  // Pre-recolored art (skin protected from the tint, unlike the CSS
-  // hue-rotate used for fairy's other colors) — see the "green" variant
-  // below for why.
   fairyGreen: ["/fairy-green-egg.png", "/fairy-green-baby.png", "/fairy-green-infant.png", "/fairy-green-adult.png", "/fairy-green-master.png"],
   fairyBlue: ["/fairy-blue-egg.png", "/fairy-blue-baby.png", "/fairy-blue-infant.png", "/fairy-blue-adult.png", "/fairy-blue-master.png"],
   fairyRed: ["/fairy-red-egg.png", "/fairy-red-baby.png", "/fairy-red-infant.png", "/fairy-red-adult.png", "/fairy-red-master.png"],
@@ -183,6 +183,13 @@ const PEGASUS_VARIANTS = [
 ];
 
 const FAIRY_VARIANTS = [
+  {
+    key: "fairy-normal",
+    species: "fairy",
+    name: "フェアリー",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#F5F0FF,#C9B8E8)",
+  },
   {
     key: "fairy-red",
     species: "fairyRed",
