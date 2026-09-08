@@ -7,10 +7,11 @@
 // all with dedicated art) / magical cat (3 colors, added later, kept as
 // flavor-only species with average stats), and tiger / phoenix / fenrir
 // / griffon /
-// swamp princess (3 colors) / mermaid (4 colors), added later still,
-// each with its own stat leanings; mermaid's normal/green/blue/red are
-// now all dedicated art, same as fairy, while swamp still only has
-// green as dedicated art. Most colors are produced with a
+// swamp princess (4 colors) / mermaid (4 colors), added later still,
+// each with its own stat leanings; mermaid's normal/green/blue/red and
+// swamp's green/blue/red are now all dedicated art, same as fairy —
+// only swamp-gold still shares the plain "swamp" art via cardBg only. Most
+// colors are produced with a
 // CSS `filter` on top of a single base art asset per species/stage
 // rather than needing separate art per color; a couple of "native"
 // colors use no filter since the base art is already that color.
@@ -48,6 +49,8 @@ const STAGE_FILES = {
   swamp: ["/swamp-egg.png", "/swamp-baby.png", "/swamp-infant.png", "/swamp-adult.png", "/swamp-master.png"],
   // Same idea as fairyGreen — pre-recolored, skin left alone.
   swampGreen: ["/swamp-green-egg.png", "/swamp-green-baby.png", "/swamp-green-infant.png", "/swamp-green-adult.png", "/swamp-green-master.png"],
+  swampBlue: ["/swamp-blue-egg.png", "/swamp-blue-baby.png", "/swamp-blue-infant.png", "/swamp-blue-adult.png", "/swamp-blue-master.png"],
+  swampRed: ["/swamp-red-egg.png", "/swamp-red-baby.png", "/swamp-red-infant.png", "/swamp-red-adult.png", "/swamp-red-master.png"],
   mermaid: ["/mermaid-egg.png", "/mermaid-baby.png", "/mermaid-infant.png", "/mermaid-adult.png", "/mermaid-master.png"],
   // Pre-recolored art, same idea as fairyGreen/fairyBlue/fairyRed above.
   mermaidGreen: ["/mermaid-green-egg.png", "/mermaid-green-baby.png", "/mermaid-green-infant.png", "/mermaid-green-adult.png", "/mermaid-green-master.png"],
@@ -359,7 +362,7 @@ const SWAMP_VARIANTS = [
   },
   {
     key: "swamp-blue",
-    species: "swamp",
+    species: "swampBlue",
     name: "ブルースワンプリンセス",
     filter: "none",
     cardBg: "linear-gradient(135deg,#DCEEFF,#A8C8F2)",
@@ -370,6 +373,13 @@ const SWAMP_VARIANTS = [
     name: "グリーンスワンプリンセス",
     filter: "none",
     cardBg: "linear-gradient(135deg,#E0F5DC,#A8D9A0)",
+  },
+  {
+    key: "swamp-red",
+    species: "swampRed",
+    name: "レッドスワンプリンセス",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#FFE0E0,#F2A8A8)",
   },
 ];
 
@@ -450,6 +460,8 @@ const SPECIES_SUFFIX = {
   griffon: "グリフォン",
   swamp: "スワンプリンセス",
   swampGreen: "スワンプリンセス",
+  swampBlue: "スワンプリンセス",
+  swampRed: "スワンプリンセス",
   mermaid: "マーメイド",
   mermaidGreen: "マーメイド",
   mermaidBlue: "マーメイド",
@@ -510,6 +522,8 @@ SPECIES_BASE_STATS.fairyGreen = SPECIES_BASE_STATS.fairy;
 SPECIES_BASE_STATS.fairyBlue = SPECIES_BASE_STATS.fairy;
 SPECIES_BASE_STATS.fairyRed = SPECIES_BASE_STATS.fairy;
 SPECIES_BASE_STATS.swampGreen = SPECIES_BASE_STATS.swamp;
+SPECIES_BASE_STATS.swampBlue = SPECIES_BASE_STATS.swamp;
+SPECIES_BASE_STATS.swampRed = SPECIES_BASE_STATS.swamp;
 SPECIES_BASE_STATS.mermaidGreen = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidBlue = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidRed = SPECIES_BASE_STATS.mermaid;
