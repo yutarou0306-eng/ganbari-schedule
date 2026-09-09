@@ -678,7 +678,7 @@ export default function ProfileRoot() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {(showAllSchedules ? activeSchedules : activeSchedules.slice(0, 5)).map((s) => (
-                <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
+                <a key={s.id} href={`${window.location.pathname}?id=${s.id}&records=1`} style={{ textDecoration: "none" }}>
                   <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
                     <span style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14.5 }}>
                       {s.theme === "boy" ? "🐉" : "🎀"} {s.title || "無題のスケジュール"}

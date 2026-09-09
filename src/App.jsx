@@ -300,14 +300,17 @@ function describeFrequency(subject) {
 
 function describeTargets(subject) {
   const parts = [];
-  if (subject.measureTime) parts.push(`⏱${subject.targetMinutes || 30}分`);
+  // measureTime defaults on — older schedules (from before pages/problems
+  // existed) never set this explicitly, so treat "not explicitly off" as on
+  // rather than requiring a truthy value.
+  if (subject.measureTime !== false) parts.push(`⏱${subject.targetMinutes || subject.durationMinutes || 30}分`);
   if (subject.measurePages) parts.push(`📖${subject.targetPages || 5}ページ`);
   if (subject.measureProblems) parts.push(`✏️${subject.targetProblems || 10}問`);
   return parts;
 }
 
 function subjectIsMeasurable(subject) {
-  return !!(subject.measureTime || subject.measurePages || subject.measureProblems);
+  return !!(subject.measureTime !== false || subject.measurePages || subject.measureProblems);
 }
 
 function formatAchvShort(vals) {
@@ -457,11 +460,17 @@ export default function KidsScheduleApp() {
             setAchievements(data.achievements || {});
             // A "?edit=1" URL flag (used by the top-page's edit button) jumps
             // straight into the setup/edit screen instead of the main view.
+            // "?records=1" (used by the stamp book's "つながっているスケジュール"
+            // list) opens the 記録を見る modal on top of the main view instead.
             let wantsEdit = false;
+            let wantsRecords = false;
             try {
-              wantsEdit = new URLSearchParams(window.location.search).get("edit") === "1";
+              const params = new URLSearchParams(window.location.search);
+              wantsEdit = params.get("edit") === "1";
+              wantsRecords = params.get("records") === "1";
             } catch (e) {}
             setView(wantsEdit ? "setup" : "main");
+            if (wantsRecords && !wantsEdit) setShowRecordsList(true);
           } else {
             applyThemeFromUrl();
             setView("setup");
@@ -1202,7 +1211,17 @@ export default function KidsScheduleApp() {
           onAddComment={handleAddParentComment}
           onEditComment={handleEditParentComment}
           onDeleteComment={handleDeleteParentComment}
-          onClose={() => setShowRecordsList(false)}
+          onClose={() => {
+            setShowRecordsList(false);
+            // Clear the ?records=1 flag so a later refresh doesn't reopen it.
+            try {
+              const url = new URL(window.location.href);
+              if (url.searchParams.has("records")) {
+                url.searchParams.delete("records");
+                window.history.replaceState(null, "", url.toString());
+              }
+            } catch (e) {}
+          }}
         />
       )}
 
@@ -1317,101 +1336,84 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
         ))}
       </div>
 
-      {isMapTheme ? (
-        <div style={styles.measureSection}>
-          <span style={styles.measureSectionLabel}>目標（複数選べます）</span>
+      <div style={styles.measureSection}>
+        <span style={styles.measureSectionLabel}>目標（複数選べます）</span>
 
-          <div style={styles.measureRow}>
-            <button
-              onClick={() => set({ measureTime: !subject.measureTime })}
-              style={{ ...styles.measureToggle, ...(subject.measureTime ? styles.measureToggleOn : {}) }}
-            >
-              ⏱ 時間
-            </button>
-            {subject.measureTime && (
-              <>
-                <select
-                  value={subject.targetMinutes ?? 30}
-                  onChange={(e) => set({ targetMinutes: Number(e.target.value) })}
-                  style={styles.measureSelect}
-                >
-                  {DURATION_OPTIONS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-                <span style={styles.measureUnit}>分</span>
-              </>
-            )}
-          </div>
-
-          <div style={styles.measureRow}>
-            <button
-              onClick={() => set({ measurePages: !subject.measurePages })}
-              style={{ ...styles.measureToggle, ...(subject.measurePages ? styles.measureToggleOn : {}) }}
-            >
-              📖 ページ数
-            </button>
-            {subject.measurePages && (
-              <>
-                <select
-                  value={subject.targetPages ?? 5}
-                  onChange={(e) => set({ targetPages: Number(e.target.value) })}
-                  style={styles.measureSelect}
-                >
-                  {PAGE_OPTIONS.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-                <span style={styles.measureUnit}>ページ</span>
-              </>
-            )}
-          </div>
-
-          <div style={styles.measureRow}>
-            <button
-              onClick={() => set({ measureProblems: !subject.measureProblems })}
-              style={{ ...styles.measureToggle, ...(subject.measureProblems ? styles.measureToggleOn : {}) }}
-            >
-              ✏️ 問題数
-            </button>
-            {subject.measureProblems && (
-              <>
-                <select
-                  value={subject.targetProblems ?? 10}
-                  onChange={(e) => set({ targetProblems: Number(e.target.value) })}
-                  style={styles.measureSelect}
-                >
-                  {PROBLEM_OPTIONS.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-                <span style={styles.measureUnit}>問</span>
-              </>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div style={styles.durationRow}>
-          <span style={{ fontSize: 13, color: "#4a6c85", fontWeight: 700 }}>取り組む時間</span>
-          <select
-            value={subject.durationMinutes ?? 10}
-            onChange={(e) => set({ durationMinutes: Number(e.target.value) })}
-            style={styles.durationSelect}
+        <div style={styles.measureRow}>
+          <button
+            onClick={() => set({ measureTime: subject.measureTime === false ? true : false })}
+            style={{ ...styles.measureToggle, ...(subject.measureTime !== false ? styles.measureToggleOn : {}) }}
           >
-            {DURATION_OPTIONS.map((m) => (
-              <option key={m} value={m}>
-                {m}分
-              </option>
-            ))}
-          </select>
+            ⏱ 時間
+          </button>
+          {subject.measureTime !== false && (
+            <>
+              <select
+                value={subject.targetMinutes ?? subject.durationMinutes ?? 30}
+                onChange={(e) => set({ targetMinutes: Number(e.target.value) })}
+                style={styles.measureSelect}
+              >
+                {DURATION_OPTIONS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+              <span style={styles.measureUnit}>分</span>
+            </>
+          )}
         </div>
-      )}
+
+        <div style={styles.measureRow}>
+          <button
+            onClick={() => set({ measurePages: !subject.measurePages })}
+            style={{ ...styles.measureToggle, ...(subject.measurePages ? styles.measureToggleOn : {}) }}
+          >
+            📖 ページ数
+          </button>
+          {subject.measurePages && (
+            <>
+              <select
+                value={subject.targetPages ?? 5}
+                onChange={(e) => set({ targetPages: Number(e.target.value) })}
+                style={styles.measureSelect}
+              >
+                {PAGE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <span style={styles.measureUnit}>ページ</span>
+            </>
+          )}
+        </div>
+
+        <div style={styles.measureRow}>
+          <button
+            onClick={() => set({ measureProblems: !subject.measureProblems })}
+            style={{ ...styles.measureToggle, ...(subject.measureProblems ? styles.measureToggleOn : {}) }}
+          >
+            ✏️ 問題数
+          </button>
+          {subject.measureProblems && (
+            <>
+              <select
+                value={subject.targetProblems ?? 10}
+                onChange={(e) => set({ targetProblems: Number(e.target.value) })}
+                style={styles.measureSelect}
+              >
+                {PROBLEM_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <span style={styles.measureUnit}>問</span>
+            </>
+          )}
+        </div>
+      </div>
 
       <div style={styles.freqRow}>
         {[
@@ -2007,7 +2009,7 @@ function MainScreen({
               <div style={styles.subjectSpotlightTextWrap}>
                 <div style={styles.subjectSpotlightName}>{s.name}</div>
                 <div style={styles.subjectSpotlightDuration}>
-                  {theme.isMapTheme ? describeTargets(s).join(" ") || "目標未設定" : `⏱ ${s.durationMinutes || 10}分`}
+                  {describeTargets(s).join(" ") || "目標未設定"}
                 </div>
                 <div style={styles.subjectSpotlightFreq}>📅 {describeFrequency(s)}</div>
               </div>
@@ -2093,7 +2095,7 @@ function MainScreen({
                       const stableIdx = subjects.findIndex((x) => x.id === s.id);
                       const count = countFor(dKey, s.id);
                       const achv = achievements[dKey] && achievements[dKey][s.id];
-                      const achvLabel = theme.isMapTheme && achv ? formatAchvShort(achv) : "";
+                      const achvLabel = achv ? formatAchvShort(achv) : "";
                       if (isToday) {
                         return (
                           <div key={s.id} style={styles.stampSlot}>
@@ -2432,7 +2434,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
     setAchv((prev) => ({ ...prev, [subjId]: { ...(prev[subjId] || {}), [field]: value } }));
   }
 
-  const measurableSubjects = isMapTheme ? (subjects || []).filter(subjectIsMeasurable) : [];
+  const measurableSubjects = (subjects || []).filter(subjectIsMeasurable);
 
   return (
     <div style={styles.modalOverlay}>
