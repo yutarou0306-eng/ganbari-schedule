@@ -678,14 +678,57 @@ export default function ProfileRoot() {
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {(showAllSchedules ? activeSchedules : activeSchedules.slice(0, 5)).map((s) => (
-                <a key={s.id} href={`${window.location.pathname}?id=${s.id}&records=1`} style={{ textDecoration: "none" }}>
-                  <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
-                    <span style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14.5 }}>
+                <div
+                  key={s.id}
+                  style={{
+                    background: "#fff",
+                    borderRadius: 14,
+                    padding: "10px 14px",
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    gap: 10,
+                    boxShadow: "0 4px 10px rgba(11,61,98,0.15)",
+                  }}
+                >
+                  <a
+                    href={`${window.location.pathname}?id=${s.id}`}
+                    style={{ textDecoration: "none", flex: 1, minWidth: 0, overflow: "hidden" }}
+                  >
+                    <span
+                      style={{
+                        fontWeight: 800,
+                        color: "#0B3D62",
+                        fontSize: 14.5,
+                        display: "block",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {s.theme === "boy" ? "🐉" : "🎀"} {s.title || "無題のスケジュール"}
                     </span>
+                  </a>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                     <span style={{ color: "#B5651D", fontWeight: 800, fontSize: 13.5 }}>⭐️ {s.stamps}</span>
+                    <a href={`${window.location.pathname}?id=${s.id}&records=1`} style={{ textDecoration: "none" }}>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          background: "#EAF4F9",
+                          color: "#14588C",
+                          fontWeight: 800,
+                          fontSize: 12,
+                          borderRadius: 10,
+                          padding: "5px 10px",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        📋 記録
+                      </span>
+                    </a>
                   </div>
-                </a>
+                </div>
               ))}
               {!showAllSchedules && activeSchedules.length > 5 && (
                 <button
