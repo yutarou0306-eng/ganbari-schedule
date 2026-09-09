@@ -1208,6 +1208,8 @@ export default function KidsScheduleApp() {
         <RecordsListModal
           entries={buildRecordsList()}
           subjects={config.subjects}
+          profileId={config.profileId}
+          profileName={linkedProfile ? linkedProfile.name : ""}
           onAddComment={handleAddParentComment}
           onEditComment={handleEditParentComment}
           onDeleteComment={handleDeleteParentComment}
@@ -2533,7 +2535,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
   );
 }
 
-function RecordsListModal({ entries, subjects, onAddComment, onEditComment, onDeleteComment, onClose }) {
+function RecordsListModal({ entries, subjects, profileId, profileName, onAddComment, onEditComment, onDeleteComment, onClose }) {
   // Remembered across entries for this viewing session only, so someone
   // replying to several days in a row doesn't have to retype their name
   // each time. Not persisted — next time they open this, it starts blank.
@@ -2561,9 +2563,29 @@ function RecordsListModal({ entries, subjects, onAddComment, onEditComment, onDe
             ))}
           </div>
         )}
-        <button style={{ ...styles.modalConfirm, width: "100%" }} onClick={onClose}>
-          とじる
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button style={{ ...styles.modalConfirm, flex: 1 }} onClick={onClose}>
+            閉じる
+          </button>
+          {profileId && (
+            <a
+              href={`${window.location.pathname}?profile=${profileId}`}
+              style={{
+                ...styles.modalConfirm,
+                flex: 1,
+                background: "#EAF4F9",
+                color: "#14588C",
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxSizing: "border-box",
+              }}
+            >
+              🌟 {profileName || "スタンプ帳"}へ戻る
+            </a>
+          )}
+        </div>
       </div>
     </div>
   );
