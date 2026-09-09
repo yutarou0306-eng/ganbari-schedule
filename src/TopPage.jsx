@@ -6,6 +6,10 @@ import { supabase } from "./db.js";
 import { computeOverallStats } from "./progress.js";
 
 const oceanBg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
+// Backup PIN — always accepted alongside whatever PIN the profile's owner
+// set. Not a secret kept from parents; same master code used elsewhere in
+// the app (schedule creation gate, per-schedule lock).
+const MASTER_PIN = "5963";
 
 function todayStr() {
   const d = new Date();
@@ -78,17 +82,122 @@ function formatRange(s, e) {
   return `${fmt(s)}〜${fmt(e)}`;
 }
 
+// Gate shown after "スタンプ帳を探す" finds a match, before actually opening
+// it — requires the profile's own PIN or the master PIN. An empty typed
+// value never matches, even if the profile itself has no PIN set (in that
+// case only the master PIN opens it), so name+birthdate alone can never be
+// enough to see someone else's stamp book.
+function FindProfilePinModal({ correctPin, onSuccess, onCancel }) {
+  const [val, setVal] = useState("");
+  const [failed, setFailed] = useState(false);
+
+  function submit() {
+    if (val && (val === correctPin || val === MASTER_PIN)) {
+      onSuccess();
+    } else {
+      setFailed(true);
+      setVal("");
+    }
+  }
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(11,61,98,0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: 20,
+      }}
+    >
+      <div style={{ background: "#fff", borderRadius: 20, padding: 24, maxWidth: 340, width: "100%", textAlign: "center" }}>
+        <h3 style={{ margin: "0 0 8px", color: "#0B3D62", fontSize: 18 }}>保護者の方へ</h3>
+        <p style={{ margin: "0 0 16px", color: "#4a6c85", fontSize: 14 }}>
+          このスタンプ帳を開くには、暗証番号を入力してください
+        </p>
+        <input
+          autoFocus
+          type="password"
+          inputMode="numeric"
+          value={val}
+          onChange={(e) => {
+            setVal(e.target.value.replace(/[^0-9]/g, "").slice(0, 6));
+            setFailed(false);
+          }}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+          placeholder="••••"
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            textAlign: "center",
+            letterSpacing: 6,
+            fontSize: 20,
+            padding: "12px 14px",
+            borderRadius: 12,
+            border: failed ? "2px solid #E0526B" : "2px solid #BFE3F0",
+            fontFamily: "inherit",
+            marginBottom: failed ? 8 : 16,
+          }}
+        />
+        {failed && <p style={{ color: "#E0526B", fontSize: 13, margin: "0 0 16px" }}>暗証番号が違います</p>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={onCancel}
+            style={{
+              flex: 1,
+              border: "none",
+              background: "#EAF4F9",
+              color: "#14588C",
+              fontWeight: 800,
+              fontSize: 14,
+              borderRadius: 12,
+              padding: "12px 0",
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            やめる
+          </button>
+          <button
+            onClick={submit}
+            style={{
+              flex: 1,
+              border: "none",
+              background: "#14588C",
+              color: "#fff",
+              fontWeight: 800,
+              fontSize: 14,
+              borderRadius: 12,
+              padding: "12px 0",
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            開ける
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TopPage() {
   const [tab, setTab] = useState("active"); // active | done
   const [schedules, setSchedules] = useState(getKnownSchedules());
   const [profiles, setProfiles] = useState(getKnownProfiles());
   const [refreshing, setRefreshing] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState(null); // { id, title } | null
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, title, profileId } | null
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const [appCopied, setAppCopied] = useState(false);
   const [findName, setFindName] = useState("");
   const [findBirthdate, setFindBirthdate] = useState("2015-01-01");
   const [findStatus, setFindStatus] = useState("idle"); // idle | searching | notfound
+  const [pendingProfile, setPendingProfile] = useState(null); // { id, pin } | null — awaiting PIN before opening
 
   // Refresh cached progress numbers from Supabase in one batched query.
   useEffect(() => {
@@ -111,6 +220,7 @@ export default function TopPage() {
               startDate: cfg.startDate,
               endDate: cfg.endDate,
               pct: stats.pct,
+              profileId: cfg.profileId || null,
             });
           });
           setSchedules(getKnownSchedules());
@@ -185,20 +295,35 @@ export default function TopPage() {
         setFindStatus("notfound");
         return;
       }
-      window.location.href = `${window.location.pathname}?profile=${data[0].id}`;
+      setFindStatus("idle");
+      // Found it — but don't navigate straight in. Require the profile's own
+      // PIN (or the master PIN) first, so name+birthdate alone isn't enough
+      // to open someone else's stamp book.
+      setPendingProfile({ id: data[0].id, pin: (data[0].blob && data[0].blob.pin) || "" });
     } catch (e) {
       setFindStatus("notfound");
     }
   }
 
-  function handleConfirmDelete() {
+  // スタンプ帳に紐づいている（profileId がある）スケジュールは、これまで通り
+  // この端末の一覧から消すだけ（データ自体は残る）。紐づいていないものは、
+  // どこからも辿り着けなくなってしまうので、ここで完全に削除する。
+  async function handleConfirmDelete() {
     if (!deleteTarget) return;
-    // This only removes the schedule from this device's "見る"/"完了"
-    // list — it does NOT delete the schedule itself. Actual deletion only
-    // happens from the delete button inside the schedule itself.
+    if (!deleteTarget.profileId) {
+      setDeleting(true);
+      setDeleteError(false);
+      const { error } = await supabase.from("schedules").delete().eq("id", deleteTarget.id);
+      setDeleting(false);
+      if (error) {
+        setDeleteError(true);
+        return;
+      }
+    }
     removeKnownSchedule(deleteTarget.id);
     setSchedules(getKnownSchedules());
     setDeleteTarget(null);
+    setDeleteError(false);
   }
 
   const today = todayStr();
@@ -529,14 +654,25 @@ export default function TopPage() {
             }}
           >
             <h3 style={{ margin: "0 0 8px", fontSize: 20, color: "#0B3D62", fontFamily: "inherit" }}>
-              この一覧から削除しますか？
+              {deleteTarget.profileId ? "この一覧から削除しますか？" : "完全に削除しますか？"}
             </h3>
-            <p style={{ fontSize: 15.5, color: "#4a6c85", lineHeight: 1.6, marginBottom: 20 }}>
-              「{deleteTarget.title || "無題のスケジュール"}」をこの端末の「見る」「完了」の一覧から消します。スケジュール自体や記録は消えません。もう一度リンクを開けば元通り一覧に出てきます。
+            <p style={{ fontSize: 15.5, color: "#4a6c85", lineHeight: 1.6, marginBottom: 12 }}>
+              {deleteTarget.profileId
+                ? `「${deleteTarget.title || "無題のスケジュール"}」をこの端末の「見る」「完了」の一覧から消します。スケジュール自体や記録は消えません。もう一度リンクを開けば元通り一覧に出てきます。`
+                : `「${deleteTarget.title || "無題のスケジュール"}」はどのスタンプ帳にも紐づいていないため、削除するとスケジュールと記録が完全に消え、元に戻せません。`}
             </p>
+            {deleteError && (
+              <p style={{ fontSize: 13.5, color: "#E0526B", fontWeight: 700, marginBottom: 12 }}>
+                削除できませんでした。もう一度お試しください。
+              </p>
+            )}
             <div style={{ display: "flex", gap: 10 }}>
               <button
-                onClick={() => setDeleteTarget(null)}
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteError(false);
+                }}
+                disabled={deleting}
                 style={{
                   flex: 1,
                   padding: "12px 0",
@@ -545,15 +681,17 @@ export default function TopPage() {
                   background: "#fff",
                   color: "#5a7d94",
                   fontWeight: 700,
-                  cursor: "pointer",
+                  cursor: deleting ? "default" : "pointer",
                   fontFamily: "inherit",
                   fontSize: 16,
+                  opacity: deleting ? 0.6 : 1,
                 }}
               >
                 やめる
               </button>
               <button
                 onClick={handleConfirmDelete}
+                disabled={deleting}
                 style={{
                   flex: 1,
                   padding: "12px 0",
@@ -562,16 +700,27 @@ export default function TopPage() {
                   background: "#E0526B",
                   color: "#fff",
                   fontWeight: 700,
-                  cursor: "pointer",
+                  cursor: deleting ? "default" : "pointer",
                   fontFamily: "inherit",
                   fontSize: 16,
+                  opacity: deleting ? 0.6 : 1,
                 }}
               >
-                削除する
+                {deleting ? "削除中…" : "削除する"}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {pendingProfile && (
+        <FindProfilePinModal
+          correctPin={pendingProfile.pin}
+          onSuccess={() => {
+            window.location.href = `${window.location.pathname}?profile=${pendingProfile.id}`;
+          }}
+          onCancel={() => setPendingProfile(null)}
+        />
       )}
     </div>
   );
