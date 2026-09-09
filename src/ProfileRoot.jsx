@@ -11,7 +11,14 @@ const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFE
 // they forget their own. Intentionally not a secret kept from the parent.
 const MASTER_PIN = "5963";
 
-// 集めたファミリアカードの並び順：種族順 → 色順（ノーマル→赤→青→緑）→ Lv順（高い順）。
+// 集めたファミリアカードの並び順は3種類から選べる（下のカードグリッドの上に
+// 切り替えボタンがある）。
+// - lv: Lvが高い順だけで並べる。
+// - species: 種族順 → 成長ステージ順（グランドマスター→マスター→アダルト→
+//   インファント→ベイビー→エッグ）→ 色順（ノーマル→赤→青→緑）→ Lv順。
+// - stage: 種族に関係なく成長ステージ順（グランドマスター→マスター→
+//   アダルト→インファント→ベイビー→エッグ）だけで並べる（同ステージ内は
+//   種族順→色順→Lv順で安定させる）。
 // 種族順はmascots.jsでの定義順（男の子：ドラゴン→タイガー→フェニックス→フェンリル→
 // グリフォン、女の子：ペガサス→フェアリー→マジカルキャット→スワンプリンセス→
 // マーメイド）にそろえている。
@@ -26,19 +33,37 @@ function cardColorRank(variantName) {
   return 0;
 }
 
-function cardSortKey(c) {
-  if (c.variant && c.variant.species) {
-    const speciesIdx = CARD_SPECIES_ORDER.indexOf(speciesLabel(c.variant.species));
-    return [speciesIdx === -1 ? CARD_SPECIES_ORDER.length : speciesIdx, cardColorRank(c.variant.name), -c.lv];
-  }
-  // 配合で生まれた完全体カード（元の種族情報を持たない）は末尾にまとめる。
-  return [CARD_SPECIES_ORDER.length + 1, 0, -c.lv];
+function cardSpeciesRank(c) {
+  if (!c.variant || !c.variant.species) return CARD_SPECIES_ORDER.length + 1;
+  const idx = CARD_SPECIES_ORDER.indexOf(speciesLabel(c.variant.species));
+  return idx === -1 ? CARD_SPECIES_ORDER.length : idx;
 }
 
-function sortCollectedCards(cards) {
+// 0 = グランドマスター（一番先）、1 = マスター、2以降 = アダルト→インファント→
+// ベイビー→エッグの順に育成段階をさかのぼる。育成中カードは currentPct から
+// 現在のステージを逆算する。
+function cardStageRank(c) {
+  if (c.grandMaster) return 0;
+  if (c.isMaster) return 1;
+  if (c.variant && c.variant.species && typeof c.currentPct === "number") {
+    const idx = stageIndex(c.variant.species, c.currentPct);
+    const count = stageCount(c.variant.species);
+    return 1 + ((count - 1) - idx); // マスターとの距離が遠いほど後ろへ
+  }
+  return 99;
+}
+
+function cardSortKey(mode, c) {
+  if (mode === "lv") return [-c.lv, cardSpeciesRank(c), cardStageRank(c), cardColorRank(c.variant && c.variant.name)];
+  if (mode === "stage") return [cardStageRank(c), cardSpeciesRank(c), cardColorRank(c.variant && c.variant.name), -c.lv];
+  // "species"（デフォルト）
+  return [cardSpeciesRank(c), cardStageRank(c), cardColorRank(c.variant && c.variant.name), -c.lv];
+}
+
+function sortCollectedCards(cards, mode) {
   cards.sort((a, b) => {
-    const ka = cardSortKey(a);
-    const kb = cardSortKey(b);
+    const ka = cardSortKey(mode, a);
+    const kb = cardSortKey(mode, b);
     for (let i = 0; i < ka.length; i++) {
       if (ka[i] !== kb[i]) return ka[i] - kb[i];
     }
@@ -159,6 +184,7 @@ export default function ProfileRoot() {
   const [profile, setProfile] = useState(freshProfile());
   const [schedules, setSchedules] = useState([]); // [{id, title, theme, stamps}]
   const [showAllSchedules, setShowAllSchedules] = useState(false); // 「つながっているスケジュール」を5件超えて全部表示中か
+  const [cardSortMode, setCardSortMode] = useState("species"); // "lv" | "species" | "stage" — ファミリアカードの並び順
   const [breedPage, setBreedPage] = useState(false); // 配合ページを表示中かどうか
   const [openCardId, setOpenCardId] = useState(null); // card.id currently open in the detail view
   const [view, setView] = useState("main"); // main | editProfile | rewards
@@ -452,7 +478,7 @@ export default function ProfileRoot() {
   }));
 
   const allCards = [...myCards, ...growingCards, ...bredCards];
-  sortCollectedCards(allCards);
+  sortCollectedCards(allCards, cardSortMode);
   const masterCards = allCards.filter((c) => c.isMaster);
 
   const totalSpent = (profile.redemptions || []).reduce((sum, r) => sum + r.cost, 0);
@@ -805,6 +831,34 @@ export default function ProfileRoot() {
         <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 8 }}>
           ステータスに割り振れる★：残り {starsForStats} 個（景品と交換できる★とは別に減ります）
         </div>
+        {allCards.length > 0 && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            {[
+              ["species", "種族順"],
+              ["stage", "成長順"],
+              ["lv", "LV順"],
+            ].map(([mode, label]) => (
+              <button
+                key={mode}
+                onClick={() => setCardSortMode(mode)}
+                style={{
+                  flex: 1,
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "8px 0",
+                  fontWeight: 800,
+                  fontSize: 12.5,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  background: cardSortMode === mode ? "#14588C" : "#EAF4F9",
+                  color: cardSortMode === mode ? "#fff" : "#14588C",
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <div style={{ marginBottom: 6 }}>
           {allCards.length === 0 ? (
             <div style={emptyCardStyle}>まだファミリアカードがありません。スケジュールを最後まで達成するとファミリアカードがもらえます。</div>
