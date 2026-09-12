@@ -2131,7 +2131,9 @@ function MainScreen({
                             withFace={theme.withFace}
                             useDragonStamp={theme.isMapTheme}
                             onToggleFun={() => onToggleFunStamp(d, s.id)}
-                            locked={locked || isFuture}
+                            locked={locked}
+                            isFuture={isFuture}
+                            onRequestUnlock={onLockToggle}
                             onTogglePast={() => onTogglePastStamp(d, s.id)}
                             onClearPast={() => onClearPastStamp(d, s.id)}
                           />
@@ -2150,7 +2152,53 @@ function MainScreen({
   );
 }
 
-function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun, onTogglePast, onClearPast, locked, shapes, withFace, useDragonStamp }) {
+// Long-press detector: fires `onLongPress` once the pointer/finger has been
+// held on the element for `delay` ms, and marks the click that follows
+// (mobile fires a synthetic click after touchend; desktop fires one after
+// mouseup) so `guardedClick` can swallow it — a short, quick tap still goes
+// through to whatever handler the caller passes it.
+function useLongPress(onLongPress, delay = 550) {
+  const timerRef = useRef(null);
+  const firedRef = useRef(false);
+
+  function start() {
+    firedRef.current = false;
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      firedRef.current = true;
+      onLongPress();
+    }, delay);
+  }
+  function clear() {
+    clearTimeout(timerRef.current);
+  }
+  function guardedClick(handler) {
+    return (e) => {
+      if (firedRef.current) {
+        firedRef.current = false;
+        return;
+      }
+      if (handler) handler(e);
+    };
+  }
+
+  return {
+    onMouseDown: start,
+    onMouseUp: clear,
+    onMouseLeave: clear,
+    onTouchStart: start,
+    onTouchEnd: clear,
+    onTouchCancel: clear,
+    onTouchMove: clear, // a scroll/drag starting on the cell shouldn't count as a hold
+    guardedClick,
+  };
+}
+
+function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun, onTogglePast, onClearPast, locked, isFuture, onRequestUnlock, shapes, withFace, useDragonStamp }) {
+  // Called unconditionally (Rules of Hooks) even though only the locked,
+  // non-future branches below actually wire it up to an element.
+  const longPress = useLongPress(onRequestUnlock);
+
   // Parent has unlocked this past day: reuse the exact same tap-cycle UI as
   // today's stamp (StampCell) — tap to mark done, tap again to recover a
   // missed earlier day of this subject (shows the "×2" badge), and an
@@ -2186,36 +2234,101 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
   );
 
   if (real) {
-    // Locked (everyday/kid view) — a genuine past completion, shown vivid, not editable.
+    if (isFuture) {
+      // Future day — a genuine future record shouldn't exist, but just in
+      // case, keep this fully non-interactive (can't unlock from a future day).
+      return (
+        <div
+          style={{
+            ...styles.stampCircle,
+            cursor: "default",
+            borderColor: color,
+            borderStyle: "solid",
+            background: color + "22",
+          }}
+        >
+          {icon}
+          {count === 2 && <span style={styles.x2Badge}>×2</span>}
+        </div>
+      );
+    }
+    // Past day, locked — long-press brings up the parent PIN/confirm prompt,
+    // same as tapping today's stamp does. Lets a parent unlock from any past
+    // day's cell, not only from today's (today may have nothing scheduled).
+    // A quick tap does nothing, same as before.
     return (
-      <div
+      <button
+        onClick={longPress.guardedClick(null)}
+        onMouseDown={longPress.onMouseDown}
+        onMouseUp={longPress.onMouseUp}
+        onMouseLeave={longPress.onMouseLeave}
+        onTouchStart={longPress.onTouchStart}
+        onTouchEnd={longPress.onTouchEnd}
+        onTouchCancel={longPress.onTouchCancel}
+        onTouchMove={longPress.onTouchMove}
         style={{
           ...styles.stampCircle,
-          cursor: "default",
           borderColor: color,
           borderStyle: "solid",
           background: color + "22",
+          cursor: "pointer",
         }}
+        aria-label={`${label} の記録をあとから直す（長押しで保護者用）`}
       >
         {icon}
         {count === 2 && <span style={styles.x2Badge}>×2</span>}
-      </div>
+      </button>
     );
   }
 
-  // No real record here, still locked — a free, playful "practice" stamp the
-  // child can pop on and off. Always tappable, always pale, never affects
-  // real progress. Shows a faint hint icon even before tapping, so it's
-  // clear which task this blank stamp belongs to.
+  if (isFuture) {
+    // No real record, future day — a free, playful "practice" stamp the
+    // child can pop on and off. Always tappable, always pale, never affects
+    // real progress. Shows a faint hint icon even before tapping, so it's
+    // clear which task this blank stamp belongs to.
+    return (
+      <button
+        onClick={onToggleFun}
+        style={{
+          ...styles.stampCircle,
+          borderColor: fun ? color : missed ? "#F4C95D" : "#dbe8ee",
+          background: fun ? color + "18" : "#fff",
+        }}
+        aria-label={`${label} れんしゅうスタンプ`}
+      >
+        {fun ? (
+          useDragonStamp ? (
+            <img src="/dragon-stamp.png" alt="" style={{ ...styles.dragonStampImg, opacity: 0.55 }} />
+          ) : (
+            <StampIcon index={iconIndex} color={color} size="72%" shapes={shapes} withFace={false} />
+          )
+        ) : (
+          hintIcon
+        )}
+      </button>
+    );
+  }
+
+  // No real record here, past day, locked — a quick tap keeps the original
+  // free, playful "practice" stamp toggle; a long-press instead brings up
+  // the parent PIN/confirm prompt, so any past day works as an unlock entry
+  // point even when it has no stamp on it yet.
   return (
     <button
-      onClick={onToggleFun}
+      onClick={longPress.guardedClick(onToggleFun)}
+      onMouseDown={longPress.onMouseDown}
+      onMouseUp={longPress.onMouseUp}
+      onMouseLeave={longPress.onMouseLeave}
+      onTouchStart={longPress.onTouchStart}
+      onTouchEnd={longPress.onTouchEnd}
+      onTouchCancel={longPress.onTouchCancel}
+      onTouchMove={longPress.onTouchMove}
       style={{
         ...styles.stampCircle,
         borderColor: fun ? color : missed ? "#F4C95D" : "#dbe8ee",
         background: fun ? color + "18" : "#fff",
       }}
-      aria-label={`${label} れんしゅうスタンプ`}
+      aria-label={`${label} れんしゅうスタンプ（長押しで保護者用）`}
     >
       {fun ? (
         useDragonStamp ? (
