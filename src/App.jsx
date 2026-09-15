@@ -435,6 +435,10 @@ export default function KidsScheduleApp() {
   const [locked, setLocked] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
+  // When set, doUnlock() runs this once the PIN/confirm succeeds, then
+  // clears it — lets "修正する" / settings ask for the PIN and then jump
+  // straight into the edit screen, instead of only unlocking stamps.
+  const pendingAfterUnlockRef = useRef(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [celebrateDay, setCelebrateDay] = useState(null);
@@ -469,8 +473,17 @@ export default function KidsScheduleApp() {
               wantsEdit = params.get("edit") === "1";
               wantsRecords = params.get("records") === "1";
             } catch (e) {}
-            setView(wantsEdit ? "setup" : "main");
-            if (wantsRecords && !wantsEdit) setShowRecordsList(true);
+            setView("main");
+            // Route the "?edit=1" jump through the same PIN/confirm gate as
+            // the in-app 修正する button and gear icon, so a direct link
+            // can't skip the parent check. Checked against data.config.pin
+            // directly (not the config state) since setConfig above hasn't
+            // committed yet at this point in the same synchronous block.
+            if (wantsEdit) {
+              pendingAfterUnlockRef.current = () => setView("setup");
+              if (data.config.pin && data.config.pin.length > 0) setShowPinModal(true);
+              else setShowConfirmModal(true);
+            } else if (wantsRecords) setShowRecordsList(true);
           } else {
             applyThemeFromUrl();
             setView("setup");
@@ -1034,12 +1047,33 @@ export default function KidsScheduleApp() {
     setLocked(false);
     setShowConfirmModal(false);
     setShowPinModal(false);
-    showToast("スタンプが押せるようになったよ！3分後に自動でロックします");
+    const pending = pendingAfterUnlockRef.current;
+    pendingAfterUnlockRef.current = null;
+    if (pending) {
+      pending();
+    } else {
+      showToast("スタンプが押せるようになったよ！3分後に自動でロックします");
+    }
     clearTimeout(unlockTimer.current);
     unlockTimer.current = setTimeout(() => {
       setLocked(true);
       showToast("自動的にロックしました");
     }, 3 * 60 * 1000);
+  }
+
+  // Gate any parent-only action behind the same PIN/confirm prompt used for
+  // stamps: if already unlocked, run it immediately; otherwise remember it
+  // and run it once the PIN/confirm succeeds. Used for opening the edit
+  // ("修正する") screen so kids can't get in from either the pencil button
+  // or the header gear icon.
+  function requestUnlockThen(action) {
+    if (!locked) {
+      action();
+      return;
+    }
+    pendingAfterUnlockRef.current = action;
+    if (config.pin && config.pin.length > 0) setShowPinModal(true);
+    else setShowConfirmModal(true);
   }
 
   function handleRelock() {
@@ -1147,12 +1181,14 @@ export default function KidsScheduleApp() {
           countFor={countFor}
           funStampFor={funStampFor}
           missedBacklog={missedBacklog}
-          onOpenSettings={() => setView("setup")}
-          onEditSubject={(subjectId) => {
-            setFocusSubjectId(subjectId);
-            setView("setup");
-          }}
-          onRequestDelete={() => setShowDeleteConfirm(true)}
+          onOpenSettings={() => requestUnlockThen(() => setView("setup"))}
+          onEditSubject={(subjectId) =>
+            requestUnlockThen(() => {
+              setFocusSubjectId(subjectId);
+              setView("setup");
+            })
+          }
+          onRequestDelete={() => requestUnlockThen(() => setShowDeleteConfirm(true))}
           stats={totalStats()}
           todayStats={todayStats()}
           streak={streakDays()}
@@ -1166,7 +1202,10 @@ export default function KidsScheduleApp() {
           confirmLabel="はい、開けます"
           cancelLabel="やめる"
           onConfirm={doUnlock}
-          onCancel={() => setShowConfirmModal(false)}
+          onCancel={() => {
+            pendingAfterUnlockRef.current = null;
+            setShowConfirmModal(false);
+          }}
         />
       )}
 
@@ -1175,7 +1214,10 @@ export default function KidsScheduleApp() {
           correctPin={config.pin}
           onSuccess={doUnlock}
           onFail={() => showToast("暗証番号が違います")}
-          onCancel={() => setShowPinModal(false)}
+          onCancel={() => {
+            pendingAfterUnlockRef.current = null;
+            setShowPinModal(false);
+          }}
         />
       )}
 
