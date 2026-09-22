@@ -24,6 +24,14 @@ const MASTER_PIN = "5963";
 // マーメイド）にそろえている。
 const CARD_SPECIES_ORDER = ["ドラゴン", "タイガー", "フェニックス", "フェンリル", "グリフォン", "ペガサス", "フェアリー", "マジカルキャット", "スワンプリンセス", "マーメイド"];
 
+// "2026-09-22" -> "2026年9月22日"。想定外の形式ならそのまま返す。
+function formatRedemptionDate(dateStr) {
+  const parts = (dateStr || "").split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return dateStr || "";
+  const [y, m, d] = parts;
+  return `${y}年${m}月${d}日`;
+}
+
 function cardColorRank(variantName) {
   if (!variantName) return 0;
   if (variantName.includes("レッド")) return 1;
@@ -576,7 +584,14 @@ export default function ProfileRoot() {
       ...profile,
       redemptions: [
         ...(profile.redemptions || []),
-        { id: generateScheduleId(6), rewardId: reward.id, rewardName: reward.name, cost: reward.cost, date: new Date().toISOString().slice(0, 10) },
+        {
+          id: generateScheduleId(6),
+          rewardId: reward.id,
+          rewardName: reward.name,
+          cost: reward.cost,
+          date: new Date().toISOString().slice(0, 10),
+          balanceAfter: available - reward.cost,
+        },
       ],
     };
     await saveProfile(next);
@@ -990,51 +1005,72 @@ export default function ProfileRoot() {
 
       {showHistory && (
         <div style={overlayStyle}>
-          <div style={{ ...modalCardStyle, maxWidth: 460, maxHeight: "80vh", overflowY: "auto" }}>
-            <h3 style={{ margin: "0 0 14px", fontSize: 20, color: "#0B3D62" }}>📖 交換履歴</h3>
+          <div style={{ ...modalCardStyle, maxWidth: 460, maxHeight: "82vh", overflowY: "auto", padding: "26px 22px" }}>
+            <div style={{ textAlign: "center", marginBottom: 18 }}>
+              <div style={{ fontSize: 30, marginBottom: 4 }}>📖</div>
+              <h3 style={{ margin: 0, fontSize: 20, color: "#0B3D62" }}>交換履歴</h3>
+              <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "#8fa6b6" }}>今もっている★ {available}個</p>
+            </div>
             {(profile.redemptions || []).length === 0 ? (
-              <p style={{ fontSize: 14.5, color: "#7c98aa" }}>まだ交換した記録はありません。</p>
+              <div style={{ ...emptyCardStyle, textAlign: "center" }}>まだ交換した記録はありません。</div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
-                {[...(profile.redemptions || [])].reverse().map((r) => (
-                  <div
-                    key={r.id}
-                    style={{
-                      background: "#F5FAFD",
-                      borderRadius: 14,
-                      padding: "12px 14px",
-                      border: r.acknowledgedAt ? "2px solid #BFE3C0" : "2px solid #F0E3C4",
-                    }}
-                  >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                      <span style={{ fontWeight: 900, color: "#0B3D62", fontSize: 15 }}>{r.rewardName}</span>
-                      <span style={{ fontWeight: 800, color: "#0B3D62", fontSize: 13.5 }}>-⭐️{r.cost}</span>
-                    </div>
-                    <div style={{ fontSize: 12.5, color: "#7c98aa", marginBottom: 8 }}>{r.date}</div>
-                    {r.acknowledgedAt ? (
-                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#E8F6EA", color: "#2E7D4F", borderRadius: 999, padding: "5px 12px", fontSize: 12.5, fontWeight: 800 }}>
-                        ✅ 受け取り確認ずみ（{r.acknowledgedAt.slice(0, 10)}）
+              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 22 }}>
+                {[...(profile.redemptions || [])].reverse().map((r) => {
+                  const acknowledged = !!r.acknowledgedAt;
+                  return (
+                    <div
+                      key={r.id}
+                      style={{
+                        background: acknowledged ? "#F3FBF4" : "#FFFBF0",
+                        borderRadius: 16,
+                        padding: "14px 16px",
+                        border: acknowledged ? "2px solid #CBEAD0" : "2px solid #F4DFA0",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                        <div>
+                          <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 17, marginBottom: 2 }}>
+                            🎁 {r.rewardName}
+                          </div>
+                          <div style={{ fontSize: 12.5, color: "#8fa6b6" }}>{formatRedemptionDate(r.date)}</div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontWeight: 900, color: "#E0526B", fontSize: 16 }}>-⭐️{r.cost}</div>
+                          {typeof r.balanceAfter === "number" && (
+                            <div style={{ fontSize: 11.5, color: "#8fa6b6", marginTop: 2 }}>交換後 ⭐️{r.balanceAfter}</div>
+                          )}
+                        </div>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => requestParentGate("ackRedemption", r.id)}
-                        style={{
-                          border: "2px solid #F4C95D",
-                          background: "#FFF8E8",
-                          color: "#8B5E34",
-                          borderRadius: 999,
-                          padding: "6px 14px",
-                          fontWeight: 800,
-                          fontSize: 12.5,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        🔒 受領印を押す（保護者のみ）
-                      </button>
-                    )}
-                  </div>
-                ))}
+
+                      <div style={{ marginTop: 10 }}>
+                        {acknowledged ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#2E7D4F", fontSize: 13, fontWeight: 800 }}>
+                            <span style={{ fontSize: 16 }}>✅</span>
+                            受け取り確認ずみ・{formatRedemptionDate(r.acknowledgedAt.slice(0, 10))}
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => requestParentGate("ackRedemption", r.id)}
+                            style={{
+                              width: "100%",
+                              border: "none",
+                              background: "linear-gradient(135deg,#F4C95D,#E8A94A)",
+                              color: "#5A3E10",
+                              borderRadius: 12,
+                              padding: "9px 0",
+                              fontWeight: 800,
+                              fontSize: 13.5,
+                              cursor: "pointer",
+                              fontFamily: "inherit",
+                            }}
+                          >
+                            🔒 受領印を押す（保護者のみ）
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
             <button onClick={() => setShowHistory(false)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
