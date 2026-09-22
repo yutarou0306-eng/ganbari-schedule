@@ -197,6 +197,7 @@ export default function ProfileRoot() {
   const [openCardId, setOpenCardId] = useState(null); // card.id currently open in the detail view
   const [view, setView] = useState("main"); // main | editProfile | rewards
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
+  const [redeemedInfo, setRedeemedInfo] = useState(null); // { name, cost, balanceAfter } | null — success popup after redeeming
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [gateTarget, setGateTarget] = useState(null); // "rewards" | "editProfile" | "createSchedule" | "ackRedemption" | null
@@ -580,6 +581,7 @@ export default function ProfileRoot() {
 
   async function handleRedeem(reward) {
     if (available < reward.cost) return;
+    const balanceAfter = available - reward.cost;
     const next = {
       ...profile,
       redemptions: [
@@ -590,12 +592,13 @@ export default function ProfileRoot() {
           rewardName: reward.name,
           cost: reward.cost,
           date: new Date().toISOString().slice(0, 10),
-          balanceAfter: available - reward.cost,
+          balanceAfter,
         },
       ],
     };
     await saveProfile(next);
     setRedeemTarget(null);
+    setRedeemedInfo({ name: reward.name, cost: reward.cost, balanceAfter });
   }
 
   async function handleShare() {
@@ -1108,6 +1111,24 @@ export default function ProfileRoot() {
 
             <button onClick={() => setShowHistory(false)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none", marginTop: 20 }}>
               閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
+      {redeemedInfo && (
+        <div style={overlayStyle}>
+          <div style={{ ...modalCardStyle, textAlign: "center" }}>
+            <div style={{ fontSize: 40, marginBottom: 6 }}>🎉</div>
+            <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>交換しました！</h3>
+            <p style={{ fontSize: 16, color: "#4a6c85", marginBottom: 6 }}>
+              <strong>{redeemedInfo.name}</strong>
+            </p>
+            <p style={{ fontSize: 14, color: "#7c98aa", marginBottom: 22 }}>
+              ⭐️{redeemedInfo.cost}個 使いました（残り {redeemedInfo.balanceAfter} 個）
+            </p>
+            <button onClick={() => setRedeemedInfo(null)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
+              とじる
             </button>
           </div>
         </div>
