@@ -418,6 +418,33 @@ function freshConfig() {
   };
 }
 
+// A parent unlocking one schedule (by PIN, or by confirm when no PIN is set)
+// also unlocks any other schedule on this device that uses the exact same
+// PIN, for the same few minutes — so stamping several schedules back-to-back
+// (e.g. every night) doesn't mean re-entering the same PIN each time. A
+// schedule with a different PIN still prompts normally; this never widens
+// what a correct entry unlocks, only how many open schedules it reaches.
+const SHARED_UNLOCK_KEY = "ganbari_shared_unlock";
+
+function readSharedUnlock() {
+  try {
+    const raw = localStorage.getItem(SHARED_UNLOCK_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.expiresAt !== "number") return null;
+    if (Date.now() >= parsed.expiresAt) return null;
+    return parsed; // { pin, expiresAt }
+  } catch (e) {
+    return null;
+  }
+}
+
+function writeSharedUnlock(pin, expiresAt) {
+  try {
+    localStorage.setItem(SHARED_UNLOCK_KEY, JSON.stringify({ pin: pin || "", expiresAt }));
+  } catch (e) {}
+}
+
 export default function KidsScheduleApp() {
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState("loading");
@@ -462,6 +489,14 @@ export default function KidsScheduleApp() {
             setNotes(data.notes || {});
             setParentComments(normalizeParentComments(data.parentComments));
             setAchievements(data.achievements || {});
+            // Another schedule on this device may have just been unlocked
+            // with the same PIN — if so, start unlocked here too instead of
+            // prompting again, and relock at that same shared expiry time.
+            const shared = readSharedUnlock();
+            if (shared && shared.pin === (data.config.pin || "")) {
+              setLocked(false);
+              scheduleRelock(shared.expiresAt);
+            }
             // A "?edit=1" URL flag (used by the top-page's edit button) jumps
             // straight into the setup/edit screen instead of the main view.
             // "?records=1" (used by the stamp book's "つながっているスケジュール"
@@ -1043,6 +1078,15 @@ export default function KidsScheduleApp() {
     }
   }
 
+  function scheduleRelock(expiresAt) {
+    clearTimeout(unlockTimer.current);
+    const ms = Math.max(0, expiresAt - Date.now());
+    unlockTimer.current = setTimeout(() => {
+      setLocked(true);
+      showToast("自動的にロックしました");
+    }, ms);
+  }
+
   function doUnlock() {
     setLocked(false);
     setShowConfirmModal(false);
@@ -1054,11 +1098,9 @@ export default function KidsScheduleApp() {
     } else {
       showToast("スタンプが押せるようになったよ！3分後に自動でロックします");
     }
-    clearTimeout(unlockTimer.current);
-    unlockTimer.current = setTimeout(() => {
-      setLocked(true);
-      showToast("自動的にロックしました");
-    }, 3 * 60 * 1000);
+    const expiresAt = Date.now() + 3 * 60 * 1000;
+    writeSharedUnlock(config.pin, expiresAt);
+    scheduleRelock(expiresAt);
   }
 
   // Gate any parent-only action behind the same PIN/confirm prompt used for
@@ -1079,6 +1121,9 @@ export default function KidsScheduleApp() {
   function handleRelock() {
     clearTimeout(unlockTimer.current);
     setLocked(true);
+    try {
+      localStorage.removeItem(SHARED_UNLOCK_KEY);
+    } catch (e) {}
   }
 
   // Delegates to progress.js so the schedule's own progress bar counts the
