@@ -1096,7 +1096,7 @@ export default function ProfileRoot() {
                               fontFamily: "inherit",
                             }}
                           >
-                            🔒 受領印を押す（保護者のみ）
+                            🔒 受領印を押す
                           </button>
                         )}
                       </div>
