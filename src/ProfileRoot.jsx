@@ -1092,7 +1092,7 @@ export default function ProfileRoot() {
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "1fr 60px 60px",
+                    gridTemplateColumns: "1fr 48px 60px 60px",
                     gap: 8,
                     background: "#F5F9FB",
                     padding: "9px 12px",
@@ -1103,6 +1103,7 @@ export default function ProfileRoot() {
                   }}
                 >
                   <div>交換日／内容</div>
+                  <div style={{ textAlign: "center" }}>受領印</div>
                   <div style={{ textAlign: "right" }}>★数</div>
                   <div style={{ textAlign: "right" }}>交換後</div>
                 </div>
@@ -1117,11 +1118,38 @@ export default function ProfileRoot() {
                         background: "#fff",
                       }}
                     >
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px", gap: 8, alignItems: "start" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 48px 60px 60px", gap: 8, alignItems: "center" }}>
                         <div>
                           <div style={{ fontSize: 12, color: "#8fa6b6", marginBottom: 2 }}>{formatRedemptionDate(r.date)}</div>
                           <div style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14.5 }}>🎁 {r.rewardName}</div>
                         </div>
+
+                        <button
+                          onClick={() => {
+                            if (!acknowledged) requestParentGate("ackRedemption", r.id);
+                          }}
+                          disabled={acknowledged}
+                          style={{
+                            justifySelf: "center",
+                            width: 42,
+                            height: 42,
+                            borderRadius: "50%",
+                            border: acknowledged ? "none" : "2px dashed #C7D6DE",
+                            background: acknowledged ? "#E0526B" : "#fff",
+                            color: acknowledged ? "#fff" : "#B7C4CC",
+                            fontWeight: 900,
+                            fontSize: 13,
+                            fontFamily: "inherit",
+                            cursor: acknowledged ? "default" : "pointer",
+                            transform: acknowledged ? "rotate(-12deg)" : "none",
+                            boxShadow: acknowledged ? "0 3px 8px rgba(224,82,107,0.45)" : "none",
+                            flexShrink: 0,
+                          }}
+                          aria-label={acknowledged ? "受け取り確認ずみ" : "受領印を押す"}
+                        >
+                          印
+                        </button>
+
                         <div style={{ textAlign: "right", fontWeight: 800, color: "#E0526B", fontSize: 14, whiteSpace: "nowrap" }}>
                           -⭐️{r.cost}
                         </div>
@@ -1136,40 +1164,22 @@ export default function ProfileRoot() {
                             ✅ 受け取り確認ずみ・{formatRedemptionDate(r.acknowledgedAt.slice(0, 10))}
                           </span>
                         ) : (
-                          <div style={{ display: "flex", gap: 8 }}>
-                            <button
-                              onClick={() => requestParentGate("ackRedemption", r.id)}
-                              style={{
-                                border: "1.5px solid #F4C95D",
-                                background: "#FFFBF0",
-                                color: "#8B5E34",
-                                borderRadius: 999,
-                                padding: "5px 13px",
-                                fontWeight: 800,
-                                fontSize: 12,
-                                cursor: "pointer",
-                                fontFamily: "inherit",
-                              }}
-                            >
-                              🔒 受領印を押す
-                            </button>
-                            <button
-                              onClick={() => requestParentGate("cancelRedemption", r.id)}
-                              style={{
-                                border: "1.5px solid #E3AEB8",
-                                background: "#FFF5F6",
-                                color: "#B14A5A",
-                                borderRadius: 999,
-                                padding: "5px 13px",
-                                fontWeight: 800,
-                                fontSize: 12,
-                                cursor: "pointer",
-                                fontFamily: "inherit",
-                              }}
-                            >
-                              🗑 取り消す
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => requestParentGate("cancelRedemption", r.id)}
+                            style={{
+                              border: "none",
+                              background: "none",
+                              color: "#B14A5A",
+                              fontSize: 12,
+                              fontWeight: 800,
+                              cursor: "pointer",
+                              fontFamily: "inherit",
+                              padding: 0,
+                              textDecoration: "underline",
+                            }}
+                          >
+                            🗑 取り消す
+                          </button>
                         )}
                       </div>
                     </div>
