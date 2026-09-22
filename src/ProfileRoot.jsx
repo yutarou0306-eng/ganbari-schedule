@@ -832,7 +832,26 @@ export default function ProfileRoot() {
           )}
         </div>
 
-        <div style={{ background: "#fff", borderRadius: 22, padding: "22px 20px", textAlign: "center", boxShadow: "0 16px 34px rgba(11,61,98,0.3)", marginBottom: 16 }}>
+        <div style={{ background: "#fff", borderRadius: 22, padding: "22px 20px", textAlign: "center", boxShadow: "0 16px 34px rgba(11,61,98,0.3)", marginBottom: 16, position: "relative" }}>
+          <button
+            onClick={() => setShowHistory(true)}
+            style={{
+              position: "absolute",
+              top: 16,
+              right: 16,
+              border: "none",
+              background: "#EAF4F9",
+              color: "#14588C",
+              fontWeight: 800,
+              fontSize: 12,
+              borderRadius: 999,
+              padding: "7px 12px",
+              cursor: "pointer",
+              fontFamily: "inherit",
+            }}
+          >
+            📖 交換履歴
+          </button>
           <div style={{ fontSize: 14, color: "#7c98aa", fontWeight: 700 }}>今もっているスタンプ</div>
           <div style={{ fontSize: 48, fontWeight: 900, color: "#0B3D62", fontFamily: "'Kaisei Decol', serif" }}>⭐️ {available}</div>
           <div style={{ fontSize: 12.5, color: "#a8bcc9" }}>
@@ -877,12 +896,9 @@ export default function ProfileRoot() {
             </div>
           )}
         </div>
-        <div style={{ display: "flex", gap: 14, marginBottom: 22, flexWrap: "wrap" }}>
+        <div style={{ marginBottom: 22 }}>
           <button onClick={() => requestParentGate("rewards")} style={linkBtnStyle}>
             ✏️ 景品を編集する（保護者のみ）
-          </button>
-          <button onClick={() => setShowHistory(true)} style={linkBtnStyle}>
-            📖 交換履歴を見る
           </button>
         </div>
 
