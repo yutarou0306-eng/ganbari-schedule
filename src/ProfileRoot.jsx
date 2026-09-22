@@ -191,10 +191,12 @@ export default function ProfileRoot() {
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [gateTarget, setGateTarget] = useState(null); // "rewards" | "editProfile" | "createSchedule" | null
+  const [gateTarget, setGateTarget] = useState(null); // "rewards" | "editProfile" | "createSchedule" | "ackRedemption" | null
   const [pendingCreateTheme, setPendingCreateTheme] = useState(null); // themeKey chosen before the gate, for "createSchedule"
+  const [pendingAckId, setPendingAckId] = useState(null); // redemption id awaiting the gate, for "ackRedemption"
   const [showGatePin, setShowGatePin] = useState(false);
   const [showGateConfirm, setShowGateConfirm] = useState(false);
+  const [showHistory, setShowHistory] = useState(false); // 交換履歴モーダル
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -277,7 +279,8 @@ export default function ProfileRoot() {
 
   function requestParentGate(target, extra) {
     setGateTarget(target);
-    if (extra !== undefined) setPendingCreateTheme(extra);
+    if (target === "createSchedule") setPendingCreateTheme(extra);
+    else if (target === "ackRedemption") setPendingAckId(extra);
     if (profile.pin && profile.pin.length > 0) {
       setShowGatePin(true);
     } else {
@@ -290,11 +293,14 @@ export default function ProfileRoot() {
     setShowGateConfirm(false);
     if (gateTarget === "createSchedule") {
       if (pendingCreateTheme) handleCreateSchedule(pendingCreateTheme);
+    } else if (gateTarget === "ackRedemption") {
+      if (pendingAckId) handleAcknowledgeRedemption(pendingAckId);
     } else if (gateTarget) {
       setView(gateTarget);
     }
     setGateTarget(null);
     setPendingCreateTheme(null);
+    setPendingAckId(null);
   }
 
   function handleGateCancel() {
@@ -302,6 +308,19 @@ export default function ProfileRoot() {
     setShowGateConfirm(false);
     setGateTarget(null);
     setPendingCreateTheme(null);
+    setPendingAckId(null);
+  }
+
+  // 保護者が実際に景品を手渡したことを確認する「受領印」。子供が勝手に
+  // 押せないよう、こちらもPIN/確認ゲート経由でのみ呼ばれる。
+  async function handleAcknowledgeRedemption(id) {
+    const next = {
+      ...profile,
+      redemptions: (profile.redemptions || []).map((r) =>
+        r.id === id ? { ...r, acknowledgedAt: new Date().toISOString() } : r
+      ),
+    };
+    await saveProfile(next);
   }
 
   const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
@@ -823,9 +842,14 @@ export default function ProfileRoot() {
             </div>
           )}
         </div>
-        <button onClick={() => requestParentGate("rewards")} style={{ ...linkBtnStyle, marginBottom: 22 }}>
-          ✏️ 景品を編集する（保護者のみ）
-        </button>
+        <div style={{ display: "flex", gap: 14, marginBottom: 22, flexWrap: "wrap" }}>
+          <button onClick={() => requestParentGate("rewards")} style={linkBtnStyle}>
+            ✏️ 景品を編集する（保護者のみ）
+          </button>
+          <button onClick={() => setShowHistory(true)} style={linkBtnStyle}>
+            📖 交換履歴を見る
+          </button>
+        </div>
 
         <SectionTitle>🎴 集めたファミリアカード</SectionTitle>
         <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 8 }}>
@@ -933,15 +957,10 @@ export default function ProfileRoot() {
         {(profile.redemptions || []).length > 0 && (
           <>
             <SectionTitle>📖 交換した記録</SectionTitle>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 20 }}>
-              {[...(profile.redemptions || [])]
-                .reverse()
-                .map((r) => (
-                  <div key={r.id} style={{ background: "rgba(255,255,255,0.85)", borderRadius: 12, padding: "8px 14px", fontSize: 13.5, color: "#0B3D62", display: "flex", justifyContent: "space-between" }}>
-                    <span>{r.date}：{r.rewardName}</span>
-                    <span style={{ fontWeight: 800 }}>-⭐️{r.cost}</span>
-                  </div>
-                ))}
+            <div style={{ marginBottom: 20 }}>
+              <div style={emptyCardStyle}>
+                「📖 交換履歴を見る」から、日付・★の数・受領印つきの一覧を確認できます。
+              </div>
             </div>
           </>
         )}
@@ -969,12 +988,68 @@ export default function ProfileRoot() {
         </div>
       )}
 
+      {showHistory && (
+        <div style={overlayStyle}>
+          <div style={{ ...modalCardStyle, maxWidth: 460, maxHeight: "80vh", overflowY: "auto" }}>
+            <h3 style={{ margin: "0 0 14px", fontSize: 20, color: "#0B3D62" }}>📖 交換履歴</h3>
+            {(profile.redemptions || []).length === 0 ? (
+              <p style={{ fontSize: 14.5, color: "#7c98aa" }}>まだ交換した記録はありません。</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 20 }}>
+                {[...(profile.redemptions || [])].reverse().map((r) => (
+                  <div
+                    key={r.id}
+                    style={{
+                      background: "#F5FAFD",
+                      borderRadius: 14,
+                      padding: "12px 14px",
+                      border: r.acknowledgedAt ? "2px solid #BFE3C0" : "2px solid #F0E3C4",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
+                      <span style={{ fontWeight: 900, color: "#0B3D62", fontSize: 15 }}>{r.rewardName}</span>
+                      <span style={{ fontWeight: 800, color: "#0B3D62", fontSize: 13.5 }}>-⭐️{r.cost}</span>
+                    </div>
+                    <div style={{ fontSize: 12.5, color: "#7c98aa", marginBottom: 8 }}>{r.date}</div>
+                    {r.acknowledgedAt ? (
+                      <div style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "#E8F6EA", color: "#2E7D4F", borderRadius: 999, padding: "5px 12px", fontSize: 12.5, fontWeight: 800 }}>
+                        ✅ 受け取り確認ずみ（{r.acknowledgedAt.slice(0, 10)}）
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => requestParentGate("ackRedemption", r.id)}
+                        style={{
+                          border: "2px solid #F4C95D",
+                          background: "#FFF8E8",
+                          color: "#8B5E34",
+                          borderRadius: 999,
+                          padding: "6px 14px",
+                          fontWeight: 800,
+                          fontSize: 12.5,
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        🔒 受領印を押す（保護者のみ）
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <button onClick={() => setShowHistory(false)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
+              閉じる
+            </button>
+          </div>
+        </div>
+      )}
+
       {showGateConfirm && (
         <div style={overlayStyle}>
           <div style={modalCardStyle}>
             <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>保護者の方へ</h3>
             <p style={{ fontSize: 15, color: "#4a6c85", lineHeight: 1.6, marginBottom: 20 }}>
-              ここから先は{gateTarget === "rewards" ? "景品リストを編集" : gateTarget === "createSchedule" ? "新しいスケジュールを作成" : "プロフィールの設定を変更"}できます。保護者の方が操作していますか？
+              ここから先は{gateTarget === "rewards" ? "景品リストを編集" : gateTarget === "createSchedule" ? "新しいスケジュールを作成" : gateTarget === "ackRedemption" ? "受領印を押す（景品を渡したことを記録する）" : "プロフィールの設定を変更"}できます。保護者の方が操作していますか？
             </p>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={handleGateCancel} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
