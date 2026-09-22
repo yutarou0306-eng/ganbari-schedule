@@ -192,6 +192,7 @@ export default function ProfileRoot() {
   const [profile, setProfile] = useState(freshProfile());
   const [schedules, setSchedules] = useState([]); // [{id, title, theme, stamps}]
   const [showAllSchedules, setShowAllSchedules] = useState(false); // 「つながっているスケジュール」を5件超えて全部表示中か
+  const [showAllCompleted, setShowAllCompleted] = useState(false); // 「完了したスケジュール」を5件超えて全部表示中か
   const [cardSortMode, setCardSortMode] = useState("species"); // "lv" | "species" | "stage" — ファミリアカードの並び順
   const [breedPage, setBreedPage] = useState(false); // 配合ページを表示中かどうか
   const [openCardId, setOpenCardId] = useState(null); // card.id currently open in the detail view
@@ -203,6 +204,7 @@ export default function ProfileRoot() {
   const [gateTarget, setGateTarget] = useState(null); // "rewards" | "editProfile" | "createSchedule" | "ackRedemption" | null
   const [pendingCreateTheme, setPendingCreateTheme] = useState(null); // themeKey chosen before the gate, for "createSchedule"
   const [pendingAckId, setPendingAckId] = useState(null); // redemption id awaiting the gate, for "ackRedemption"
+  const [pendingCancelId, setPendingCancelId] = useState(null); // redemption id awaiting the gate, for "cancelRedemption"
   const [showGatePin, setShowGatePin] = useState(false);
   const [showGateConfirm, setShowGateConfirm] = useState(false);
   const [showHistory, setShowHistory] = useState(false); // 交換履歴モーダル
@@ -290,6 +292,7 @@ export default function ProfileRoot() {
     setGateTarget(target);
     if (target === "createSchedule") setPendingCreateTheme(extra);
     else if (target === "ackRedemption") setPendingAckId(extra);
+    else if (target === "cancelRedemption") setPendingCancelId(extra);
     if (profile.pin && profile.pin.length > 0) {
       setShowGatePin(true);
     } else {
@@ -304,12 +307,15 @@ export default function ProfileRoot() {
       if (pendingCreateTheme) handleCreateSchedule(pendingCreateTheme);
     } else if (gateTarget === "ackRedemption") {
       if (pendingAckId) handleAcknowledgeRedemption(pendingAckId);
+    } else if (gateTarget === "cancelRedemption") {
+      if (pendingCancelId) handleCancelRedemption(pendingCancelId);
     } else if (gateTarget) {
       setView(gateTarget);
     }
     setGateTarget(null);
     setPendingCreateTheme(null);
     setPendingAckId(null);
+    setPendingCancelId(null);
   }
 
   function handleGateCancel() {
@@ -318,6 +324,7 @@ export default function ProfileRoot() {
     setGateTarget(null);
     setPendingCreateTheme(null);
     setPendingAckId(null);
+    setPendingCancelId(null);
   }
 
   // 保護者が実際に景品を手渡したことを確認する「受領印」。子供が勝手に
@@ -328,6 +335,16 @@ export default function ProfileRoot() {
       redemptions: (profile.redemptions || []).map((r) =>
         r.id === id ? { ...r, acknowledgedAt: new Date().toISOString() } : r
       ),
+    };
+    await saveProfile(next);
+  }
+
+  // 受領印を押す前の交換を取り消す（記録ごと削除して★を返す）。押した後は
+  // 取り消せない — 一覧側で受領印済みの行にはこのボタン自体を出さない。
+  async function handleCancelRedemption(id) {
+    const next = {
+      ...profile,
+      redemptions: (profile.redemptions || []).filter((r) => r.id !== id),
     };
     await saveProfile(next);
   }
@@ -939,7 +956,7 @@ export default function ProfileRoot() {
             <div style={emptyCardStyle}>まだ完了したスケジュールはありません。</div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {completedSchedules.map((s) => {
+              {(showAllCompleted ? completedSchedules : completedSchedules.slice(0, 5)).map((s) => {
                 const t = s.achvTotals;
                 const achvParts = [];
                 if (t.minutes > 0) achvParts.push(`⏱${t.minutes}分`);
@@ -959,6 +976,24 @@ export default function ProfileRoot() {
                   </a>
                 );
               })}
+              {!showAllCompleted && completedSchedules.length > 5 && (
+                <button
+                  onClick={() => setShowAllCompleted(true)}
+                  style={{
+                    border: "none",
+                    background: "#EAF4F9",
+                    color: "#14588C",
+                    fontWeight: 800,
+                    fontSize: 13.5,
+                    borderRadius: 12,
+                    padding: "10px 0",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  すべて見る（{completedSchedules.length}件）
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -1085,22 +1120,40 @@ export default function ProfileRoot() {
                             ✅ 受け取り確認ずみ・{formatRedemptionDate(r.acknowledgedAt.slice(0, 10))}
                           </span>
                         ) : (
-                          <button
-                            onClick={() => requestParentGate("ackRedemption", r.id)}
-                            style={{
-                              border: "1.5px solid #F4C95D",
-                              background: "#FFFBF0",
-                              color: "#8B5E34",
-                              borderRadius: 999,
-                              padding: "5px 13px",
-                              fontWeight: 800,
-                              fontSize: 12,
-                              cursor: "pointer",
-                              fontFamily: "inherit",
-                            }}
-                          >
-                            🔒 受領印を押す
-                          </button>
+                          <div style={{ display: "flex", gap: 8 }}>
+                            <button
+                              onClick={() => requestParentGate("ackRedemption", r.id)}
+                              style={{
+                                border: "1.5px solid #F4C95D",
+                                background: "#FFFBF0",
+                                color: "#8B5E34",
+                                borderRadius: 999,
+                                padding: "5px 13px",
+                                fontWeight: 800,
+                                fontSize: 12,
+                                cursor: "pointer",
+                                fontFamily: "inherit",
+                              }}
+                            >
+                              🔒 受領印を押す
+                            </button>
+                            <button
+                              onClick={() => requestParentGate("cancelRedemption", r.id)}
+                              style={{
+                                border: "1.5px solid #E3AEB8",
+                                background: "#FFF5F6",
+                                color: "#B14A5A",
+                                borderRadius: 999,
+                                padding: "5px 13px",
+                                fontWeight: 800,
+                                fontSize: 12,
+                                cursor: "pointer",
+                                fontFamily: "inherit",
+                              }}
+                            >
+                              🗑 取り消す
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1139,7 +1192,7 @@ export default function ProfileRoot() {
           <div style={modalCardStyle}>
             <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>保護者の方へ</h3>
             <p style={{ fontSize: 15, color: "#4a6c85", lineHeight: 1.6, marginBottom: 20 }}>
-              ここから先は{gateTarget === "rewards" ? "景品リストを編集" : gateTarget === "createSchedule" ? "新しいスケジュールを作成" : gateTarget === "ackRedemption" ? "受領印を押す（景品を渡したことを記録する）" : "プロフィールの設定を変更"}できます。保護者の方が操作していますか？
+              ここから先は{gateTarget === "rewards" ? "景品リストを編集" : gateTarget === "createSchedule" ? "新しいスケジュールを作成" : gateTarget === "ackRedemption" ? "受領印を押す（景品を渡したことを記録する）" : gateTarget === "cancelRedemption" ? "この交換を取り消す（★を返す）" : "プロフィールの設定を変更"}できます。保護者の方が操作していますか？
             </p>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={handleGateCancel} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
