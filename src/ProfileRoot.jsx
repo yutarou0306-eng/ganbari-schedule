@@ -1005,61 +1005,93 @@ export default function ProfileRoot() {
 
       {showHistory && (
         <div style={overlayStyle}>
-          <div style={{ ...modalCardStyle, maxWidth: 460, maxHeight: "82vh", overflowY: "auto", padding: "26px 22px" }}>
-            <div style={{ textAlign: "center", marginBottom: 18 }}>
-              <div style={{ fontSize: 30, marginBottom: 4 }}>📖</div>
-              <h3 style={{ margin: 0, fontSize: 20, color: "#0B3D62" }}>交換履歴</h3>
-              <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "#8fa6b6" }}>今もっている★ {available}個</p>
+          <div style={{ ...modalCardStyle, maxWidth: 520, maxHeight: "82vh", overflowY: "auto", padding: "22px 20px", textAlign: "left" }}>
+            <h3 style={{ margin: "0 0 14px", fontSize: 19, color: "#0B3D62" }}>📖 交換履歴</h3>
+
+            <div style={{ background: "#EFF5F8", borderRadius: 12, overflow: "hidden", marginBottom: 20 }}>
+              <div style={{ background: "#E0EBF0", padding: "8px 14px", fontWeight: 800, fontSize: 13, color: "#3E5C6E" }}>
+                所持スタンプ
+              </div>
+              <div style={{ padding: "14px 14px 16px", display: "flex", gap: 24 }}>
+                <div>
+                  <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 4 }}>今もっている★</div>
+                  <div style={{ fontSize: 26, fontWeight: 900, color: "#0B3D62" }}>
+                    {available}
+                    <span style={{ fontSize: 13, fontWeight: 700, marginLeft: 2 }}>個</span>
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 4 }}>これまでに獲得</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#3E5C6E" }}>{totalEarned}個</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 4 }}>交換した分</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#3E5C6E" }}>{totalSpent}個</div>
+                </div>
+              </div>
             </div>
+
             {(profile.redemptions || []).length === 0 ? (
               <div style={{ ...emptyCardStyle, textAlign: "center" }}>まだ交換した記録はありません。</div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 22 }}>
-                {[...(profile.redemptions || [])].reverse().map((r) => {
+              <div style={{ border: "1px solid #E0EAEF", borderRadius: 10, overflow: "hidden" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 60px 60px",
+                    gap: 8,
+                    background: "#F5F9FB",
+                    padding: "9px 12px",
+                    fontSize: 11.5,
+                    fontWeight: 800,
+                    color: "#5a7d94",
+                    borderBottom: "1px solid #E0EAEF",
+                  }}
+                >
+                  <div>交換日／内容</div>
+                  <div style={{ textAlign: "right" }}>★数</div>
+                  <div style={{ textAlign: "right" }}>交換後</div>
+                </div>
+                {[...(profile.redemptions || [])].reverse().map((r, i, arr) => {
                   const acknowledged = !!r.acknowledgedAt;
                   return (
                     <div
                       key={r.id}
                       style={{
-                        background: acknowledged ? "#F3FBF4" : "#FFFBF0",
-                        borderRadius: 16,
-                        padding: "14px 16px",
-                        border: acknowledged ? "2px solid #CBEAD0" : "2px solid #F4DFA0",
+                        padding: "12px 12px",
+                        borderBottom: i < arr.length - 1 ? "1px solid #EEF3F5" : "none",
+                        background: "#fff",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 60px 60px", gap: 8, alignItems: "start" }}>
                         <div>
-                          <div style={{ fontWeight: 900, color: "#0B3D62", fontSize: 17, marginBottom: 2 }}>
-                            🎁 {r.rewardName}
-                          </div>
-                          <div style={{ fontSize: 12.5, color: "#8fa6b6" }}>{formatRedemptionDate(r.date)}</div>
+                          <div style={{ fontSize: 12, color: "#8fa6b6", marginBottom: 2 }}>{formatRedemptionDate(r.date)}</div>
+                          <div style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14.5 }}>🎁 {r.rewardName}</div>
                         </div>
-                        <div style={{ textAlign: "right", flexShrink: 0 }}>
-                          <div style={{ fontWeight: 900, color: "#E0526B", fontSize: 16 }}>-⭐️{r.cost}</div>
-                          {typeof r.balanceAfter === "number" && (
-                            <div style={{ fontSize: 11.5, color: "#8fa6b6", marginTop: 2 }}>交換後 ⭐️{r.balanceAfter}</div>
-                          )}
+                        <div style={{ textAlign: "right", fontWeight: 800, color: "#E0526B", fontSize: 14, whiteSpace: "nowrap" }}>
+                          -⭐️{r.cost}
+                        </div>
+                        <div style={{ textAlign: "right", fontSize: 12.5, color: "#7c98aa", whiteSpace: "nowrap" }}>
+                          {typeof r.balanceAfter === "number" ? `⭐️${r.balanceAfter}` : "－"}
                         </div>
                       </div>
 
-                      <div style={{ marginTop: 10 }}>
+                      <div style={{ marginTop: 8 }}>
                         {acknowledged ? (
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "#2E7D4F", fontSize: 13, fontWeight: 800 }}>
-                            <span style={{ fontSize: 16 }}>✅</span>
-                            受け取り確認ずみ・{formatRedemptionDate(r.acknowledgedAt.slice(0, 10))}
-                          </div>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, color: "#2E7D4F", fontSize: 12.5, fontWeight: 800 }}>
+                            ✅ 受け取り確認ずみ・{formatRedemptionDate(r.acknowledgedAt.slice(0, 10))}
+                          </span>
                         ) : (
                           <button
                             onClick={() => requestParentGate("ackRedemption", r.id)}
                             style={{
-                              width: "100%",
-                              border: "none",
-                              background: "linear-gradient(135deg,#F4C95D,#E8A94A)",
-                              color: "#5A3E10",
-                              borderRadius: 12,
-                              padding: "9px 0",
+                              border: "1.5px solid #F4C95D",
+                              background: "#FFFBF0",
+                              color: "#8B5E34",
+                              borderRadius: 999,
+                              padding: "5px 13px",
                               fontWeight: 800,
-                              fontSize: 13.5,
+                              fontSize: 12,
                               cursor: "pointer",
                               fontFamily: "inherit",
                             }}
@@ -1073,7 +1105,8 @@ export default function ProfileRoot() {
                 })}
               </div>
             )}
-            <button onClick={() => setShowHistory(false)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
+
+            <button onClick={() => setShowHistory(false)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none", marginTop: 20 }}>
               閉じる
             </button>
           </div>
