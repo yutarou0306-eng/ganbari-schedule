@@ -431,13 +431,21 @@ export const BOY_VARIANTS = [...DRAGON_VARIANTS, ...TIGER_VARIANTS, ...PHOENIX_V
 
 export const GIRL_VARIANTS = [...PEGASUS_VARIANTS, ...FAIRY_VARIANTS, ...CAT_VARIANTS, ...SWAMP_VARIANTS, ...MERMAID_VARIANTS];
 
+// Grouped by species (not flattened) so a new egg's species is chosen with
+// equal odds regardless of how many color variants that species happens to
+// have — a species with 5 colors shouldn't come up more often than one with
+// 3. The color within the chosen species is then picked at random too.
+const BOY_SPECIES_GROUPS = [DRAGON_VARIANTS, TIGER_VARIANTS, PHOENIX_VARIANTS, FENRIR_VARIANTS, GRIFFON_VARIANTS];
+const GIRL_SPECIES_GROUPS = [PEGASUS_VARIANTS, FAIRY_VARIANTS, CAT_VARIANTS, SWAMP_VARIANTS, MERMAID_VARIANTS];
+
 export function variantsForTheme(themeKey) {
   return themeKey === "boy" ? BOY_VARIANTS : GIRL_VARIANTS;
 }
 
 export function pickRandomVariant(themeKey) {
-  const list = variantsForTheme(themeKey);
-  return list[Math.floor(Math.random() * list.length)].key;
+  const groups = themeKey === "boy" ? BOY_SPECIES_GROUPS : GIRL_SPECIES_GROUPS;
+  const group = groups[Math.floor(Math.random() * groups.length)];
+  return group[Math.floor(Math.random() * group.length)].key;
 }
 
 export function getVariant(themeKey, variantKey) {
