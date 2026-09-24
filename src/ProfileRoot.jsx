@@ -2556,6 +2556,22 @@ function RewardsEditor({ rewards, onSave, onCancel }) {
   function remove(id) {
     setList((prev) => prev.filter((r) => r.id !== id));
   }
+  function moveUp(index) {
+    if (index <= 0) return;
+    setList((prev) => {
+      const next = [...prev];
+      [next[index - 1], next[index]] = [next[index], next[index - 1]];
+      return next;
+    });
+  }
+  function moveDown(index) {
+    setList((prev) => {
+      if (index >= prev.length - 1) return prev;
+      const next = [...prev];
+      [next[index], next[index + 1]] = [next[index + 1], next[index]];
+      return next;
+    });
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: bg, padding: "28px 16px", display: "flex", justifyContent: "center" }}>
@@ -2566,8 +2582,42 @@ function RewardsEditor({ rewards, onSave, onCancel }) {
         <h1 style={{ fontFamily: "'Kaisei Decol', serif", fontSize: 24, color: "#0B3D62", margin: "0 0 16px" }}>景品リストを編集</h1>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 16 }}>
-          {list.map((r) => (
+          {list.map((r, i) => (
             <div key={r.id} style={{ background: "#fff", border: "2px solid #EAF7FB", borderRadius: 14, padding: 12, display: "flex", gap: 8, alignItems: "center" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <button
+                  onClick={() => moveUp(i)}
+                  disabled={i === 0}
+                  aria-label="上に動かす"
+                  style={{
+                    border: "none",
+                    background: "none",
+                    color: i === 0 ? "#d5e2e8" : "#14588C",
+                    cursor: i === 0 ? "default" : "pointer",
+                    fontSize: 13,
+                    lineHeight: 1,
+                    padding: 2,
+                  }}
+                >
+                  ▲
+                </button>
+                <button
+                  onClick={() => moveDown(i)}
+                  disabled={i === list.length - 1}
+                  aria-label="下に動かす"
+                  style={{
+                    border: "none",
+                    background: "none",
+                    color: i === list.length - 1 ? "#d5e2e8" : "#14588C",
+                    cursor: i === list.length - 1 ? "default" : "pointer",
+                    fontSize: 13,
+                    lineHeight: 1,
+                    padding: 2,
+                  }}
+                >
+                  ▼
+                </button>
+              </div>
               <input
                 value={r.name}
                 onChange={(e) => update(r.id, { name: e.target.value })}
