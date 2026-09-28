@@ -948,14 +948,14 @@ export default function KidsScheduleApp() {
 
   // Hands out the growth-mascot card the first time a schedule reaches
   // 100% — but only for schedules substantial enough to matter: at least
-  // 30 days long AND at least 50 total stamps required. Short schedules
-  // reaching 100% don't earn a card, so cards can't be farmed with tiny
-  // schedules. Idempotent (checks config.awardedCard) so re-triggering the
-  // "all done" check (e.g. toggling a past stamp back and forth) never
+  // 30 days long AND at least 2 "やること" (subjects). Short/single-subject
+  // schedules reaching 100% don't earn a card, so cards can't be farmed with
+  // tiny schedules. Idempotent (checks config.awardedCard) so re-triggering
+  // the "all done" check (e.g. toggling a past stamp back and forth) never
   // hands out a second card for the same schedule.
   function awardCardIfNeeded(totalStamps) {
     const scheduleDays = Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
-    if (scheduleDays < 30 || totalStamps < 50) return;
+    if (scheduleDays < 30 || (config.subjects || []).length < 2) return;
     setConfig((prev) => {
       if (prev.awardedCard) return prev;
       return {
@@ -1678,8 +1678,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       // Only warn on brand-new schedules — someone editing an existing one
       // has already made this choice once.
       const days = Math.round((parseDate(ed).getTime() - parseDate(sd).getTime()) / 86400000) + 1;
-      const totalStamps = computeOverallStats({ subjects: cleanSubjects, startDate: sd, endDate: ed }, {}).need;
-      if (days < 30 || totalStamps <= 50) {
+      if (days < 30 || cleanSubjects.length < 2) {
         setPendingLowCardSave(payload);
         return;
       }
@@ -1820,7 +1819,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       {pendingLowCardSave && (
         <ConfirmModal
           title="ファミリアカードがもらえないかも"
-          message="スケジュールが30日未満、若しくは獲得スタンプ数が50個以下だと完了した時ファミリアカードが貰えないよ。それでもスケジュール帳作る？"
+          message="スケジュールが30日未満、若しくは「やること」が1つだけだと完了した時ファミリアカードが貰えないよ。それでもスケジュール帳作る？"
           confirmLabel="作る"
           cancelLabel="編集にもどる"
           onConfirm={() => {
