@@ -84,13 +84,25 @@ function sortCollectedCards(cards, mode) {
 // as well as today's, not just counted as one stamp slot filled.
 function countStampsInBlob(blob) {
   const completions = (blob && blob.completions) || {};
+  const excused = (blob && blob.excused) || {};
   let n = 0;
-  Object.values(completions).forEach((day) => {
-    Object.values(day || {}).forEach((v) => {
+  Object.entries(completions).forEach(([dKey, day]) => {
+    Object.entries(day || {}).forEach(([subjId, v]) => {
       n += Math.min(2, Math.max(0, v || 0));
+      // お休みスタンプ（親の合意で押す特殊スタンプ）は達成率には数えるが、
+      // ★（交換・ステータス用のポイント）にはしない。
+      if (excused[dKey] && excused[dKey][subjId] && (v || 0) >= 1) n -= 1;
     });
   });
-  return n;
+  return Math.max(0, n);
+}
+
+// 今日の日付（端末のローカル時間）を "YYYY-MM-DD" で返す。
+function localTodayKey() {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
 }
 
 // Sums up every day's achv entries (minutes/pages/problems) for a
@@ -252,7 +264,11 @@ export default function ProfileRoot() {
             mascotName: row.blob.config.mascotName || "",
             currentPct: stats.pct,
             pendingToday: todayPendingSubjects(row.blob.config, row.blob.completions),
-            completed: stats.need > 0 && stats.done >= stats.need,
+            // 全部達成したもの、または予定していた期限（終了日）が過ぎたものは
+            // スタンプが足りていなくても「完了」扱いにする。
+            completed:
+              (stats.need > 0 && stats.done >= stats.need) ||
+              (!!row.blob.config.endDate && row.blob.config.endDate < localTodayKey()),
             achvTotals: totalAchievementsInBlob(row.blob),
           };
         });

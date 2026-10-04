@@ -453,6 +453,10 @@ export default function KidsScheduleApp() {
   const [completions, setCompletions] = useState({});
   const [recoveries, setRecoveries] = useState({});
   const [funStamps, setFunStamps] = useState({});
+  // お休みスタンプ：風邪・家族旅行など、親の合意（暗証番号）のもとで押す特殊スタンプ。
+  // { [dateKey]: { [subjectId]: true } }。押した日は completions にも 1 が入るので、
+  // 達成率・連続日数・卵の成長にはそのまま数えられる（★だけは増やさない）。
+  const [excused, setExcused] = useState({});
   const [notes, setNotes] = useState({});
   const [parentComments, setParentComments] = useState({});
   const [achievements, setAchievements] = useState({});
@@ -486,6 +490,7 @@ export default function KidsScheduleApp() {
             setCompletions(data.completions || {});
             setRecoveries(data.recoveries || {});
             setFunStamps(data.funStamps || {});
+            setExcused(data.excused || {});
             setNotes(data.notes || {});
             setParentComments(normalizeParentComments(data.parentComments));
             setAchievements(data.achievements || {});
@@ -564,13 +569,13 @@ export default function KidsScheduleApp() {
       try {
         await window.storage.set(
           STORAGE_KEY,
-          JSON.stringify({ config, completions, recoveries, funStamps, notes, parentComments, achievements }),
+          JSON.stringify({ config, completions, recoveries, funStamps, excused, notes, parentComments, achievements }),
           false
         );
       } catch (e) {}
     }, 350);
     return () => clearTimeout(t);
-  }, [config, completions, recoveries, funStamps, notes, parentComments, achievements, loaded]);
+  }, [config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, loaded]);
 
   // iOS home-screen apps often get suspended instead of fully closed, and
   // reopening them can show whatever was last in memory instead of fetching
@@ -600,6 +605,7 @@ export default function KidsScheduleApp() {
             setCompletions(data.completions || {});
             setRecoveries(data.recoveries || {});
             setFunStamps(data.funStamps || {});
+            setExcused(data.excused || {});
             setNotes(data.notes || {});
             setParentComments(normalizeParentComments(data.parentComments));
             setAchievements(data.achievements || {});
@@ -704,12 +710,16 @@ export default function KidsScheduleApp() {
         let total = 0;
         (schedData || []).forEach((row) => {
           const completions = (row.blob && row.blob.completions) || {};
-          Object.values(completions).forEach((day) => {
-            Object.values(day || {}).forEach((v) => {
+          const rowExcused = (row.blob && row.blob.excused) || {};
+          Object.entries(completions).forEach(([dKey, day]) => {
+            Object.entries(day || {}).forEach(([subjId, v]) => {
               total += Math.min(2, Math.max(0, v || 0));
+              // お休みスタンプは★に数えない
+              if (rowExcused[dKey] && rowExcused[dKey][subjId] && (v || 0) >= 1) total -= 1;
             });
           });
         });
+        total = Math.max(0, total);
         if (!cancelled) {
           setLinkedProfile({ name: (profData && profData.blob && profData.blob.name) || "", totalStamps: total });
         }
@@ -740,6 +750,74 @@ export default function KidsScheduleApp() {
 
   function funStampFor(dKey, subjId) {
     return !!(funStamps[dKey] && funStamps[dKey][subjId]);
+  }
+
+  function isExcused(dKey, subjId) {
+    return !!(excused[dKey] && excused[dKey][subjId]);
+  }
+
+  // 全体で何個のお休みスタンプが押されているか（カードの★の予算から引く用）。
+  function excusedTotal() {
+    let n = 0;
+    Object.entries(excused).forEach(([dKey, day]) => {
+      Object.keys(day || {}).forEach((subjId) => {
+        if (countFor(dKey, subjId) >= 1) n += 1;
+      });
+    });
+    return n;
+  }
+
+  // お休みスタンプのオン／オフ。ロック解除中（＝親の合意済み）の今日・過去の日の
+  // まだ押していないマスだけに押せる。もう一度押すと取り消せる。未来の日には押せない。
+  function handleToggleExcused(date, subjId) {
+    if (locked) {
+      if (config.pin && config.pin.length > 0) setShowPinModal(true);
+      else setShowConfirmModal(true);
+      return;
+    }
+    const dKey = dateKey(date);
+    if (dKey > todayKey) return;
+    const subject = config.subjects.find((s) => s.id === subjId);
+    if (!subject) return;
+
+    if (isExcused(dKey, subjId)) {
+      // 取り消し：お休みの印と、それで入れた「1」を一緒に消す
+      setExcused((prev) => {
+        const day = { ...(prev[dKey] || {}) };
+        delete day[subjId];
+        return { ...prev, [dKey]: day };
+      });
+      setCompletions((prev) => {
+        const day = { ...(prev[dKey] || {}) };
+        delete day[subjId];
+        return { ...prev, [dKey]: day };
+      });
+      showToast("お休みスタンプを取り消したよ");
+      return;
+    }
+
+    if (countFor(dKey, subjId) !== 0) {
+      showToast("すでにスタンプが押してあるよ");
+      return;
+    }
+
+    setExcused((prev) => ({ ...prev, [dKey]: { ...(prev[dKey] || {}), [subjId]: true } }));
+    setCompletions((prev) => {
+      const day = { ...(prev[dKey] || {}), [subjId]: 1 };
+      const updated = { ...prev, [dKey]: day };
+
+      const need = daySubjectsFor(date).map((s) => s.id);
+      const allDone = need.length > 0 && need.every((id) => (day[id] || 0) >= 1);
+      if (allDone) setTimeout(() => setCelebrateDay(dKey), 50);
+
+      const overall = computeOverallStats(config, updated);
+      if (overall.need > 0 && overall.done >= overall.need) {
+        setTimeout(() => setCelebrateSchedule(true), 400);
+        awardCardIfNeeded(overall.need, 1);
+      }
+      return updated;
+    });
+    showToast("お休みスタンプを押したよ 🌙");
   }
 
   // how many past required occurrences of this subject were never done, minus what's already been recovered
@@ -953,7 +1031,7 @@ export default function KidsScheduleApp() {
   // tiny schedules. Idempotent (checks config.awardedCard) so re-triggering
   // the "all done" check (e.g. toggling a past stamp back and forth) never
   // hands out a second card for the same schedule.
-  function awardCardIfNeeded(totalStamps) {
+  function awardCardIfNeeded(totalStamps, pendingExcused = 0) {
     const scheduleDays = Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
     if (scheduleDays < 30 || (config.subjects || []).length < 2) return;
     setConfig((prev) => {
@@ -967,7 +1045,7 @@ export default function KidsScheduleApp() {
           // Stars this card was earned with — the stamp book lets the kid
           // spend these as points on whichever stats they like, so this
           // needs to be locked in at award time as their point budget.
-          stars: totalStamps,
+          stars: Math.max(0, totalStamps - excusedTotal() - pendingExcused),
         },
       };
     });
@@ -1225,6 +1303,8 @@ export default function KidsScheduleApp() {
           isStamped={isStamped}
           countFor={countFor}
           funStampFor={funStampFor}
+          isExcused={isExcused}
+          onToggleExcused={handleToggleExcused}
           missedBacklog={missedBacklog}
           onOpenSettings={() => requestUnlockThen(() => setView("setup"))}
           onEditSubject={(subjectId) =>
@@ -1852,6 +1932,8 @@ function MainScreen({
   isStamped,
   countFor,
   funStampFor,
+  isExcused,
+  onToggleExcused,
   missedBacklog,
   onOpenSettings,
   onEditSubject,
@@ -2184,6 +2266,30 @@ function MainScreen({
                       const count = countFor(dKey, s.id);
                       const achv = achievements[dKey] && achievements[dKey][s.id];
                       const achvLabel = achv ? formatAchvShort(achv) : "";
+                      const excusedHere = isExcused(dKey, s.id);
+                      // お休みスタンプ：ロック解除中の今日・過去の日の、まだ押していない
+                      // マス（またはお休みを押したマス）にだけ、小さな切り替えボタンを出す。
+                      const excuseBtn =
+                        !locked && dKey <= todayKey && (count === 0 || excusedHere) ? (
+                          <button
+                            onClick={() => onToggleExcused(d, s.id)}
+                            style={styles.excuseBtn}
+                            aria-label={excusedHere ? "お休みスタンプを取り消す" : "お休みスタンプを押す"}
+                          >
+                            {excusedHere ? "🌙取消" : "🌙お休み"}
+                          </button>
+                        ) : null;
+                      if (excusedHere) {
+                        return (
+                          <div key={s.id} style={styles.stampSlot}>
+                            <div style={styles.excusedStamp} title={`${s.name}：お休み`}>
+                              <span style={{ fontSize: "58%", lineHeight: 1 }}>🌙</span>
+                            </div>
+                            {achvLabel && <div style={styles.achvMiniLabel}>{achvLabel}</div>}
+                            {excuseBtn}
+                          </div>
+                        );
+                      }
                       if (isToday) {
                         return (
                           <div key={s.id} style={styles.stampSlot}>
@@ -2199,6 +2305,7 @@ function MainScreen({
                               onClear={() => onClearStamp(d, s.id)}
                             />
                             {achvLabel && <div style={styles.achvMiniLabel}>{achvLabel}</div>}
+                            {excuseBtn}
                           </div>
                         );
                       }
@@ -2224,6 +2331,7 @@ function MainScreen({
                             onClearPast={() => onClearPastStamp(d, s.id)}
                           />
                           {achvLabel && <div style={styles.achvMiniLabel}>{achvLabel}</div>}
+                          {excuseBtn}
                         </div>
                       );
                     })}
@@ -3612,6 +3720,8 @@ const styles = {
 
   dayStampsRow: { display: "flex", flexWrap: "wrap", gap: 3, justifyContent: "center", width: "100%" },
   stampSlot: { flex: "1 1 0", minWidth: 26, maxWidth: 90 },
+  excuseBtn: { display: "block", margin: "3px auto 0", border: "1px dashed #B9A8E0", background: "#F4F0FF", color: "#6B52AE", borderRadius: 999, padding: "1px 6px", fontSize: 9, fontWeight: 800, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
+  excusedStamp: { width: "100%", aspectRatio: "1", borderRadius: "50%", border: "3px solid #B9A8E0", background: "radial-gradient(circle at 35% 30%, #F4F0FF, #D9CFF5)", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" },
   achvMiniLabel: { fontSize: 8.5, fontWeight: 800, color: "#5C3A21", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%", textAlign: "center" },
   stampCellWrap: { position: "relative", width: "100%" },
   stampCircle: { width: "100%", aspectRatio: "1", borderRadius: "50%", border: "3px dashed", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", overflow: "visible", boxSizing: "border-box" },
