@@ -210,6 +210,7 @@ export default function ProfileRoot() {
   const [openCardId, setOpenCardId] = useState(null); // card.id currently open in the detail view
   const [view, setView] = useState("main"); // main | editProfile | rewards
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
+  const [rewardClaimTarget, setRewardClaimTarget] = useState(null); // 完了スケジュールのご褒美を交換しようとしているスケジュール
   const [redeemedInfo, setRedeemedInfo] = useState(null); // { name, cost, balanceAfter } | null — success popup after redeeming
   const [copied, setCopied] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -263,6 +264,8 @@ export default function ProfileRoot() {
             mascotVariant: row.blob.config.mascotVariant || null,
             mascotName: row.blob.config.mascotName || "",
             currentPct: stats.pct,
+            reward: (row.blob.config.reward || "").trim(),
+            goalReached: stats.need > 0 && stats.done >= stats.need,
             pendingToday: todayPendingSubjects(row.blob.config, row.blob.completions),
             // 全部達成したもの、または予定していた期限（終了日）が過ぎたものは
             // スタンプが足りていなくても「完了」扱いにする。
@@ -610,6 +613,38 @@ export default function ProfileRoot() {
     });
     const next = { ...profile, statAllocations: { ...(profile.statAllocations || {}), [cardId]: merged } };
     await saveProfile(next);
+  }
+
+  // 全部達成したスケジュールの「ご褒美」との交換。★は使わない（cost 0）。
+  // 交換履歴に同じ形で残り、受領印・取り消しもそちらと同じ仕組みで扱う。
+  function redemptionForSchedule(scheduleId) {
+    return (profile.redemptions || []).find((r) => r.scheduleId === scheduleId) || null;
+  }
+
+  async function handleClaimScheduleReward(sch) {
+    if (!sch || !sch.reward || redemptionForSchedule(sch.id)) {
+      setRewardClaimTarget(null);
+      return;
+    }
+    const next = {
+      ...profile,
+      redemptions: [
+        ...(profile.redemptions || []),
+        {
+          id: generateScheduleId(6),
+          rewardId: `schedule:${sch.id}`,
+          rewardName: sch.reward,
+          cost: 0,
+          date: new Date().toISOString().slice(0, 10),
+          kind: "scheduleReward",
+          scheduleId: sch.id,
+          scheduleTitle: sch.title || "",
+        },
+      ],
+    };
+    await saveProfile(next);
+    setRewardClaimTarget(null);
+    setRedeemedInfo({ name: sch.reward, cost: 0, balanceAfter: available, isScheduleReward: true });
   }
 
   async function handleRedeem(reward) {
@@ -997,8 +1032,9 @@ export default function ProfileRoot() {
                 return (
                   <div
                     key={s.id}
-                    style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", boxShadow: "0 4px 10px rgba(11,61,98,0.15)", display: "flex", alignItems: "center", gap: 10 }}
+                    style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}
                   >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <a href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none", flex: 1, minWidth: 0 }}>
                       <div style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14, marginBottom: 4 }}>
                         🏆 {s.title || "無題のスケジュール"}
@@ -1025,6 +1061,41 @@ export default function ProfileRoot() {
                         📋 記録
                       </span>
                     </a>
+                    </div>
+                    {s.goalReached && s.reward && (() => {
+                      const red = redemptionForSchedule(s.id);
+                      return (
+                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: "1px dashed #E3EEF3", display: "flex", alignItems: "center", gap: 10 }}>
+                          <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: "#B5651D", fontWeight: 800, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            🎁 ご褒美：{s.reward}
+                          </div>
+                          {!red ? (
+                            <button
+                              onClick={() => setRewardClaimTarget(s)}
+                              style={{ border: "none", borderRadius: 999, padding: "7px 14px", fontWeight: 900, fontSize: 12.5, cursor: "pointer", background: "linear-gradient(135deg,#FFB6C9,#F4C95D)", color: "#fff", fontFamily: "inherit", flexShrink: 0 }}
+                            >
+                              交換する
+                            </button>
+                          ) : red.acknowledgedAt ? (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                              <span style={{ fontSize: 12, fontWeight: 800, color: "#2E7D4F" }}>✅ 受け取りずみ</span>
+                              <div style={{ width: 30, height: 30, borderRadius: "50%", background: "#E0526B", color: "#fff", fontWeight: 900, fontSize: 11, display: "flex", alignItems: "center", justifyContent: "center", transform: "rotate(-12deg)", boxShadow: "0 2px 6px rgba(224,82,107,0.45)" }}>印</div>
+                            </div>
+                          ) : (
+                            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                              <span style={{ fontSize: 12, fontWeight: 800, color: "#8B5E34" }}>交換ずみ・受領印を</span>
+                              <button
+                                onClick={() => requestParentGate("ackRedemption", red.id)}
+                                aria-label="受領印を押す"
+                                style={{ width: 32, height: 32, borderRadius: "50%", border: "2px dashed #C7D6DE", background: "#fff", color: "#B7C4CC", fontWeight: 900, fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: 0 }}
+                              >
+                                印
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -1070,6 +1141,27 @@ export default function ProfileRoot() {
           </>
         )}
       </div>
+
+      {rewardClaimTarget && (
+        <div style={overlayStyle}>
+          <div style={modalCardStyle}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>ご褒美と交換する？</h3>
+            <p style={{ fontSize: 13, color: "#7c98aa", marginBottom: 6 }}>「{rewardClaimTarget.title || "無題のスケジュール"}」を達成したご褒美</p>
+            <p style={{ fontSize: 17, color: "#B5651D", marginBottom: 6 }}>
+              <strong>🎁 {rewardClaimTarget.reward}</strong>
+            </p>
+            <p style={{ fontSize: 13.5, color: "#7c98aa", marginBottom: 20 }}>※ ★は減りません</p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setRewardClaimTarget(null)} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
+                やめる
+              </button>
+              <button onClick={() => handleClaimScheduleReward(rewardClaimTarget)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
+                交換する
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {redeemTarget && (
         <div style={overlayStyle}>
@@ -1158,6 +1250,9 @@ export default function ProfileRoot() {
                         <div>
                           <div style={{ fontSize: 12, color: "#8fa6b6", marginBottom: 2 }}>{formatRedemptionDate(r.date)}</div>
                           <div style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14.5 }}>🎁 {r.rewardName}</div>
+                          {r.kind === "scheduleReward" && r.scheduleTitle && (
+                            <div style={{ fontSize: 11.5, color: "#8fa6b6", marginTop: 1 }}>「{r.scheduleTitle}」達成のご褒美</div>
+                          )}
                         </div>
 
                         <button
@@ -1187,7 +1282,7 @@ export default function ProfileRoot() {
                         </button>
 
                         <div style={{ textAlign: "right", fontWeight: 800, color: "#E0526B", fontSize: 14, whiteSpace: "nowrap" }}>
-                          -⭐️{r.cost}
+                          {r.kind === "scheduleReward" ? <span style={{ color: "#B5651D", fontSize: 12.5 }}>ご褒美</span> : `-⭐️${r.cost}`}
                         </div>
                         <div style={{ textAlign: "right", fontSize: 12.5, color: "#7c98aa", whiteSpace: "nowrap" }}>
                           {typeof r.balanceAfter === "number" ? `⭐️${r.balanceAfter}` : "－"}
@@ -1240,7 +1335,9 @@ export default function ProfileRoot() {
               <strong>{redeemedInfo.name}</strong>
             </p>
             <p style={{ fontSize: 14, color: "#7c98aa", marginBottom: 22 }}>
-              ⭐️{redeemedInfo.cost}個 使いました（残り {redeemedInfo.balanceAfter} 個）
+              {redeemedInfo.isScheduleReward
+                ? "ご褒美と交換しました（★は減りません）。景品を受け取ったら受領印を押してね。"
+                : `⭐️${redeemedInfo.cost}個 使いました（残り ${redeemedInfo.balanceAfter} 個）`}
             </p>
             <button onClick={() => setRedeemedInfo(null)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
               とじる
