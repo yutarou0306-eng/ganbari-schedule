@@ -457,6 +457,9 @@ export default function KidsScheduleApp() {
   // { [dateKey]: { [subjectId]: true } }。押した日は completions にも 1 が入るので、
   // 達成率・連続日数・卵の成長にはそのまま数えられる（★だけは増やさない）。
   const [excused, setExcused] = useState({});
+  // お休みスタンプを押す／取り消す操作は、ロック解除中であっても毎回
+  // 暗証番号（未設定なら確認）を求める。確認待ちの操作をここに持つ。
+  const [pendingExcuse, setPendingExcuse] = useState(null); // { date, subjId } | null
   const [notes, setNotes] = useState({});
   const [parentComments, setParentComments] = useState({});
   const [achievements, setAchievements] = useState({});
@@ -767,14 +770,21 @@ export default function KidsScheduleApp() {
     return n;
   }
 
-  // お休みスタンプのオン／オフ。ロック解除中（＝親の合意済み）の今日・過去の日の
-  // まだ押していないマスだけに押せる。もう一度押すと取り消せる。未来の日には押せない。
+  // お休みスタンプのオン／オフ。親の合意が必要な特殊スタンプなので、ロック解除中
+  // かどうかに関係なく、押す・取り消すたびに暗証番号（未設定なら確認）を求める。
+  // 今日と過去の日のまだ押していないマスにだけ押せる。未来の日には押せない。
   function handleToggleExcused(date, subjId) {
-    if (locked) {
-      if (config.pin && config.pin.length > 0) setShowPinModal(true);
-      else setShowConfirmModal(true);
+    const dKey = dateKey(date);
+    if (dKey > todayKey) return;
+    if (!config.subjects.find((s) => s.id === subjId)) return;
+    if (!isExcused(dKey, subjId) && countFor(dKey, subjId) !== 0) {
+      showToast("すでにスタンプが押してあるよ");
       return;
     }
+    setPendingExcuse({ date, subjId });
+  }
+
+  function performToggleExcused(date, subjId) {
     const dKey = dateKey(date);
     if (dKey > todayKey) return;
     const subject = config.subjects.find((s) => s.id === subjId);
@@ -1319,6 +1329,33 @@ export default function KidsScheduleApp() {
           streak={streakDays()}
         />
       )}
+
+      {pendingExcuse &&
+        (config.pin && config.pin.length > 0 ? (
+          <PinModal
+            correctPin={config.pin}
+            onSuccess={() => {
+              const p = pendingExcuse;
+              setPendingExcuse(null);
+              performToggleExcused(p.date, p.subjId);
+            }}
+            onFail={() => showToast("暗証番号が違います")}
+            onCancel={() => setPendingExcuse(null)}
+          />
+        ) : (
+          <ConfirmModal
+            title="保護者の方へ"
+            message="お休みスタンプは、風邪や家族旅行などで保護者の方が認めたときに使う特別なスタンプです。保護者の方が操作していますか？"
+            confirmLabel="はい"
+            cancelLabel="やめる"
+            onConfirm={() => {
+              const p = pendingExcuse;
+              setPendingExcuse(null);
+              performToggleExcused(p.date, p.subjId);
+            }}
+            onCancel={() => setPendingExcuse(null)}
+          />
+        ))}
 
       {showConfirmModal && (
         <ConfirmModal
@@ -2267,10 +2304,10 @@ function MainScreen({
                       const achv = achievements[dKey] && achievements[dKey][s.id];
                       const achvLabel = achv ? formatAchvShort(achv) : "";
                       const excusedHere = isExcused(dKey, s.id);
-                      // お休みスタンプ：ロック解除中の今日・過去の日の、まだ押していない
-                      // マス（またはお休みを押したマス）にだけ、小さな切り替えボタンを出す。
+                      // お休みスタンプ：今日・過去の日の、まだ押していないマス（または
+                      // お休みを押したマス）に小さなボタンを出す。押すと毎回暗証番号を聞く。
                       const excuseBtn =
-                        !locked && dKey <= todayKey && (count === 0 || excusedHere) ? (
+                        dKey <= todayKey && (count === 0 || excusedHere) ? (
                           <button
                             onClick={() => onToggleExcused(d, s.id)}
                             style={styles.excuseBtn}
