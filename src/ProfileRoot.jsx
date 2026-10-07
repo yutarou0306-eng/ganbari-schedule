@@ -2604,8 +2604,19 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
 
   // 手に入れたことのある色違い（配合で消費されたカードも含む）
   const owned = new Set();
+  // ・正式にカードをもらったもの
+  // ・配合に使った／使い切ったもの（マスターまで育っていた証拠）
+  // ・認定前でも、マスターの姿まで育ったもの
+  const consumed = profile.consumedScheduleCards || [];
+  const overrides = profile.cardOverrides || {};
   schedules.forEach((s) => {
-    if (s.awardedCard) owned.add(`${s.awardedCard.theme || s.theme}:${s.awardedCard.variant}`);
+    if (s.awardedCard) {
+      owned.add(`${s.awardedCard.theme || s.theme}:${s.awardedCard.variant}`);
+      return;
+    }
+    const v = getVariant(s.theme, s.mascotVariant);
+    const reachedMaster = stageIndex(v.species, s.currentPct) >= stageCount(v.species) - 1;
+    if (reachedMaster || consumed.includes(s.id) || overrides[s.id]) owned.add(`${s.theme}:${v.key}`);
   });
   const gmNames = new Set();
   Object.values(profile.cardOverrides || {}).forEach((o) => {
@@ -2614,6 +2625,7 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
 
   const groups = speciesGroupsForTheme(theme);
   const speciesKeys = groups.map((g) => g[0].species);
+  const speciesKnown = (sp) => groups.some((g) => g[0].species === sp && g.some((v) => owned.has(`${theme}:${v.key}`)));
   const total = groups.reduce((n, g) => n + g.length, 0);
   const got = groups.reduce((n, g) => n + g.filter((v) => owned.has(`${theme}:${v.key}`)).length, 0);
   let gmGot = 0;
@@ -2648,7 +2660,7 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
         <div style={{ fontWeight: 900, color: "#0B3D62", marginBottom: 6 }}>🎴 ファミリアカード</div>
         {groups.map((g) => (
           <div key={g[0].species} style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 800, color: "#14588C", marginBottom: 4 }}>{speciesLabel(g[0].species)}</div>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: "#14588C", marginBottom: 4 }}>{g.some((v) => owned.has(`${theme}:${v.key}`)) ? speciesLabel(g[0].species) : "？？？"}</div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
               {g.map((v) => {
                 const has = owned.has(`${theme}:${v.key}`);
@@ -2670,20 +2682,23 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
 
         <div style={{ fontWeight: 900, color: "#0B3D62", margin: "16px 0 4px" }}>⚗️ グランドマスター</div>
         <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 6 }}>たて：ベース　よこ：配合した相手</div>
-        <div style={{ display: "grid", gridTemplateColumns: "34px repeat(5, 1fr)", gap: 4, alignItems: "center" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "34px repeat(5, 1fr)", gap: 4, alignItems: "start" }}>
           <div />
           {speciesKeys.map((f) => (
-            <div key={f} style={{ fontSize: 9.5, fontWeight: 800, color: "#14588C", textAlign: "center" }}>{speciesLabel(f)}</div>
+            <div key={f} style={{ fontSize: 9.5, fontWeight: 800, color: "#14588C", textAlign: "center" }}>{speciesKnown(f) ? speciesLabel(f) : "？？？"}</div>
           ))}
           {speciesKeys.map((b) => (
             <React.Fragment key={b}>
-              <div style={{ fontSize: 9.5, fontWeight: 800, color: "#14588C" }}>{speciesLabel(b)}</div>
+              <div style={{ fontSize: 9.5, fontWeight: 800, color: "#14588C" }}>{speciesKnown(b) ? speciesLabel(b) : "？？？"}</div>
               {speciesKeys.map((f) => {
                 const c = GRAND_MASTER_COMBOS[b] && GRAND_MASTER_COMBOS[b][f];
                 const has = !!c && gmNames.has(c.name);
                 return (
-                  <div key={f} style={{ ...cell, borderRadius: 8, background: has ? "linear-gradient(135deg,#EFE3FF,#C9B3F2)" : "#F1F6F9", cursor: has && c.img ? "pointer" : "default" }} onClick={() => has && c.img && setZoom({ img: c.img, name: c.name, filter: "none" })}>
-                    {has ? (c.img ? <img src={c.img} alt={c.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <span>⚗️</span>) : <span style={{ fontSize: 18, fontWeight: 900, color: "#B7C4CC" }}>？</span>}
+                  <div key={f}>
+                    <div style={{ ...cell, borderRadius: 8, background: has ? "linear-gradient(135deg,#EFE3FF,#C9B3F2)" : "#F1F6F9", cursor: has && c.img ? "pointer" : "default" }} onClick={() => has && c.img && setZoom({ img: c.img, name: c.name, filter: "none" })}>
+                      {has ? (c.img ? <img src={c.img} alt={c.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <span>⚗️</span>) : <span style={{ fontSize: 18, fontWeight: 900, color: "#B7C4CC" }}>？</span>}
+                    </div>
+                    <div style={{ fontSize: 8.5, textAlign: "center", color: has ? "#3d5a6c" : "#B7C4CC", marginTop: 2, lineHeight: 1.15, minHeight: 20, wordBreak: "break-all" }}>{has ? c.name : "？？？"}</div>
                   </div>
                 );
               })}
