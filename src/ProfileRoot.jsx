@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "./db.js";
 import { getProfileIdFromUrl, generateProfileId } from "./profileId.js";
 import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
-import { getVariant, finalFormImage, stageImage, stageIndex, stageLabel, eggLabel, speciesLabel, computeCardStats, combineStats, combineLevel, levelFromPct, stageImageAt, stageCount, getGrandMasterCombo, STAT_LABELS, STAT_KEYS, STAT_MAX, MASTER_LEVEL } from "./mascots.js";
+import { getVariant, finalFormImage, stageImage, stageIndex, stageLabel, eggLabel, speciesLabel, computeCardStats, combineStats, combineLevel, levelFromPct, stageImageAt, stageCount, getGrandMasterCombo, speciesGroupsForTheme, GRAND_MASTER_COMBOS, STAT_LABELS, STAT_KEYS, STAT_MAX, MASTER_LEVEL } from "./mascots.js";
 import { todayPendingSubjects, computeOverallStats } from "./progress.js";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
@@ -206,6 +206,7 @@ export default function ProfileRoot() {
   const [showAllSchedules, setShowAllSchedules] = useState(false); // 「つながっているスケジュール」を5件超えて全部表示中か
   const [showAllCompleted, setShowAllCompleted] = useState(false); // 「完了したスケジュール」を5件超えて全部表示中か
   const [cardSortMode, setCardSortMode] = useState("species"); // "lv" | "species" | "stage" — ファミリアカードの並び順
+  const [zukanPage, setZukanPage] = useState(false); // ファミリアずかんを表示中かどうか
   const [breedPage, setBreedPage] = useState(false); // 配合ページを表示中かどうか
   const [openCardId, setOpenCardId] = useState(null); // card.id currently open in the detail view
   const [view, setView] = useState("main"); // main | editProfile | rewards
@@ -218,6 +219,9 @@ export default function ProfileRoot() {
   const [pendingCreateTheme, setPendingCreateTheme] = useState(null); // themeKey chosen before the gate, for "createSchedule"
   const [pendingAckId, setPendingAckId] = useState(null); // redemption id awaiting the gate, for "ackRedemption"
   const [pendingCancelId, setPendingCancelId] = useState(null); // redemption id awaiting the gate, for "cancelRedemption"
+  // 交換・配合・ステータス割り振りなど、「操作そのもの」を暗証番号の後に実行するための枠。
+  const gateActionRef = useRef(null); // { fn, resolve } | null
+  const [gateLabel, setGateLabel] = useState(""); // 「景品と交換する」など、確認画面に出す操作名
   const [showGatePin, setShowGatePin] = useState(false);
   const [showGateConfirm, setShowGateConfirm] = useState(false);
   const [showHistory, setShowHistory] = useState(false); // 交換履歴モーダル
@@ -286,14 +290,17 @@ export default function ProfileRoot() {
     upsertKnownProfile({ id: profileId, name: next.name || "" });
   }
 
-  async function handleCreateOrEditProfile(name, birthdate, pin) {
+  async function handleCreateOrEditProfile(name, birthdate, pin, gender) {
     const next = { ...profile, name: name.trim(), birthdate, pin: (pin || "").trim() };
+    // 男の子／女の子は一度決めたら変更不可（未設定の古いスタンプ帳だけ後から設定できる）
+    if (!profile.gender && (gender === "boy" || gender === "girl")) next.gender = gender;
     await saveProfile(next);
     setView("main");
     if (!exists) await loadSchedules();
   }
 
   function handleCreateSchedule(themeKey) {
+    if (bookGender) themeKey = bookGender;
     const id = generateScheduleId();
     window.location.href = `${window.location.pathname}?id=${id}&theme=${themeKey}&profileId=${profileId}`;
   }
@@ -319,10 +326,26 @@ export default function ProfileRoot() {
     }
   }
 
+  // 暗証番号（未設定なら確認画面）を通ったあとに fn を実行する。
+  // 実行できたら true、キャンセルされたら false で解決する Promise を返す。
+  function askParent(label, fn) {
+    return new Promise((resolve) => {
+      gateActionRef.current = { fn, resolve };
+      setGateLabel(label);
+      setGateTarget("action");
+      if (profile.pin && profile.pin.length > 0) setShowGatePin(true);
+      else setShowGateConfirm(true);
+    });
+  }
+
   function handleGateSuccess() {
     setShowGatePin(false);
     setShowGateConfirm(false);
-    if (gateTarget === "createSchedule") {
+    if (gateTarget === "action") {
+      const a = gateActionRef.current;
+      gateActionRef.current = null;
+      if (a) Promise.resolve(a.fn()).then(() => a.resolve(true), () => a.resolve(false));
+    } else if (gateTarget === "createSchedule") {
       if (pendingCreateTheme) handleCreateSchedule(pendingCreateTheme);
     } else if (gateTarget === "ackRedemption") {
       if (pendingAckId) handleAcknowledgeRedemption(pendingAckId);
@@ -340,6 +363,10 @@ export default function ProfileRoot() {
   function handleGateCancel() {
     setShowGatePin(false);
     setShowGateConfirm(false);
+    if (gateActionRef.current) {
+      gateActionRef.current.resolve(false);
+      gateActionRef.current = null;
+    }
     setGateTarget(null);
     setPendingCreateTheme(null);
     setPendingAckId(null);
@@ -401,6 +428,16 @@ export default function ProfileRoot() {
   // Schedules that reached 100% — shown as a small trophy list with what
   // was actually earned/done on each one.
   const completedSchedules = schedules.filter((s) => s.completed);
+
+  // このスタンプ帳の性別。設定済みならそれ、古いスタンプ帳（未設定）は
+  // 既存スケジュールがすべて同じ側ならそれに合わせる。混在・空なら null（制限なし）。
+  const inferredThemes = Array.from(new Set(schedules.map((s) => s.theme)));
+  const bookGender =
+    profile.gender === "boy" || profile.gender === "girl"
+      ? profile.gender
+      : inferredThemes.length === 1
+      ? inferredThemes[0]
+      : null;
 
   // Still-in-progress schedules — shown in "つながっているスケジュール".
   // Completed ones are checked via 完了したスケジュール instead, not here.
@@ -541,7 +578,9 @@ export default function ProfileRoot() {
     earnedAt: c.createdAt || "",
   }));
 
-  const allCards = [...myCards, ...growingCards, ...bredCards];
+  const allCards = [...myCards, ...growingCards, ...bredCards].filter(
+    (c) => !bookGender || !c.theme || c.theme === bookGender
+  );
   sortCollectedCards(allCards, cardSortMode);
   const masterCards = allCards.filter((c) => c.isMaster);
 
@@ -739,8 +778,46 @@ export default function ProfileRoot() {
     );
   }
 
+  const gateModalsJsx = (
+    <>
+      {showGateConfirm && (
+        <div style={{ ...overlayStyle, zIndex: 3000 }}>
+          <div style={modalCardStyle}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>保護者の方へ</h3>
+            <p style={{ fontSize: 15, color: "#4a6c85", lineHeight: 1.6, marginBottom: 20 }}>
+              ここから先は{gateTarget === "action" ? `${gateLabel}こと` : gateTarget === "rewards" ? "景品リストを編集" : gateTarget === "createSchedule" ? "新しいスケジュールを作成" : gateTarget === "ackRedemption" ? "受領印を押す（景品を渡したことを記録する）" : gateTarget === "cancelRedemption" ? "この交換を取り消す（★を返す）" : "プロフィールの設定を変更"}できます。保護者の方が操作していますか？
+            </p>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={handleGateCancel} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
+                やめる
+              </button>
+              <button onClick={handleGateSuccess} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
+                はい、開けます
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGatePin && <RewardsPinModal correctPin={profile.pin} onSuccess={handleGateSuccess} onCancel={handleGateCancel} message={gateTarget === "action" ? `${gateLabel}には、暗証番号を入力してください。` : undefined} />}
+    </>
+  );
+
+  if (zukanPage) {
+    return <ZukanPage gender={bookGender} schedules={schedules} profile={profile} onClose={() => setZukanPage(false)} />;
+  }
+
   if (breedPage) {
-    return <BreedPage masterCards={masterCards} onFinalize={handleFinalizeBreed} onClose={() => setBreedPage(false)} />;
+    return (
+      <>
+        <BreedPage
+          masterCards={masterCards}
+          onFinalize={(baseId, subId) => askParent("ファミリアを配合する", () => handleFinalizeBreed(baseId, subId))}
+          onClose={() => setBreedPage(false)}
+        />
+        {gateModalsJsx}
+      </>
+    );
   }
 
   return (
@@ -957,6 +1034,12 @@ export default function ProfileRoot() {
         <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 8 }}>
           ステータスに割り振れる★：残り {starsForStats} 個（景品と交換できる★とは別に減ります）
         </div>
+        <button
+          onClick={() => setZukanPage(true)}
+          style={{ width: "100%", padding: "12px 0", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#5EB3E8,#14588C)", color: "#fff", fontWeight: 800, fontSize: 14.5, cursor: "pointer", fontFamily: "inherit", marginBottom: 10 }}
+        >
+          📚 ファミリアずかんを見る
+        </button>
         {allCards.length > 0 && (
           <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             {[
@@ -1122,12 +1205,16 @@ export default function ProfileRoot() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
-          <button onClick={() => requestParentGate("createSchedule", "girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
-            🎀 新しいスケジュールを作る（女の子用）
-          </button>
-          <button onClick={() => requestParentGate("createSchedule", "boy")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#8B5E34,#C89B3C)" }}>
-            🐉 新しいスケジュールを作る（男の子用）
-          </button>
+          {bookGender !== "boy" && (
+            <button onClick={() => requestParentGate("createSchedule", "girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
+              🎀 新しいスケジュールを作る{bookGender ? "" : "（女の子用）"}
+            </button>
+          )}
+          {bookGender !== "girl" && (
+            <button onClick={() => requestParentGate("createSchedule", "boy")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#8B5E34,#C89B3C)" }}>
+              🐉 新しいスケジュールを作る{bookGender ? "" : "（男の子用）"}
+            </button>
+          )}
         </div>
 
         {(profile.redemptions || []).length > 0 && (
@@ -1155,7 +1242,7 @@ export default function ProfileRoot() {
               <button onClick={() => setRewardClaimTarget(null)} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
                 やめる
               </button>
-              <button onClick={() => handleClaimScheduleReward(rewardClaimTarget)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
+              <button onClick={() => askParent("ご褒美と交換する", () => handleClaimScheduleReward(rewardClaimTarget))} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
                 交換する
               </button>
             </div>
@@ -1177,7 +1264,7 @@ export default function ProfileRoot() {
               <button onClick={() => setRedeemTarget(null)} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
                 やめる
               </button>
-              <button onClick={() => handleRedeem(redeemTarget)} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
+              <button onClick={() => askParent("景品と交換する", () => handleRedeem(redeemTarget))} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
                 交換する
               </button>
             </div>
@@ -1346,26 +1433,7 @@ export default function ProfileRoot() {
         </div>
       )}
 
-      {showGateConfirm && (
-        <div style={overlayStyle}>
-          <div style={modalCardStyle}>
-            <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>保護者の方へ</h3>
-            <p style={{ fontSize: 15, color: "#4a6c85", lineHeight: 1.6, marginBottom: 20 }}>
-              ここから先は{gateTarget === "rewards" ? "景品リストを編集" : gateTarget === "createSchedule" ? "新しいスケジュールを作成" : gateTarget === "ackRedemption" ? "受領印を押す（景品を渡したことを記録する）" : gateTarget === "cancelRedemption" ? "この交換を取り消す（★を返す）" : "プロフィールの設定を変更"}できます。保護者の方が操作していますか？
-            </p>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={handleGateCancel} style={{ ...modalBtnStyle, background: "#fff", color: "#5a7d94", border: "2px solid #d7ecf3" }}>
-                やめる
-              </button>
-              <button onClick={handleGateSuccess} style={{ ...modalBtnStyle, background: "#14588C", color: "#fff", border: "none" }}>
-                はい、開けます
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showGatePin && <RewardsPinModal correctPin={profile.pin} onSuccess={handleGateSuccess} onCancel={handleGateCancel} />}
+      {gateModalsJsx}
 
       {openCardId &&
         (() => {
@@ -1380,7 +1448,7 @@ export default function ProfileRoot() {
               onPrev={allCards.length > 1 ? () => setOpenCardId(allCards[(idx - 1 + allCards.length) % allCards.length].id) : null}
               onNext={allCards.length > 1 ? () => setOpenCardId(allCards[(idx + 1) % allCards.length].id) : null}
               starsForStats={starsForStats}
-              onAllocate={handleAllocateStats}
+              onAllocate={(cardId, deltas) => askParent("ステータスに★を割り振る", () => handleAllocateStats(cardId, deltas))}
             />
           );
         })()}
@@ -1388,7 +1456,7 @@ export default function ProfileRoot() {
   );
 }
 
-function RewardsPinModal({ correctPin, onSuccess, onCancel }) {
+function RewardsPinModal({ correctPin, onSuccess, onCancel, message }) {
   const [value, setValue] = useState("");
   const [wrong, setWrong] = useState(false);
   const [failCount, setFailCount] = useState(0);
@@ -1409,11 +1477,11 @@ function RewardsPinModal({ correctPin, onSuccess, onCancel }) {
   }
 
   return (
-    <div style={overlayStyle}>
+    <div style={{ ...overlayStyle, zIndex: 3000 }}>
       <div style={modalCardStyle}>
         <h3 style={{ margin: "0 0 10px", fontSize: 20, color: "#0B3D62" }}>保護者の方へ</h3>
         <p style={{ fontSize: 15, color: "#4a6c85", lineHeight: 1.6, marginBottom: 14 }}>
-          景品リストを編集するには、暗証番号を入力してください。
+          {message || "景品リストを編集するには、暗証番号を入力してください。"}
         </p>
         <input
           type="password"
@@ -1693,7 +1761,8 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
   }
   async function confirmAllocation() {
     if (!canConfirm) return;
-    await onAllocate(card.id, pending);
+    const done = await onAllocate(card.id, pending);
+    if (!done) return; // 暗証番号の入力をやめた → 割り振り画面のまま
     setPending({});
     setAllocating(false);
     setConfirming(false);
@@ -2273,8 +2342,8 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
               </button>
               <button
                 onClick={async () => {
-                  await onFinalize(base.id, sub.id);
-                  onClose();
+                  const done = await onFinalize(base.id, sub.id);
+                  if (done) onClose();
                 }}
                 style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "none", background: "#5A3FA0", color: "#fff", fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
               >
@@ -2528,14 +2597,121 @@ const modalBtnStyle = {
   fontSize: 15,
 };
 
+function ZukanPage({ gender, schedules, profile, onClose }) {
+  const [tab, setTab] = useState(gender || "girl");
+  const [zoom, setZoom] = useState(null); // { img, name, filter }
+  const theme = gender || tab;
+
+  // 手に入れたことのある色違い（配合で消費されたカードも含む）
+  const owned = new Set();
+  schedules.forEach((s) => {
+    if (s.awardedCard) owned.add(`${s.awardedCard.theme || s.theme}:${s.awardedCard.variant}`);
+  });
+  const gmNames = new Set();
+  Object.values(profile.cardOverrides || {}).forEach((o) => {
+    if (o && o.grandMaster && o.grandMaster.name) gmNames.add(o.grandMaster.name);
+  });
+
+  const groups = speciesGroupsForTheme(theme);
+  const speciesKeys = groups.map((g) => g[0].species);
+  const total = groups.reduce((n, g) => n + g.length, 0);
+  const got = groups.reduce((n, g) => n + g.filter((v) => owned.has(`${theme}:${v.key}`)).length, 0);
+  let gmGot = 0;
+  speciesKeys.forEach((b) => speciesKeys.forEach((f) => {
+    const c = GRAND_MASTER_COMBOS[b] && GRAND_MASTER_COMBOS[b][f];
+    if (c && gmNames.has(c.name)) gmGot++;
+  }));
+
+  const cell = { borderRadius: 10, background: "#fff", border: "2px solid #E3EEF3", aspectRatio: "1 / 1", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", position: "relative" };
+  const q = <span style={{ fontSize: 26, fontWeight: 900, color: "#B7C4CC" }}>？</span>;
+
+  return (
+    <div style={{ minHeight: "100vh", background: bg, padding: "20px 12px 50px", fontFamily: "'Kaisei Decol', 'Hiragino Maru Gothic ProN', sans-serif" }}>
+      <div style={{ maxWidth: 480, margin: "0 auto", background: "#FFFBF3", borderRadius: 22, padding: 16, boxShadow: "0 20px 50px rgba(11,61,98,0.35)" }}>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "#14588C", fontWeight: 700, cursor: "pointer", fontSize: 15, fontFamily: "inherit", padding: 0, marginBottom: 8 }}>
+          ← もどる
+        </button>
+        <h2 style={{ margin: "0 0 10px", color: "#0B3D62", fontSize: 22 }}>📚 ファミリアずかん</h2>
+        {!gender && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            {[["girl", "👧 女の子"], ["boy", "👦 男の子"]].map(([k, l]) => (
+              <button key={k} onClick={() => setTab(k)} style={{ flex: 1, border: "none", borderRadius: 10, padding: "8px 0", fontWeight: 800, fontFamily: "inherit", cursor: "pointer", background: tab === k ? "#14588C" : "#EAF4F9", color: tab === k ? "#fff" : "#14588C" }}>
+                {l}
+              </button>
+            ))}
+          </div>
+        )}
+        <div style={{ fontSize: 13, color: "#4a6c85", marginBottom: 12, fontWeight: 700 }}>
+          あつめたカード {got} / {total}　・　グランドマスター {gmGot} / {speciesKeys.length * speciesKeys.length}
+        </div>
+
+        <div style={{ fontWeight: 900, color: "#0B3D62", marginBottom: 6 }}>🎴 ファミリアカード</div>
+        {groups.map((g) => (
+          <div key={g[0].species} style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: "#14588C", marginBottom: 4 }}>{speciesLabel(g[0].species)}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
+              {g.map((v) => {
+                const has = owned.has(`${theme}:${v.key}`);
+                return (
+                  <div key={v.key}>
+                    <div
+                      style={{ ...cell, background: has ? v.cardBg : "#F1F6F9", cursor: has ? "pointer" : "default" }}
+                      onClick={() => has && setZoom({ img: finalFormImage(theme, v.key), name: v.name, filter: v.filter })}
+                    >
+                      {has ? <img src={finalFormImage(theme, v.key)} alt={v.name} style={{ width: "100%", height: "100%", objectFit: "contain", filter: v.filter }} /> : q}
+                    </div>
+                    <div style={{ fontSize: 9.5, textAlign: "center", color: has ? "#3d5a6c" : "#B7C4CC", marginTop: 2, lineHeight: 1.2 }}>{has ? v.name : "？？？"}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        <div style={{ fontWeight: 900, color: "#0B3D62", margin: "16px 0 4px" }}>⚗️ グランドマスター</div>
+        <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 6 }}>たて：ベース　よこ：配合した相手</div>
+        <div style={{ display: "grid", gridTemplateColumns: "34px repeat(5, 1fr)", gap: 4, alignItems: "center" }}>
+          <div />
+          {speciesKeys.map((f) => (
+            <div key={f} style={{ fontSize: 9.5, fontWeight: 800, color: "#14588C", textAlign: "center" }}>{speciesLabel(f)}</div>
+          ))}
+          {speciesKeys.map((b) => (
+            <React.Fragment key={b}>
+              <div style={{ fontSize: 9.5, fontWeight: 800, color: "#14588C" }}>{speciesLabel(b)}</div>
+              {speciesKeys.map((f) => {
+                const c = GRAND_MASTER_COMBOS[b] && GRAND_MASTER_COMBOS[b][f];
+                const has = !!c && gmNames.has(c.name);
+                return (
+                  <div key={f} style={{ ...cell, borderRadius: 8, background: has ? "linear-gradient(135deg,#EFE3FF,#C9B3F2)" : "#F1F6F9", cursor: has && c.img ? "pointer" : "default" }} onClick={() => has && c.img && setZoom({ img: c.img, name: c.name, filter: "none" })}>
+                    {has ? (c.img ? <img src={c.img} alt={c.name} style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : <span>⚗️</span>) : <span style={{ fontSize: 18, fontWeight: 900, color: "#B7C4CC" }}>？</span>}
+                  </div>
+                );
+              })}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      {zoom && (
+        <div onClick={() => setZoom(null)} style={{ position: "fixed", inset: 0, background: "rgba(5,25,45,0.8)", zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <img src={zoom.img} alt={zoom.name} style={{ maxWidth: "90%", maxHeight: "65vh", objectFit: "contain", filter: zoom.filter }} />
+          <div style={{ color: "#fff", fontWeight: 900, fontSize: 20, marginTop: 12 }}>{zoom.name}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete }) {
   const [name, setName] = useState(initial.name || "");
   const [birthdate, setBirthdate] = useState(initial.birthdate || "");
   const [pin, setPin] = useState(initial.pin || "");
+  const [gender, setGender] = useState(initial.gender || "");
+  const genderLocked = !!initial.gender;
   const [dupProfile, setDupProfile] = useState(null); // { id, name } | null
   const [checking, setChecking] = useState(false);
   const pinValid = pin.length >= 4 && pin.length <= 6;
-  const canSave = !!name.trim() && !!birthdate && pinValid;
+  const canSave = !!name.trim() && !!birthdate && pinValid && (!isNew || !!gender);
 
   async function handleSaveClick() {
     if (!canSave) return;
@@ -2558,7 +2734,7 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
       setChecking(false);
     }
 
-    onSave(name, birthdate, pin);
+    onSave(name, birthdate, pin, gender);
   }
 
   return (
@@ -2579,6 +2755,41 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
         </h1>
         <p style={{ color: "#4a6c85", fontSize: 14.5, marginBottom: 20 }}>
           名前と生年月日だけの、かんたんなプロフィールです。むずかしい登録は必要ありません。
+        </p>
+
+        <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>
+          男の子 / 女の子{isNew ? "" : genderLocked ? "（変更できません）" : "（未設定）"}
+        </label>
+        <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
+          {[["girl", "👧 女の子"], ["boy", "👦 男の子"]].map(([k, label]) => {
+            const on = gender === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                disabled={genderLocked}
+                onClick={() => setGender(k)}
+                style={{
+                  flex: 1,
+                  padding: "14px 0",
+                  borderRadius: 14,
+                  border: on ? "3px solid #14588C" : "2px solid #BFE3F0",
+                  background: on ? (k === "girl" ? "linear-gradient(135deg,#FFD6E2,#FFE9B8)" : "linear-gradient(135deg,#D9C09A,#F0D9A8)") : "#fff",
+                  color: on ? "#0B3D62" : "#7c98aa",
+                  fontWeight: 900,
+                  fontSize: 16,
+                  fontFamily: "inherit",
+                  cursor: genderLocked ? "default" : "pointer",
+                  opacity: genderLocked && !on ? 0.4 : 1,
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <p style={{ color: "#7c98aa", fontSize: 12.5, marginTop: 0, marginBottom: 18, lineHeight: 1.5 }}>
+          女の子用は女の子のファミリア、男の子用は男の子のファミリアだけが登場します。あとから変更できません。
         </p>
 
         <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>なまえ</label>

@@ -438,6 +438,11 @@ export const GIRL_VARIANTS = [...PEGASUS_VARIANTS, ...FAIRY_VARIANTS, ...CAT_VAR
 const BOY_SPECIES_GROUPS = [DRAGON_VARIANTS, TIGER_VARIANTS, PHOENIX_VARIANTS, FENRIR_VARIANTS, GRIFFON_VARIANTS];
 const GIRL_SPECIES_GROUPS = [PEGASUS_VARIANTS, FAIRY_VARIANTS, CAT_VARIANTS, SWAMP_VARIANTS, MERMAID_VARIANTS];
 
+// 種族ごとにまとめた色違い一覧（ずかん表示用）。
+export function speciesGroupsForTheme(themeKey) {
+  return themeKey === "boy" ? BOY_SPECIES_GROUPS : GIRL_SPECIES_GROUPS;
+}
+
 export function variantsForTheme(themeKey) {
   return themeKey === "boy" ? BOY_VARIANTS : GIRL_VARIANTS;
 }

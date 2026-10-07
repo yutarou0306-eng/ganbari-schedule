@@ -11,15 +11,18 @@ const STORAGE_KEY = "pearl-sea-schedule-v2";
 const MASTER_PIN = "5963";
 const DAY_LABELS = ["月", "火", "水", "木", "金", "土", "日"]; // index 0=Mon ... 6=Sun
 
+// 色の選択肢。となり同士（さくら／もも、らべんだー／らいらっく）が似すぎて
+// 見分けにくかったので、色相がバラけるよう「もも」を珊瑚色に、「らいらっく」を
+// ライム色に差し替えた。すでに保存済みのスケジュールの色（hex）はそのまま表示される。
 const PASTELS = [
   { name: "さくら", hex: "#FFD6E0" },
-  { name: "もも", hex: "#FFC9DE" },
+  { name: "こーらる", hex: "#FFB5A8" },
   { name: "ぴーち", hex: "#FFE3C2" },
   { name: "れもん", hex: "#FFF3B0" },
+  { name: "らいむ", hex: "#DDF1A6" },
   { name: "みんと", hex: "#CFF3DE" },
   { name: "そら", hex: "#C6E9F9" },
   { name: "らべんだー", hex: "#DCCBF7" },
-  { name: "らいらっく", hex: "#F3C9EA" },
 ];
 
 const BOY_PALETTE = [
@@ -465,6 +468,11 @@ export default function KidsScheduleApp() {
   const [achievements, setAchievements] = useState({});
   const [noteModalDate, setNoteModalDate] = useState(null);
   const [linkedProfile, setLinkedProfile] = useState(null); // { name, totalStamps } | null
+  // スタンプ帳（プロフィール）に設定された保護者用暗証番号。スケジュール自身の
+  // 暗証番号欄は廃止されたので、新しいスケジュールは config.pin が空になる。
+  // 空のときはこちらを使う（空のままだと「はい」だけで解除できてしまうため）。
+  const [profilePin, setProfilePin] = useState("");
+  const effectivePin = config.pin && config.pin.length > 0 ? config.pin : profilePin;
   const [showRecordsList, setShowRecordsList] = useState(false);
   const [locked, setLocked] = useState(true);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -501,7 +509,7 @@ export default function KidsScheduleApp() {
             // with the same PIN — if so, start unlocked here too instead of
             // prompting again, and relock at that same shared expiry time.
             const shared = readSharedUnlock();
-            if (shared && shared.pin === (data.config.pin || "")) {
+            if (shared && shared.pin && shared.pin === (data.config.pin || "")) {
               setLocked(false);
               scheduleRelock(shared.expiresAt);
             }
@@ -725,6 +733,22 @@ export default function KidsScheduleApp() {
         total = Math.max(0, total);
         if (!cancelled) {
           setLinkedProfile({ name: (profData && profData.blob && profData.blob.name) || "", totalStamps: total });
+          const pPin = (profData && profData.blob && profData.blob.pin) || "";
+          setProfilePin(pPin);
+          const ownPin = config.pin && config.pin.length > 0 ? config.pin : "";
+          if (!ownPin && pPin) {
+            // 暗証番号が分かる前に「はい」だけの確認画面を開いていたら、暗証番号入力に切り替える
+            setShowConfirmModal((open) => {
+              if (open) setShowPinModal(true);
+              return false;
+            });
+            // 同じ暗証番号の別スケジュールが3分以内に解除されていたら、そのまま引き継ぐ
+            const shared = readSharedUnlock();
+            if (shared && shared.pin && shared.pin === pPin) {
+              setLocked(false);
+              scheduleRelock(shared.expiresAt);
+            }
+          }
         }
       } catch (e) {}
     })();
@@ -847,7 +871,7 @@ export default function KidsScheduleApp() {
       return;
     }
     if (locked) {
-      if (config.pin && config.pin.length > 0) setShowPinModal(true);
+      if (effectivePin) setShowPinModal(true);
       else setShowConfirmModal(true);
       return;
     }
@@ -913,7 +937,7 @@ export default function KidsScheduleApp() {
       return;
     }
     if (locked) {
-      if (config.pin && config.pin.length > 0) setShowPinModal(true);
+      if (effectivePin) setShowPinModal(true);
       else setShowConfirmModal(true);
       return;
     }
@@ -1187,7 +1211,7 @@ export default function KidsScheduleApp() {
       showToast("スタンプが押せるようになったよ！3分後に自動でロックします");
     }
     const expiresAt = Date.now() + 3 * 60 * 1000;
-    writeSharedUnlock(config.pin, expiresAt);
+    writeSharedUnlock(effectivePin, expiresAt);
     scheduleRelock(expiresAt);
   }
 
@@ -1202,7 +1226,7 @@ export default function KidsScheduleApp() {
       return;
     }
     pendingAfterUnlockRef.current = action;
-    if (config.pin && config.pin.length > 0) setShowPinModal(true);
+    if (effectivePin) setShowPinModal(true);
     else setShowConfirmModal(true);
   }
 
@@ -1294,7 +1318,7 @@ export default function KidsScheduleApp() {
           locked={locked}
           onLockToggle={() =>
             locked
-              ? config.pin && config.pin.length > 0
+              ? effectivePin
                 ? setShowPinModal(true)
                 : setShowConfirmModal(true)
               : handleRelock()
@@ -1331,9 +1355,9 @@ export default function KidsScheduleApp() {
       )}
 
       {pendingExcuse &&
-        (config.pin && config.pin.length > 0 ? (
+        (effectivePin ? (
           <PinModal
-            correctPin={config.pin}
+            correctPin={effectivePin}
             onSuccess={() => {
               const p = pendingExcuse;
               setPendingExcuse(null);
@@ -1373,7 +1397,7 @@ export default function KidsScheduleApp() {
 
       {showPinModal && (
         <PinModal
-          correctPin={config.pin}
+          correctPin={effectivePin}
           onSuccess={doUnlock}
           onFail={() => showToast("暗証番号が違います")}
           onCancel={() => {
@@ -1719,7 +1743,16 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
     (async () => {
       try {
         const { data } = await supabase.from("profiles").select("blob").eq("id", profileId).maybeSingle();
-        if (!cancelled && data && data.blob) setProfileName(data.blob.name || "");
+        if (!cancelled && data && data.blob) {
+          // 性別が違うスタンプ帳にはつなげない（URLで直接指定された場合も解除）
+          if (data.blob.gender && data.blob.gender !== theme) {
+            setProfileId("");
+            setProfileName("");
+            setLinkStatus("gendermismatch");
+          } else {
+            setProfileName(data.blob.name || "");
+          }
+        }
       } catch (e) {}
     })();
     return () => {
@@ -1737,6 +1770,11 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       const { data, error } = await query;
       if (error || !data || data.length === 0) {
         setLinkStatus("notfound");
+        return;
+      }
+      const g = data[0].blob && data[0].blob.gender;
+      if (g && g !== theme) {
+        setLinkStatus("gendermismatch");
         return;
       }
       setProfileId(data[0].id);
@@ -1860,6 +1898,11 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
               </button>
             </div>
             {linkStatus === "notfound" && <p style={styles.profileLinkError}>見つかりませんでした。</p>}
+            {linkStatus === "gendermismatch" && (
+              <p style={styles.profileLinkError}>
+                このスタンプ帳は{theme === "boy" ? "女の子" : "男の子"}用なので、{theme === "boy" ? "男の子" : "女の子"}用スケジュールはつなげられません。
+              </p>
+            )}
           </div>
         )}
 
