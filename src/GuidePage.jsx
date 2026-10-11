@@ -189,10 +189,23 @@ export default function GuidePage() {
         </Section>
 
         <Section id="guide-homescreen" emoji="📱" title="ホーム画面にアプリのように追加する">
-          <div style={{ fontWeight: 800, color: "#0B3D62", marginBottom: 4 }}>iPhone（Safari）</div>
-          共有アイコン→「ホーム画面に追加」
-          <div style={{ fontWeight: 800, color: "#0B3D62", marginTop: 10, marginBottom: 4 }}>Android（Chrome）</div>
-          右上「⋮」→「ホーム画面に追加」
+          ホーム画面に追加すると、アイコンをタップするだけで開けて、ブラウザのバーが消えて画面も広く使えます。追加する前に、使いたいスタンプ帳（またはスケジュール）のページをブラウザで開いておいてください。追加したアイコンから、そのページがそのまま開きます。
+          <div style={{ fontWeight: 800, color: "#0B3D62", marginTop: 12, marginBottom: 4 }}>iPhone（Safari）</div>
+          <Step n={1}>Safariでページを開き、画面下の共有アイコン（□から↑が出ているマーク）をタップします。</Step>
+          <Step n={2}>メニューを上にスクロールして「ホーム画面に追加」をタップします。</Step>
+          <Step n={3}>名前を確認して、右上の「追加」をタップします。</Step>
+          <div style={{ fontWeight: 800, color: "#0B3D62", marginTop: 12, marginBottom: 4 }}>iPad（Safari）</div>
+          <Step n={1}>Safariでページを開き、画面右上（アドレスバーの近く）の共有アイコン（□から↑が出ているマーク）をタップします。</Step>
+          <Step n={2}>「ホーム画面に追加」をタップします。</Step>
+          <Step n={3}>名前を確認して、「追加」をタップします。</Step>
+          <div style={{ fontWeight: 800, color: "#0B3D62", marginTop: 12, marginBottom: 4 }}>Android（Chrome）</div>
+          <Step n={1}>Chromeでページを開き、右上の「⋮」をタップします。</Step>
+          <Step n={2}>「ホーム画面に追加」（または「アプリをインストール」）をタップします。</Step>
+          <Step n={3}>名前を確認して「追加」をタップします。</Step>
+          <div style={{ marginTop: 10, fontSize: 13, color: "#5a7d94", lineHeight: 1.7 }}>
+            ※ iPhone・iPadでは、Safari以外（ChromeやLINE内のブラウザなど）だと「ホーム画面に追加」が出ないことがあります。その場合は、リンクをSafariで開き直してください。
+            <br />※ 子どもの端末に追加するときは、お子さん用のスケジュールのページを開いた状態で追加すると、そのまま使えます。
+          </div>
         </Section>
 
         <a
