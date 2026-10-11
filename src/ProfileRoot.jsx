@@ -2292,7 +2292,7 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
           ⚗️ ファミリア配合
         </h1>
         <p style={{ textAlign: "center", color: "#EAF7FB", fontSize: 13, marginBottom: 18, lineHeight: 1.7 }}>
-          「ベース」と「サブ」を1枚ずつ選んでください。配合すると、ベースのLVとステータスにサブの分が合計され、サブのファミリアカードはなくなります。
+          「ベース」と「サブ」を1枚ずつ選んでください。配合すると、ベースのLVとステータスにサブの分が合計され、サブのファミリアカードはなくなります。グランドマスターもベース・サブとして使え、LVとステータスを上げられます。
         </p>
 
         <div style={{ fontSize: 12, color: "#EAF7FB", fontWeight: 700, marginBottom: 8 }}>Masterのファミリアカード一覧</div>
@@ -2602,22 +2602,29 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
   const [zoom, setZoom] = useState(null); // { img, name, filter }
   const theme = gender || tab;
 
-  // 手に入れたことのある色違い（配合で消費されたカードも含む）
-  const owned = new Set();
-  // ・正式にカードをもらったもの
-  // ・配合に使った／使い切ったもの（マスターまで育っていた証拠）
-  // ・認定前でも、マスターの姿まで育ったもの
+  // 色違いごとの「いちばん育ったステージ」（配合で消費されたカードも含む）。
+  // ・正式にカードをもらった／配合に使った／認定前でもマスターまで育った → マスター
+  // ・育成中 → いまの成長段階（卵は、かえってから載る＝何が生まれるかはナイショ）
+  const reached = {}; // `${theme}:${variantKey}` -> 最高ステージ番号（-1 = 未発見）
   const consumed = profile.consumedScheduleCards || [];
   const overrides = profile.cardOverrides || {};
+  const bump = (key, idx) => {
+    if (reached[key] === undefined || idx > reached[key]) reached[key] = idx;
+  };
   schedules.forEach((s) => {
     if (s.awardedCard) {
-      owned.add(`${s.awardedCard.theme || s.theme}:${s.awardedCard.variant}`);
+      const t = s.awardedCard.theme || s.theme;
+      const v = getVariant(t, s.awardedCard.variant);
+      bump(`${t}:${v.key}`, stageCount(v.species) - 1);
       return;
     }
     const v = getVariant(s.theme, s.mascotVariant);
-    const reachedMaster = stageIndex(v.species, s.currentPct) >= stageCount(v.species) - 1;
-    if (reachedMaster || consumed.includes(s.id) || overrides[s.id]) owned.add(`${s.theme}:${v.key}`);
+    const last = stageCount(v.species) - 1;
+    const idx = stageIndex(v.species, s.currentPct);
+    bump(`${s.theme}:${v.key}`, consumed.includes(s.id) || overrides[s.id] ? last : idx >= 1 ? idx : -1);
   });
+  const owned = { has: (k) => reached[k] !== undefined && reached[k] >= 0 };
+  const stageLabels = (n) => (n >= 6 ? ["卵", "幼年期", "少年期", "青年期", "成熟期", "マスター"] : ["卵", "幼年期", "青年期", "成熟期", "マスター"]);
   const gmNames = new Set();
   Object.values(profile.cardOverrides || {}).forEach((o) => {
     if (o && o.grandMaster && o.grandMaster.name) gmNames.add(o.grandMaster.name);
@@ -2627,7 +2634,7 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
   const speciesKeys = groups.map((g) => g[0].species);
   const speciesKnown = (sp) => groups.some((g) => g[0].species === sp && g.some((v) => owned.has(`${theme}:${v.key}`)));
   const total = groups.reduce((n, g) => n + g.length, 0);
-  const got = groups.reduce((n, g) => n + g.filter((v) => owned.has(`${theme}:${v.key}`)).length, 0);
+  const got = groups.reduce((n, g) => n + g.filter((v) => reached[`${theme}:${v.key}`] === stageCount(v.species) - 1).length, 0);
   let gmGot = 0;
   speciesKeys.forEach((b) => speciesKeys.forEach((f) => {
     const c = GRAND_MASTER_COMBOS[b] && GRAND_MASTER_COMBOS[b][f];
@@ -2654,29 +2661,42 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
           </div>
         )}
         <div style={{ fontSize: 13, color: "#4a6c85", marginBottom: 12, fontWeight: 700 }}>
-          あつめたカード {got} / {total}　・　グランドマスター {gmGot} / {speciesKeys.length * speciesKeys.length}
+          マスターまで育てた {got} / {total}　・　グランドマスター {gmGot} / {speciesKeys.length * speciesKeys.length}
         </div>
 
         <div style={{ fontWeight: 900, color: "#0B3D62", marginBottom: 6 }}>🎴 ファミリアカード</div>
+        <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 8 }}>卵からマスターまで、育った姿が順番にひらいていきます。</div>
         {groups.map((g) => (
-          <div key={g[0].species} style={{ marginBottom: 10 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 800, color: "#14588C", marginBottom: 4 }}>{g.some((v) => owned.has(`${theme}:${v.key}`)) ? speciesLabel(g[0].species) : "？？？"}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
-              {g.map((v) => {
-                const has = owned.has(`${theme}:${v.key}`);
-                return (
-                  <div key={v.key}>
-                    <div
-                      style={{ ...cell, background: has ? v.cardBg : "#F1F6F9", cursor: has ? "pointer" : "default" }}
-                      onClick={() => has && setZoom({ img: finalFormImage(theme, v.key), name: v.name, filter: v.filter })}
-                    >
-                      {has ? <img src={finalFormImage(theme, v.key)} alt={v.name} style={{ width: "100%", height: "100%", objectFit: "contain", filter: v.filter }} /> : q}
-                    </div>
-                    <div style={{ fontSize: 9.5, textAlign: "center", color: has ? "#3d5a6c" : "#B7C4CC", marginTop: 2, lineHeight: 1.2 }}>{has ? v.name : "？？？"}</div>
+          <div key={g[0].species} style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#14588C", marginBottom: 4 }}>{g.some((v) => owned.has(`${theme}:${v.key}`)) ? speciesLabel(g[0].species) : "？？？"}</div>
+            {g.map((v) => {
+              const key = `${theme}:${v.key}`;
+              const top = reached[key] === undefined ? -1 : reached[key];
+              const n = stageCount(v.species);
+              const labels = stageLabels(n);
+              return (
+                <div key={v.key} style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: top >= 0 ? "#3d5a6c" : "#B7C4CC", marginBottom: 2 }}>{top >= 0 ? v.name : "？？？"}</div>
+                  <div style={{ display: "grid", gridTemplateColumns: `repeat(${n}, 1fr)`, gap: 4 }}>
+                    {Array.from({ length: n }).map((_, i) => {
+                      const open = i <= top;
+                      const img = stageImageAt(v.species, i);
+                      return (
+                        <div key={i}>
+                          <div
+                            style={{ ...cell, borderRadius: 8, background: open ? v.cardBg : "#F1F6F9", cursor: open ? "pointer" : "default" }}
+                            onClick={() => open && setZoom({ img, name: `${v.name}（${labels[i]}）`, filter: v.filter })}
+                          >
+                            {open ? <img src={img} alt={labels[i]} style={{ width: "100%", height: "100%", objectFit: "contain", filter: v.filter }} /> : <span style={{ fontSize: 16, fontWeight: 900, color: "#B7C4CC" }}>？</span>}
+                          </div>
+                          <div style={{ fontSize: 8.5, textAlign: "center", color: open ? "#5a7d94" : "#B7C4CC", marginTop: 1 }}>{open ? labels[i] : "？？"}</div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
         ))}
 
