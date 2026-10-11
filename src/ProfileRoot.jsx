@@ -583,6 +583,8 @@ export default function ProfileRoot() {
   );
   sortCollectedCards(allCards, cardSortMode);
   const masterCards = allCards.filter((c) => c.isMaster);
+  // 途中までしか育っていないカード（サブ＝材料専用。ステータスとLVだけ加算され、進化には関わらない）
+  const partialCards = allCards.filter((c) => !c.isMaster && c.source === "growing" && c.lv > 0);
 
   const totalSpent = (profile.redemptions || []).reduce((sum, r) => sum + r.cost, 0);
   const available = totalEarned - totalSpent;
@@ -598,11 +600,12 @@ export default function ProfileRoot() {
   async function handleFinalizeBreed(baseId, subId) {
     const base = allCards.find((c) => c.id === baseId);
     const sub = allCards.find((c) => c.id === subId);
-    if (!base || !sub || !base.isMaster || !sub.isMaster) return;
+    if (!base || !sub || !base.isMaster) return;
+    if (!sub.isMaster && !(sub.source === "growing" && sub.lv > 0)) return;
     const newLv = combineLevel(base.lv, sub.lv);
     const newStats = combineStats(base.stats, sub.stats);
     const combo =
-      base.variant && sub.variant && !base.grandMaster ? getGrandMasterCombo(base.variant.species, sub.variant.species) : null;
+      sub.isMaster && base.variant && sub.variant && !base.grandMaster ? getGrandMasterCombo(base.variant.species, sub.variant.species) : null;
     const existingGm = profile.cardOverrides && profile.cardOverrides[base.scheduleId] && profile.cardOverrides[base.scheduleId].grandMaster;
     const existingCombined =
       base.source === "bred"
@@ -812,6 +815,7 @@ export default function ProfileRoot() {
       <>
         <BreedPage
           masterCards={masterCards}
+          partialCards={partialCards}
           onFinalize={(baseId, subId) => askParent("ファミリアを配合する", () => handleFinalizeBreed(baseId, subId))}
           onClose={() => setBreedPage(false)}
         />
@@ -1079,7 +1083,7 @@ export default function ProfileRoot() {
             </div>
           )}
         </div>
-        {masterCards.length >= 2 && (
+        {masterCards.length >= 1 && masterCards.length + partialCards.length >= 2 && (
           <button
             onClick={() => setBreedPage(true)}
             style={{
@@ -2242,7 +2246,7 @@ function RecipeTile({ src, filter, cardBg, label, selected, onClick }) {
   );
 }
 
-function BreedPage({ masterCards, onFinalize, onClose }) {
+function BreedPage({ masterCards, partialCards = [], onFinalize, onClose }) {
   const [baseId, setBaseId] = useState(null);
   const [subId, setSubId] = useState(null);
   const [confirming, setConfirming] = useState(false);
@@ -2252,6 +2256,11 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
   }, []);
 
   function handleTap(id) {
+    if (partialCards.some((c) => c.id === id)) {
+      // 途中のカードはサブ専用
+      setSubId(id === subId ? null : id);
+      return;
+    }
     if (id === baseId) {
       setBaseId(null);
       return;
@@ -2273,11 +2282,11 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
   }
 
   const base = masterCards.find((c) => c.id === baseId);
-  const sub = masterCards.find((c) => c.id === subId);
+  const sub = masterCards.find((c) => c.id === subId) || partialCards.find((c) => c.id === subId);
   const combined = base && sub ? combineStats(base.stats, sub.stats) : null;
   const combinedLv = base && sub ? combineLevel(base.lv, sub.lv) : null;
   const willGrandMaster =
-    base && sub && base.variant && sub.variant && !base.grandMaster ? getGrandMasterCombo(base.variant.species, sub.variant.species) : null;
+    base && sub && sub.isMaster && base.variant && sub.variant && !base.grandMaster ? getGrandMasterCombo(base.variant.species, sub.variant.species) : null;
 
   return (
     <div style={{ minHeight: "100vh", background: bg, fontFamily: "'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', sans-serif", padding: "28px 16px" }}>
@@ -2307,6 +2316,18 @@ function BreedPage({ masterCards, onFinalize, onClose }) {
             />
           ))}
         </div>
+
+        {partialCards.length > 0 && (
+          <>
+            <div style={{ fontSize: 12, color: "#EAF7FB", fontWeight: 700, marginBottom: 2 }}>育成中のカード（サブ専用）</div>
+            <div style={{ fontSize: 11, color: "#CFE9F3", marginBottom: 8 }}>LVとステータスだけベースに加わります。進化（グランドマスターへの変化）には関わりません。</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18, marginBottom: 22 }}>
+              {partialCards.map((c) => (
+                <CardTile key={c.id} card={c} selected={c.id === subId} roleLabel={c.id === subId ? "サブ" : null} onOpen={() => handleTap(c.id)} />
+              ))}
+            </div>
+          </>
+        )}
 
         <div style={{ display: "flex", gap: 10, alignItems: "flex-start", justifyContent: "center", marginBottom: 6 }}>
           <StatSlotCard label="ベース" accent="#FFE27A" card={base} />
