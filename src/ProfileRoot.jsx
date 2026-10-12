@@ -582,9 +582,13 @@ export default function ProfileRoot() {
     (c) => !bookGender || !c.theme || c.theme === bookGender
   );
   sortCollectedCards(allCards, cardSortMode);
-  const masterCards = allCards.filter((c) => c.isMaster);
+  // 配合に使えるのは「完了したスケジュール」に紐づくカードだけ（育成中のスケジュールのカードは対象外）。
+  // 配合で生まれたスケジュールを持たないカード（bred）は、そのまま対象。
+  const completedIds = new Set(schedules.filter((s) => s.completed).map((s) => s.id));
+  const breedable = allCards.filter((c) => c.source === "bred" || completedIds.has(c.scheduleId));
+  const masterCards = breedable.filter((c) => c.isMaster);
   // 途中までしか育っていないカード（サブ＝材料専用。ステータスとLVだけ加算され、進化には関わらない）
-  const partialCards = allCards.filter((c) => !c.isMaster && c.source === "growing" && c.lv > 0);
+  const partialCards = breedable.filter((c) => !c.isMaster && c.source === "growing" && c.lv > 0);
 
   const totalSpent = (profile.redemptions || []).reduce((sum, r) => sum + r.cost, 0);
   const available = totalEarned - totalSpent;
