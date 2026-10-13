@@ -1087,15 +1087,17 @@ export default function KidsScheduleApp() {
 
   function buildRecordsList() {
     const entries = [];
+    // 今日まで（期間が終わっていればその最終日まで）の全日を並べる。
+    // 子どものメモが無い日でも、保護者・祖父母がコメントを書けるようにするため。
+    const todayKey = todayStr();
     for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = addDays(d, 1)) {
       const dKey = dateKey(d);
+      if (dKey > todayKey) break;
       const note = notes[dKey];
       const comments = parentComments[dKey] || [];
       const achv = achievements[dKey];
       const hasAchv = achv && Object.keys(achv).length > 0;
-      if (note || comments.length > 0 || hasAchv) {
-        entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null });
-      }
+      entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null });
     }
     entries.sort((a, b) => b.date.getTime() - a.date.getTime());
     return entries;
@@ -2933,7 +2935,7 @@ function RecordsListModal({ entries, subjects, profileId, profileName, onAddComm
       <div style={styles.recordsListCard}>
         <h3 style={styles.modalTitle}>📋 きろく一覧</h3>
         {entries.length === 0 ? (
-          <p style={styles.modalMsg}>まだ記録がありません。日付の「📝メモ」から書いてみよう！</p>
+          <p style={styles.modalMsg}>まだ記録できる日がありません。</p>
         ) : (
           <div style={styles.recordsListScroll}>
             {entries.map((e) => (
@@ -3033,7 +3035,11 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
           {a.name}：{a.text}
         </div>
       ))}
-      {e.note && <div style={styles.recordEntryNote}>{e.note}</div>}
+      {e.note ? (
+        <div style={styles.recordEntryNote}>{e.note}</div>
+      ) : (
+        <div style={{ ...styles.recordEntryNote, color: "#9db3c2" }}>（まだメモはありません）</div>
+      )}
 
       {e.comments && e.comments.length > 0 && (
         <div style={{ marginTop: 8 }}>
@@ -3119,7 +3125,7 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
         </div>
       ) : (
         <button style={styles.replyOpenBtn} onClick={() => setReplyOpen(true)}>
-          💬 返信する
+          {e.note ? "💬 返信する" : "💬 コメントを書く"}
         </button>
       )}
     </div>
