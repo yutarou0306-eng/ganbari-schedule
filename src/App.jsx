@@ -257,6 +257,18 @@ function dateKey(d) {
   return `${y}-${m}-${day}`;
 }
 
+// ファミリア（卵・キャラクター）が登場し、カードがもらえる条件：
+// スケジュールが30日以上 かつ「やること」が2つ以上。満たさないスケジュールではキャラは表示されない。
+const MIN_CARD_DAYS = 30;
+const MIN_CARD_SUBJECTS = 2;
+function isCardEligibleConfig(config) {
+  const sd = parseDate(config.startDate);
+  const ed = parseDate(config.endDate);
+  if (!sd || !ed) return false;
+  const days = Math.round((ed.getTime() - sd.getTime()) / 86400000) + 1;
+  return days >= MIN_CARD_DAYS && (config.subjects || []).length >= MIN_CARD_SUBJECTS;
+}
+
 function dayIndexMon0(d) {
   return (d.getDay() + 6) % 7;
 }
@@ -645,6 +657,7 @@ export default function KidsScheduleApp() {
   useEffect(() => {
     if (!loaded || view !== "main") return;
     if (!config.subjects || config.subjects.length === 0) return;
+    if (!isCardEligibleConfig(config)) return; // 条件を満たさないスケジュールにはキャラは出ない
     if (config.mascotHatchPrompted) return;
     if (hatchNamingSnoozed) return; // wait for next app open, not this session
     const variant = getVariant(config.theme, config.mascotVariant);
@@ -669,6 +682,7 @@ export default function KidsScheduleApp() {
   useEffect(() => {
     if (!loaded || view !== "main") return;
     if (!config.subjects || config.subjects.length === 0) return;
+    if (!isCardEligibleConfig(config)) return;
     if (!config.mascotHatchPrompted) return; // hatching not handled yet — let that effect go first
     if (pendingEvolution || evolution) return; // already showing something about this
     if (evolutionSnoozed) return; // parent chose 放っておく — wait for next app open, not this session
@@ -1066,8 +1080,7 @@ export default function KidsScheduleApp() {
   // the "all done" check (e.g. toggling a past stamp back and forth) never
   // hands out a second card for the same schedule.
   function awardCardIfNeeded(totalStamps, pendingExcused = 0) {
-    const scheduleDays = Math.round((endDate.getTime() - startDate.getTime()) / 86400000) + 1;
-    if (scheduleDays < 30 || (config.subjects || []).length < 2) return;
+    if (!isCardEligibleConfig(config)) return;
     setConfig((prev) => {
       if (prev.awardedCard) return prev;
       return {
@@ -1835,7 +1848,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       // Only warn on brand-new schedules — someone editing an existing one
       // has already made this choice once.
       const days = Math.round((parseDate(ed).getTime() - parseDate(sd).getTime()) / 86400000) + 1;
-      if (days < 30 || cleanSubjects.length < 2) {
+      if (days < MIN_CARD_DAYS || cleanSubjects.length < MIN_CARD_SUBJECTS) {
         setPendingLowCardSave(payload);
         return;
       }
@@ -1968,6 +1981,27 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
           <Plus size={20} /> やることを追加
         </button>
 
+        {(() => {
+          const sdo = parseDate(startDate);
+          const edo = parseDate(endDate);
+          const days = sdo && edo ? Math.round((edo.getTime() - sdo.getTime()) / 86400000) + 1 : 0;
+          const nSubj = subjects.length;
+          const okDays = days >= MIN_CARD_DAYS;
+          const okSubj = nSubj >= MIN_CARD_SUBJECTS;
+          const ok = okDays && okSubj;
+          return (
+            <div style={{ marginTop: 16, borderRadius: 14, padding: "12px 14px", background: ok ? "#EAF7EE" : "#FFF3E0", border: `2px solid ${ok ? "#9AD5AE" : "#F4C95D"}`, fontSize: 13, lineHeight: 1.7, color: "#4a5c66" }}>
+              <div style={{ fontWeight: 800, color: ok ? "#2E7D4F" : "#8B5E34", marginBottom: 4 }}>
+                {ok ? "🥚 ファミリアが登場します！" : "⚠️ このままだとファミリアは登場しません"}
+              </div>
+              ファミリア（キャラクター）が登場してカードがもらえるのは、次の<b>両方</b>を満たすスケジュールだけです。
+              <div>{okDays ? "✅" : "❌"} 期間が{MIN_CARD_DAYS}日以上（いま{days}日）</div>
+              <div>{okSubj ? "✅" : "❌"} 「やること」が{MIN_CARD_SUBJECTS}つ以上（いま{nSubj}つ）</div>
+              <div style={{ marginTop: 4, fontSize: 12, color: "#7c98aa" }}>条件を満たさないスケジュールでは、キャラクターは表示されません。</div>
+            </div>
+          );
+        })()}
+
         <button style={styles.saveBtn} onClick={handleSave}>
           このスケジュールで始める
         </button>
@@ -1980,8 +2014,8 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       </div>
       {pendingLowCardSave && (
         <ConfirmModal
-          title="ファミリアカードがもらえないかも"
-          message="スケジュールが30日未満、若しくは「やること」が1つだけだと完了した時ファミリアカードが貰えないよ。それでもスケジュール帳作る？"
+          title="ファミリアが登場しません"
+          message="スケジュールが30日未満、または「やること」が1つだけだと、ファミリア（キャラクター）は表示されず、カードももらえないよ。それでもスケジュールを作る？"
           confirmLabel="作る"
           cancelLabel="編集にもどる"
           onConfirm={() => {
@@ -2189,7 +2223,9 @@ function MainScreen({
               </div>
             )}
           </div>
-          <GrowthMascotArt theme={theme.key} pct={pct} variantKey={config.mascotVariant} mascotName={config.mascotName} />
+          {isCardEligibleConfig(config) && (
+            <GrowthMascotArt theme={theme.key} pct={pct} variantKey={config.mascotVariant} mascotName={config.mascotName} />
+          )}
         </div>
 
         <div style={{ ...styles.necklaceRow, background: theme.overlayBg }}>

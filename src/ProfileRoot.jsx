@@ -265,6 +265,13 @@ export default function ProfileRoot() {
             endDate: row.blob.config.endDate || "",
             stamps: countStampsInBlob(row.blob),
             awardedCard: row.blob.config.awardedCard || null,
+            // ファミリアが登場する条件：30日以上 かつ やること2つ以上
+            cardEligible: (() => {
+              const c = row.blob.config;
+              if (!c.startDate || !c.endDate) return false;
+              const d = Math.round((new Date(c.endDate).getTime() - new Date(c.startDate).getTime()) / 86400000) + 1;
+              return d >= 30 && (c.subjects || []).length >= 2;
+            })(),
             mascotVariant: row.blob.config.mascotVariant || null,
             mascotName: row.blob.config.mascotName || "",
             currentPct: stats.pct,
@@ -515,6 +522,8 @@ export default function ProfileRoot() {
   // rather than silently disappearing from this list.
   const growingCards = schedules
     .filter((s) => !s.awardedCard && !(profile.consumedScheduleCards || []).includes(s.id))
+    // 条件（30日以上・やること2つ以上）を満たさないスケジュールにはキャラは登場しない
+    .filter((s) => s.cardEligible || (profile.cardOverrides && profile.cardOverrides[s.id]))
     .map((s) => {
       const variant = getVariant(s.theme, s.mascotVariant);
       const hatched = stageIndex(variant.species, s.currentPct) > 0;
@@ -2643,6 +2652,7 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
       bump(`${t}:${v.key}`, stageCount(v.species) - 1);
       return;
     }
+    if (!s.cardEligible && !overrides[s.id]) return;
     const v = getVariant(s.theme, s.mascotVariant);
     const last = stageCount(v.species) - 1;
     const idx = stageIndex(v.species, s.currentPct);
