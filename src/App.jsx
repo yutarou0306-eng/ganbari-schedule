@@ -159,7 +159,7 @@ function StampIcon({ index, color, size = 30, withFace = true, shapes }) {
   const set = shapes || SHAPES;
   const draw = set[index % set.length];
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24">
+    <svg width={size} height={size} viewBox="0 0 24 24" style={{ maxWidth: "100%", maxHeight: "100%", flexShrink: 0 }}>
       {draw(color)}
       {withFace && <Face />}
     </svg>
@@ -2536,12 +2536,12 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
   const icon = useDragonStamp ? (
     <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
   ) : (
-    <StampIcon index={iconIndex} color={color} size="76%" shapes={shapes} withFace={withFace} />
+    <StampIcon index={iconIndex} color={color} size="86%" shapes={shapes} withFace={withFace} />
   );
   const hintIdx = taskIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1);
   const hintIcon = (
     <span style={styles.stampHintIcon}>
-      <StampIcon index={hintIdx} color={color} size="72%" shapes={shapes} withFace={false} />
+      <StampIcon index={hintIdx} color={color} size="82%" shapes={shapes} withFace={false} />
     </span>
   );
 
@@ -2612,7 +2612,7 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
           useDragonStamp ? (
             <img src="/dragon-stamp.png" alt="" style={{ ...styles.dragonStampImg, opacity: 0.55 }} />
           ) : (
-            <StampIcon index={iconIndex} color={color} size="72%" shapes={shapes} withFace={false} />
+            <StampIcon index={iconIndex} color={color} size="82%" shapes={shapes} withFace={false} />
           )
         ) : (
           hintIcon
@@ -2646,7 +2646,7 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
         useDragonStamp ? (
           <img src="/dragon-stamp.png" alt="" style={{ ...styles.dragonStampImg, opacity: 0.55 }} />
         ) : (
-          <StampIcon index={iconIndex} color={color} size="72%" shapes={shapes} withFace={false} />
+          <StampIcon index={iconIndex} color={color} size="82%" shapes={shapes} withFace={false} />
         )
       ) : (
         hintIcon
@@ -2740,7 +2740,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, wit
             {useDragonStamp ? (
               <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
             ) : (
-              <StampIcon index={iconIndex} color={color} size="78%" shapes={shapes} withFace={withFace} />
+              <StampIcon index={iconIndex} color={color} size="88%" shapes={shapes} withFace={withFace} />
             )}
           </span>
         ) : (
@@ -2748,7 +2748,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, wit
             <StampIcon
               index={taskIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1)}
               color={color}
-              size="72%"
+              size="82%"
               shapes={shapes}
               withFace={false}
             />
@@ -3847,7 +3847,7 @@ const styles = {
   achvMiniLabel: { fontSize: 8.5, fontWeight: 800, color: "#5C3A21", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%", textAlign: "center" },
   stampCellWrap: { position: "relative", width: "100%" },
   stampCircle: { width: "100%", aspectRatio: "1", borderRadius: "50%", border: "3px dashed", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", overflow: "visible", boxSizing: "border-box" },
-  stampPopWrap: { display: "flex", alignItems: "center", justifyContent: "center", animation: "stampPop 0.45s cubic-bezier(.34,1.56,.64,1)" },
+  stampPopWrap: { width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", animation: "stampPop 0.45s cubic-bezier(.34,1.56,.64,1)" },
   x2Badge: { position: "absolute", top: -8, right: -8, background: "#FF6B8A", color: "#fff", fontSize: 11, fontWeight: 900, borderRadius: 999, padding: "2px 6px", boxShadow: "0 2px 5px rgba(0,0,0,0.3)" },
   undoBadge: { position: "absolute", top: -8, left: -8, width: 22, height: 22, borderRadius: "50%", background: "#8aa4b4", color: "#fff", fontSize: 14, fontWeight: 900, border: "2px solid #fff", boxShadow: "0 2px 5px rgba(0,0,0,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 },
   commentBubble: { position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap", background: "#fff", color: "#FF6B8A", fontSize: 12, fontWeight: 900, padding: "3px 8px", borderRadius: 999, boxShadow: "0 4px 10px rgba(0,0,0,0.2)", animation: "floatComment 1.3s ease-out forwards", pointerEvents: "none", zIndex: 5 },
@@ -3938,7 +3938,7 @@ const styles = {
   celebrateDragonImg: { width: 120, height: 120, borderRadius: "50%", marginBottom: 10, boxShadow: "0 8px 20px rgba(0,0,0,0.35)" },
   dragonStampImg: { width: "82%", height: "82%", borderRadius: "50%", objectFit: "cover" },
   backfillHint: { fontSize: 20, fontWeight: 900, color: "#c9d8e0" },
-  stampHintIcon: { display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.55 },
+  stampHintIcon: { width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.7 },
   weekCelebrateTitle: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 27, margin: "4px 0" },
   weekCelebrateSub: { fontSize: 17, color: "#5a7d94", marginBottom: 16, lineHeight: 1.6 },
   bigStamp: { display: "inline-block", border: "4px solid #FF8FA3", color: "#FF8FA3", fontWeight: 900, fontSize: 26, padding: "10px 26px", borderRadius: 14, transform: "rotate(-8deg)", marginBottom: 18, fontFamily: "'Kaisei Decol', serif" },
