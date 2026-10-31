@@ -62,6 +62,8 @@ const STAGE_FILES = {
   mermaidGreen: ["/mermaid-green-egg.png", "/mermaid-green-baby.png", "/mermaid-green-infant.png", "/mermaid-green-adult.png", "/mermaid-green-master.png"],
   mermaidBlue: ["/mermaid-blue-egg.png", "/mermaid-blue-baby.png", "/mermaid-blue-infant.png", "/mermaid-blue-adult.png", "/mermaid-blue-master.png"],
   mermaidRed: ["/mermaid-red-egg.png", "/mermaid-red-baby.png", "/mermaid-red-infant.png", "/mermaid-red-adult.png", "/mermaid-red-master.png"],
+  crystalButterfly: ["/crystalbutterfly-egg.png", "/crystalbutterfly-baby.png", "/crystalbutterfly-infant.png", "/crystalbutterfly-adult.png", "/crystalbutterfly-master.png"],
+  crystalButterflyRed: ["/crystalbutterfly-red-egg.png", "/crystalbutterfly-red-baby.png", "/crystalbutterfly-red-infant.png", "/crystalbutterfly-red-adult.png", "/crystalbutterfly-red-master.png"],
 };
 
 // Picks the growth-stage index (0 = still an egg, higher = further grown)
@@ -427,16 +429,33 @@ const MERMAID_VARIANTS = [
   },
 ];
 
+const CRYSTAL_BUTTERFLY_VARIANTS = [
+  {
+    key: "crystalbutterfly-normal",
+    species: "crystalButterfly",
+    name: "クリスタルバタフライ",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#F3E6FF,#BFD8FF)",
+  },
+  {
+    key: "crystalbutterfly-red",
+    species: "crystalButterflyRed",
+    name: "レッドクリスタルバタフライ",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#FFE0E0,#F2A8A8)",
+  },
+];
+
 export const BOY_VARIANTS = [...DRAGON_VARIANTS, ...TIGER_VARIANTS, ...PHOENIX_VARIANTS, ...FENRIR_VARIANTS, ...GRIFFON_VARIANTS];
 
-export const GIRL_VARIANTS = [...PEGASUS_VARIANTS, ...FAIRY_VARIANTS, ...CAT_VARIANTS, ...SWAMP_VARIANTS, ...MERMAID_VARIANTS];
+export const GIRL_VARIANTS = [...PEGASUS_VARIANTS, ...FAIRY_VARIANTS, ...CAT_VARIANTS, ...SWAMP_VARIANTS, ...MERMAID_VARIANTS, ...CRYSTAL_BUTTERFLY_VARIANTS];
 
 // Grouped by species (not flattened) so a new egg's species is chosen with
 // equal odds regardless of how many color variants that species happens to
 // have — a species with 5 colors shouldn't come up more often than one with
 // 3. The color within the chosen species is then picked at random too.
 const BOY_SPECIES_GROUPS = [DRAGON_VARIANTS, TIGER_VARIANTS, PHOENIX_VARIANTS, FENRIR_VARIANTS, GRIFFON_VARIANTS];
-const GIRL_SPECIES_GROUPS = [PEGASUS_VARIANTS, FAIRY_VARIANTS, CAT_VARIANTS, SWAMP_VARIANTS, MERMAID_VARIANTS];
+const GIRL_SPECIES_GROUPS = [PEGASUS_VARIANTS, FAIRY_VARIANTS, CAT_VARIANTS, SWAMP_VARIANTS, MERMAID_VARIANTS, CRYSTAL_BUTTERFLY_VARIANTS];
 
 // 種族ごとにまとめた色違い一覧（ずかん表示用）。
 export function speciesGroupsForTheme(themeKey) {
@@ -495,6 +514,8 @@ const SPECIES_SUFFIX = {
   mermaidGreen: "マーメイド",
   mermaidBlue: "マーメイド",
   mermaidRed: "マーメイド",
+  crystalButterfly: "クリスタルバタフライ",
+  crystalButterflyRed: "クリスタルバタフライ",
 };
 
 // The color-only part of a variant's name plus "エッグ" (e.g. "ブルー
@@ -542,6 +563,7 @@ export const SPECIES_BASE_STATS = {
   pegasus: { hp: 115, mp: 90, power: 55, defense: 70, speed: 70, wisdom: 100 },
   swamp: { hp: 130, mp: 110, power: 55, defense: 65, speed: 50, wisdom: 90 },
   mermaid: { hp: 110, mp: 105, power: 50, defense: 65, speed: 70, wisdom: 100 },
+  crystalButterfly: { hp: 100, mp: 120, power: 40, defense: 50, speed: 80, wisdom: 110 },
   fairy: { hp: 110, mp: 110, power: 65, defense: 60, speed: 50, wisdom: 105 },
   cat: { hp: 100, mp: 140, power: 40, defense: 40, speed: 60, wisdom: 120 },
 };
@@ -559,6 +581,7 @@ SPECIES_BASE_STATS.catRed = SPECIES_BASE_STATS.cat;
 SPECIES_BASE_STATS.mermaidGreen = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidBlue = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidRed = SPECIES_BASE_STATS.mermaid;
+SPECIES_BASE_STATS.crystalButterflyRed = SPECIES_BASE_STATS.crystalButterfly;
 SPECIES_BASE_STATS.pegasusStarlight = SPECIES_BASE_STATS.pegasus;
 SPECIES_BASE_STATS.pegasusSunset = SPECIES_BASE_STATS.pegasus;
 SPECIES_BASE_STATS.pegasusEmerald = SPECIES_BASE_STATS.pegasus;
@@ -652,6 +675,7 @@ export const GRAND_MASTER_COMBOS = {
     cat: { name: "ミスティックユニコーン", img: "/gm-pegasus-cat.png" },
     swamp: { name: "スワンユニコーン", img: "/gm-pegasus-swamp.png" },
     mermaid: { name: "アクアユニコーン", img: "/gm-pegasus-mermaid.png" },
+    crystalButterfly: { name: "クリスタルユニコーン", img: null },
   },
   fairy: {
     pegasus: { name: "ユニコーンフェアリー", img: "/gm-fairy-pegasus.png" },
@@ -659,6 +683,7 @@ export const GRAND_MASTER_COMBOS = {
     cat: { name: "キャットフェアリー", img: "/gm-fairy-cat.png" },
     swamp: { name: "スワンフェアリー", img: "/gm-fairy-swamp.png" },
     mermaid: { name: "マーメイドフェアリー", img: "/gm-fairy-mermaid.png" },
+    crystalButterfly: { name: "クリスタルフェアリー", img: null },
   },
   cat: {
     pegasus: { name: "ユニコーンキャット", img: "/gm-cat-pegasus.png" },
@@ -666,6 +691,7 @@ export const GRAND_MASTER_COMBOS = {
     cat: { name: "アークメイジキャット", img: "/gm-cat-cat.png" },
     swamp: { name: "スワンキャット", img: "/gm-cat-swamp.png" },
     mermaid: { name: "アクアキャット", img: "/gm-cat-mermaid.png" },
+    crystalButterfly: { name: "クリスタルキャット", img: null },
   },
   swamp: {
     pegasus: { name: "ユニコーンスワン", img: "/gm-swamp-pegasus.png" },
@@ -673,6 +699,7 @@ export const GRAND_MASTER_COMBOS = {
     cat: { name: "ミスティックスワン", img: "/gm-swamp-cat.png" },
     swamp: { name: "スワンクイーン", img: "/gm-swamp-swamp.png" },
     mermaid: { name: "アクアスワン", img: "/gm-swamp-mermaid.png" },
+    crystalButterfly: { name: "クリスタルスワン", img: null },
   },
   mermaid: {
     pegasus: { name: "ユニコーンマーメイド", img: "/gm-mermaid-pegasus.png" },
@@ -680,6 +707,15 @@ export const GRAND_MASTER_COMBOS = {
     cat: { name: "ミスティックマーメイド", img: "/gm-mermaid-cat.png" },
     swamp: { name: "スワンマーメイド", img: "/gm-mermaid-swamp.png" },
     mermaid: { name: "マーメイドクイーン", img: "/gm-mermaid-mermaid.png" },
+    crystalButterfly: { name: "クリスタルマーメイド", img: null },
+  },
+  crystalButterfly: {
+    pegasus: { name: "ユニコーンバタフライ", img: null },
+    fairy: { name: "フェアリーバタフライ", img: null },
+    cat: { name: "ミスティックバタフライ", img: null },
+    swamp: { name: "スワンバタフライ", img: null },
+    mermaid: { name: "アクアバタフライ", img: null },
+    crystalButterfly: { name: "クリスタルバタフライクイーン", img: null },
   },
 };
 

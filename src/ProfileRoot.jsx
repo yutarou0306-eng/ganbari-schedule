@@ -22,7 +22,7 @@ const MASTER_PIN = "5963";
 // 種族順はmascots.jsでの定義順（男の子：ドラゴン→タイガー→フェニックス→フェンリル→
 // グリフォン、女の子：ペガサス→フェアリー→マジカルキャット→スワンプリンセス→
 // マーメイド）にそろえている。
-const CARD_SPECIES_ORDER = ["ドラゴン", "タイガー", "フェニックス", "フェンリル", "グリフォン", "ペガサス", "フェアリー", "マジカルキャット", "スワンプリンセス", "マーメイド"];
+const CARD_SPECIES_ORDER = ["ドラゴン", "タイガー", "フェニックス", "フェンリル", "グリフォン", "ペガサス", "フェアリー", "マジカルキャット", "スワンプリンセス", "マーメイド", "クリスタルバタフライ"];
 
 // "2026-09-22" -> "2026年9月22日"。想定外の形式ならそのまま返す。
 function formatRedemptionDate(dateStr) {
@@ -2737,7 +2737,7 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
 
         <div style={{ fontWeight: 900, color: "#0B3D62", margin: "16px 0 4px" }}>⚗️ グランドマスター</div>
         <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 6 }}>たて：ベース　よこ：配合した相手</div>
-        <div style={{ display: "grid", gridTemplateColumns: "34px repeat(5, 1fr)", gap: 4, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: `34px repeat(${speciesKeys.length}, 1fr)`, gap: 4, alignItems: "start" }}>
           <div />
           {speciesKeys.map((f) => (
             <div key={f} style={{ fontSize: 9.5, fontWeight: 800, color: "#14588C", textAlign: "center" }}>{speciesKnown(f) ? speciesLabel(f) : "？？？"}</div>
