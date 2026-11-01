@@ -1582,6 +1582,8 @@ function CardTile({ card, selected, roleLabel, onOpen }) {
             background: card.variant ? card.variant.cardBg : "linear-gradient(135deg,#D6C4F0,#5A3FA0)",
             boxShadow: selected
               ? "0 0 0 3px #FFE27A, 0 4px 10px rgba(11,61,98,0.35)"
+              : card.grandMaster
+              ? "0 0 0 2px #E8B931, 0 4px 10px rgba(11,61,98,0.25), inset 0 0 0 2px rgba(255,255,255,0.6)"
               : "0 4px 10px rgba(11,61,98,0.25), inset 0 0 0 2px rgba(255,255,255,0.6)",
             display: "flex",
             alignItems: "center",
@@ -1647,6 +1649,36 @@ function CardTile({ card, selected, roleLabel, onOpen }) {
       >
         {card.label}
       </div>
+      {(card.grandMaster || card.isMaster) && (
+        <div
+          onClick={onOpen}
+          style={{
+            marginTop: 3,
+            maxWidth: "100%",
+            textAlign: "center",
+            fontSize: 8.5,
+            fontWeight: 900,
+            lineHeight: 1.2,
+            borderRadius: card.grandMaster ? 8 : 999,
+            padding: card.grandMaster ? "2px 7px" : "1px 6px",
+            whiteSpace: "nowrap",
+            cursor: "pointer",
+            ...(card.grandMaster
+              ? { background: "linear-gradient(135deg,#FFE27A,#E8B931)", color: "#5A3FA0" }
+              : { background: "#D7EEF7", color: "#0B3D62" }),
+          }}
+        >
+          {card.grandMaster ? (
+            <>
+              👑グランド
+              <br />
+              マスター
+            </>
+          ) : (
+            "⭐ マスター"
+          )}
+        </div>
+      )}
     </div>
   );
 }
