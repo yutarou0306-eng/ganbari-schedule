@@ -62,7 +62,11 @@ const STAGE_FILES = {
   mermaidGreen: ["/mermaid-green-egg.png", "/mermaid-green-baby.png", "/mermaid-green-infant.png", "/mermaid-green-adult.png", "/mermaid-green-master.png"],
   mermaidBlue: ["/mermaid-blue-egg.png", "/mermaid-blue-baby.png", "/mermaid-blue-infant.png", "/mermaid-blue-adult.png", "/mermaid-blue-master.png"],
   mermaidRed: ["/mermaid-red-egg.png", "/mermaid-red-baby.png", "/mermaid-red-infant.png", "/mermaid-red-adult.png", "/mermaid-red-master.png"],
+  fairyFox: ["/fairyfox-egg.png", "/fairyfox-baby.png", "/fairyfox-infant.png", "/fairyfox-adult.png", "/fairyfox-master.png"],
+  fairyFoxBlue: ["/fairyfox-blue-egg.png", "/fairyfox-blue-baby.png", "/fairyfox-blue-infant.png", "/fairyfox-blue-adult.png", "/fairyfox-blue-master.png"],
   crystalButterfly: ["/crystalbutterfly-egg.png", "/crystalbutterfly-baby.png", "/crystalbutterfly-infant.png", "/crystalbutterfly-adult.png", "/crystalbutterfly-master.png"],
+  crystalButterflyBlue: ["/crystalbutterfly-blue-egg.png", "/crystalbutterfly-blue-baby.png", "/crystalbutterfly-blue-infant.png", "/crystalbutterfly-blue-adult.png", "/crystalbutterfly-blue-master.png"],
+  crystalButterflyGreen: ["/crystalbutterfly-green-egg.png", "/crystalbutterfly-green-baby.png", "/crystalbutterfly-green-infant.png", "/crystalbutterfly-green-adult.png", "/crystalbutterfly-green-master.png"],
   crystalButterflyRed: ["/crystalbutterfly-red-egg.png", "/crystalbutterfly-red-baby.png", "/crystalbutterfly-red-infant.png", "/crystalbutterfly-red-adult.png", "/crystalbutterfly-red-master.png"],
 };
 
@@ -429,6 +433,23 @@ const MERMAID_VARIANTS = [
   },
 ];
 
+const FAIRY_FOX_VARIANTS = [
+  {
+    key: "fairyfox-normal",
+    species: "fairyFox",
+    name: "フェアリーフォックス",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#FFE8F2,#E4D8FF)",
+  },
+  {
+    key: "fairyfox-blue",
+    species: "fairyFoxBlue",
+    name: "ブルーフェアリーフォックス",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#DCEEFF,#A8C8F2)",
+  },
+];
+
 const CRYSTAL_BUTTERFLY_VARIANTS = [
   {
     key: "crystalbutterfly-normal",
@@ -444,18 +465,32 @@ const CRYSTAL_BUTTERFLY_VARIANTS = [
     filter: "none",
     cardBg: "linear-gradient(135deg,#FFE0E0,#F2A8A8)",
   },
+  {
+    key: "crystalbutterfly-green",
+    species: "crystalButterflyGreen",
+    name: "グリーンクリスタルバタフライ",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#E0F5DC,#A8D9A0)",
+  },
+  {
+    key: "crystalbutterfly-blue",
+    species: "crystalButterflyBlue",
+    name: "ブルークリスタルバタフライ",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#DCEEFF,#A8C8F2)",
+  },
 ];
 
 export const BOY_VARIANTS = [...DRAGON_VARIANTS, ...TIGER_VARIANTS, ...PHOENIX_VARIANTS, ...FENRIR_VARIANTS, ...GRIFFON_VARIANTS];
 
-export const GIRL_VARIANTS = [...PEGASUS_VARIANTS, ...FAIRY_VARIANTS, ...CAT_VARIANTS, ...SWAMP_VARIANTS, ...MERMAID_VARIANTS, ...CRYSTAL_BUTTERFLY_VARIANTS];
+export const GIRL_VARIANTS = [...PEGASUS_VARIANTS, ...FAIRY_VARIANTS, ...CAT_VARIANTS, ...SWAMP_VARIANTS, ...MERMAID_VARIANTS, ...FAIRY_FOX_VARIANTS, ...CRYSTAL_BUTTERFLY_VARIANTS];
 
 // Grouped by species (not flattened) so a new egg's species is chosen with
 // equal odds regardless of how many color variants that species happens to
 // have — a species with 5 colors shouldn't come up more often than one with
 // 3. The color within the chosen species is then picked at random too.
 const BOY_SPECIES_GROUPS = [DRAGON_VARIANTS, TIGER_VARIANTS, PHOENIX_VARIANTS, FENRIR_VARIANTS, GRIFFON_VARIANTS];
-const GIRL_SPECIES_GROUPS = [PEGASUS_VARIANTS, FAIRY_VARIANTS, CAT_VARIANTS, SWAMP_VARIANTS, MERMAID_VARIANTS, CRYSTAL_BUTTERFLY_VARIANTS];
+const GIRL_SPECIES_GROUPS = [PEGASUS_VARIANTS, FAIRY_VARIANTS, CAT_VARIANTS, SWAMP_VARIANTS, MERMAID_VARIANTS, FAIRY_FOX_VARIANTS, CRYSTAL_BUTTERFLY_VARIANTS];
 
 // 種族ごとにまとめた色違い一覧（ずかん表示用）。
 export function speciesGroupsForTheme(themeKey) {
@@ -514,8 +549,12 @@ const SPECIES_SUFFIX = {
   mermaidGreen: "マーメイド",
   mermaidBlue: "マーメイド",
   mermaidRed: "マーメイド",
+  fairyFox: "フェアリーフォックス",
+  fairyFoxBlue: "フェアリーフォックス",
   crystalButterfly: "クリスタルバタフライ",
   crystalButterflyRed: "クリスタルバタフライ",
+  crystalButterflyGreen: "クリスタルバタフライ",
+  crystalButterflyBlue: "クリスタルバタフライ",
 };
 
 // The color-only part of a variant's name plus "エッグ" (e.g. "ブルー
@@ -563,6 +602,7 @@ export const SPECIES_BASE_STATS = {
   pegasus: { hp: 115, mp: 90, power: 55, defense: 70, speed: 70, wisdom: 100 },
   swamp: { hp: 130, mp: 110, power: 55, defense: 65, speed: 50, wisdom: 90 },
   mermaid: { hp: 110, mp: 105, power: 50, defense: 65, speed: 70, wisdom: 100 },
+  fairyFox: { hp: 115, mp: 100, power: 55, defense: 55, speed: 80, wisdom: 95 },
   crystalButterfly: { hp: 100, mp: 120, power: 40, defense: 50, speed: 80, wisdom: 110 },
   fairy: { hp: 110, mp: 110, power: 65, defense: 60, speed: 50, wisdom: 105 },
   cat: { hp: 100, mp: 140, power: 40, defense: 40, speed: 60, wisdom: 120 },
@@ -581,7 +621,10 @@ SPECIES_BASE_STATS.catRed = SPECIES_BASE_STATS.cat;
 SPECIES_BASE_STATS.mermaidGreen = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidBlue = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidRed = SPECIES_BASE_STATS.mermaid;
+SPECIES_BASE_STATS.fairyFoxBlue = SPECIES_BASE_STATS.fairyFox;
 SPECIES_BASE_STATS.crystalButterflyRed = SPECIES_BASE_STATS.crystalButterfly;
+SPECIES_BASE_STATS.crystalButterflyGreen = SPECIES_BASE_STATS.crystalButterfly;
+SPECIES_BASE_STATS.crystalButterflyBlue = SPECIES_BASE_STATS.crystalButterfly;
 SPECIES_BASE_STATS.pegasusStarlight = SPECIES_BASE_STATS.pegasus;
 SPECIES_BASE_STATS.pegasusSunset = SPECIES_BASE_STATS.pegasus;
 SPECIES_BASE_STATS.pegasusEmerald = SPECIES_BASE_STATS.pegasus;
@@ -676,6 +719,7 @@ export const GRAND_MASTER_COMBOS = {
     swamp: { name: "スワンユニコーン", img: "/gm-pegasus-swamp.png" },
     mermaid: { name: "アクアユニコーン", img: "/gm-pegasus-mermaid.png" },
     crystalButterfly: { name: "クリスタルユニコーン", img: null },
+    fairyFox: { name: "フラワーユニコーン", img: null },
   },
   fairy: {
     pegasus: { name: "ユニコーンフェアリー", img: "/gm-fairy-pegasus.png" },
@@ -684,6 +728,7 @@ export const GRAND_MASTER_COMBOS = {
     swamp: { name: "スワンフェアリー", img: "/gm-fairy-swamp.png" },
     mermaid: { name: "マーメイドフェアリー", img: "/gm-fairy-mermaid.png" },
     crystalButterfly: { name: "クリスタルフェアリー", img: null },
+    fairyFox: { name: "フォックスフェアリー", img: null },
   },
   cat: {
     pegasus: { name: "ユニコーンキャット", img: "/gm-cat-pegasus.png" },
@@ -692,6 +737,7 @@ export const GRAND_MASTER_COMBOS = {
     swamp: { name: "スワンキャット", img: "/gm-cat-swamp.png" },
     mermaid: { name: "アクアキャット", img: "/gm-cat-mermaid.png" },
     crystalButterfly: { name: "クリスタルキャット", img: null },
+    fairyFox: { name: "フォックスキャット", img: null },
   },
   swamp: {
     pegasus: { name: "ユニコーンスワン", img: "/gm-swamp-pegasus.png" },
@@ -700,6 +746,7 @@ export const GRAND_MASTER_COMBOS = {
     swamp: { name: "スワンクイーン", img: "/gm-swamp-swamp.png" },
     mermaid: { name: "アクアスワン", img: "/gm-swamp-mermaid.png" },
     crystalButterfly: { name: "クリスタルスワン", img: null },
+    fairyFox: { name: "フォックススワン", img: null },
   },
   mermaid: {
     pegasus: { name: "ユニコーンマーメイド", img: "/gm-mermaid-pegasus.png" },
@@ -708,6 +755,16 @@ export const GRAND_MASTER_COMBOS = {
     swamp: { name: "スワンマーメイド", img: "/gm-mermaid-swamp.png" },
     mermaid: { name: "マーメイドクイーン", img: "/gm-mermaid-mermaid.png" },
     crystalButterfly: { name: "クリスタルマーメイド", img: null },
+    fairyFox: { name: "フォックスマーメイド", img: null },
+  },
+  fairyFox: {
+    pegasus: { name: "ユニコーンフォックス", img: null },
+    fairy: { name: "フェアリーフォックス", img: null },
+    cat: { name: "ミスティックフォックス", img: null },
+    swamp: { name: "スワンフォックス", img: null },
+    mermaid: { name: "アクアフォックス", img: null },
+    fairyFox: { name: "フラワーフォックスクイーン", img: null },
+    crystalButterfly: { name: "クリスタルフォックス", img: null },
   },
   crystalButterfly: {
     pegasus: { name: "ユニコーンバタフライ", img: null },
@@ -716,6 +773,7 @@ export const GRAND_MASTER_COMBOS = {
     swamp: { name: "スワンバタフライ", img: null },
     mermaid: { name: "アクアバタフライ", img: null },
     crystalButterfly: { name: "クリスタルバタフライクイーン", img: null },
+    fairyFox: { name: "フラワーバタフライ", img: null },
   },
 };
 
