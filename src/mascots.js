@@ -63,6 +63,8 @@ const STAGE_FILES = {
   mermaidBlue: ["/mermaid-blue-egg.png", "/mermaid-blue-baby.png", "/mermaid-blue-infant.png", "/mermaid-blue-adult.png", "/mermaid-blue-master.png"],
   mermaidRed: ["/mermaid-red-egg.png", "/mermaid-red-baby.png", "/mermaid-red-infant.png", "/mermaid-red-adult.png", "/mermaid-red-master.png"],
   fairyFox: ["/fairyfox-egg.png", "/fairyfox-baby.png", "/fairyfox-infant.png", "/fairyfox-adult.png", "/fairyfox-master.png"],
+  fairyFoxGreen: ["/fairyfox-green-egg.png", "/fairyfox-green-baby.png", "/fairyfox-green-infant.png", "/fairyfox-green-adult.png", "/fairyfox-green-master.png"],
+  fairyFoxRed: ["/fairyfox-red-egg.png", "/fairyfox-red-baby.png", "/fairyfox-red-infant.png", "/fairyfox-red-adult.png", "/fairyfox-red-master.png"],
   fairyFoxBlue: ["/fairyfox-blue-egg.png", "/fairyfox-blue-baby.png", "/fairyfox-blue-infant.png", "/fairyfox-blue-adult.png", "/fairyfox-blue-master.png"],
   crystalButterfly: ["/crystalbutterfly-egg.png", "/crystalbutterfly-baby.png", "/crystalbutterfly-infant.png", "/crystalbutterfly-adult.png", "/crystalbutterfly-master.png"],
   crystalButterflyBlue: ["/crystalbutterfly-blue-egg.png", "/crystalbutterfly-blue-baby.png", "/crystalbutterfly-blue-infant.png", "/crystalbutterfly-blue-adult.png", "/crystalbutterfly-blue-master.png"],
@@ -442,11 +444,25 @@ const FAIRY_FOX_VARIANTS = [
     cardBg: "linear-gradient(135deg,#FFE8F2,#E4D8FF)",
   },
   {
+    key: "fairyfox-green",
+    species: "fairyFoxGreen",
+    name: "グリーンフェアリーフォックス",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#E0F5DC,#A8D9A0)",
+  },
+  {
     key: "fairyfox-blue",
     species: "fairyFoxBlue",
     name: "ブルーフェアリーフォックス",
     filter: "none",
     cardBg: "linear-gradient(135deg,#DCEEFF,#A8C8F2)",
+  },
+  {
+    key: "fairyfox-red",
+    species: "fairyFoxRed",
+    name: "レッドフェアリーフォックス",
+    filter: "none",
+    cardBg: "linear-gradient(135deg,#FFE0E0,#F2A8A8)",
   },
 ];
 
@@ -551,6 +567,8 @@ const SPECIES_SUFFIX = {
   mermaidRed: "マーメイド",
   fairyFox: "フェアリーフォックス",
   fairyFoxBlue: "フェアリーフォックス",
+  fairyFoxGreen: "フェアリーフォックス",
+  fairyFoxRed: "フェアリーフォックス",
   crystalButterfly: "クリスタルバタフライ",
   crystalButterflyRed: "クリスタルバタフライ",
   crystalButterflyGreen: "クリスタルバタフライ",
@@ -622,6 +640,8 @@ SPECIES_BASE_STATS.mermaidGreen = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidBlue = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.mermaidRed = SPECIES_BASE_STATS.mermaid;
 SPECIES_BASE_STATS.fairyFoxBlue = SPECIES_BASE_STATS.fairyFox;
+SPECIES_BASE_STATS.fairyFoxGreen = SPECIES_BASE_STATS.fairyFox;
+SPECIES_BASE_STATS.fairyFoxRed = SPECIES_BASE_STATS.fairyFox;
 SPECIES_BASE_STATS.crystalButterflyRed = SPECIES_BASE_STATS.crystalButterfly;
 SPECIES_BASE_STATS.crystalButterflyGreen = SPECIES_BASE_STATS.crystalButterfly;
 SPECIES_BASE_STATS.crystalButterflyBlue = SPECIES_BASE_STATS.crystalButterfly;
