@@ -242,10 +242,12 @@ const THEME_NAMES = { girl: "女の子", boy: "男の子", diet: "ダイエッ�
 
 // スケジュールをスタンプ帳につなげられるか。大人用（ダイエット）スケジュールは
 // どの種類のスタンプ帳にもつなげられる（ためたスター・ファミリアをそのまま使えるように）。
-// 子ども用（女の子／男の子）は同じ種類のスタンプ帳だけ。
+// 大人用スタンプ帳には女の子／男の子デザインのスケジュールもつなげられる。
+// 子ども用スタンプ帳には同じ種類（と大人用）だけ。
 function canLinkTheme(bookGender, scheduleTheme) {
   if (!bookGender) return true;
   if (scheduleTheme === "diet") return true;
+  if (bookGender === "diet") return true; // 大人用スタンプ帳には子ども用デザインのスケジュールもつなげられる
   return bookGender === scheduleTheme;
 }
 

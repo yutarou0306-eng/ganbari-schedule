@@ -340,7 +340,9 @@ export default function ProfileRoot() {
 
   function handleCreateSchedule(themeKey) {
     // 大人用（ダイエット）はどのスタンプ帳でも作れる。それ以外はスタンプ帳の種類に合わせる
-    if (bookGender && themeKey !== "diet") themeKey = bookGender;
+    // 大人用（ダイエット）スケジュールはどのスタンプ帳でも作れる。
+    // 大人用スタンプ帳では、子ども用デザイン（女の子／男の子）のスケジュールも作れる。
+    if (bookGender && bookGender !== "diet" && themeKey !== "diet") themeKey = bookGender;
     const id = generateScheduleId();
     window.location.href = `${window.location.pathname}?id=${id}&theme=${themeKey}&profileId=${profileId}`;
   }
@@ -627,7 +629,7 @@ export default function ProfileRoot() {
   }));
 
   const allCards = [...myCards, ...growingCards, ...bredCards].filter(
-    (c) => !bookGender || !c.theme || c.theme === bookGender || c.theme === "diet"
+    (c) => !bookGender || bookGender === "diet" || !c.theme || c.theme === bookGender || c.theme === "diet"
   );
   sortCollectedCards(allCards, cardSortMode);
   // 配合に使えるのは「完了したスケジュール」に紐づくカードだけ（育成中のスケジュールのカードは対象外）。
@@ -1268,14 +1270,14 @@ export default function ProfileRoot() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
 
-          {bookGender !== "boy" && bookGender !== "diet" && (
+          {bookGender !== "boy" && (
             <button onClick={() => requestParentGate("createSchedule", "girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
-              🎀 新しいスケジュールを作る{bookGender ? "" : "（女の子用）"}
+              🎀 新しいスケジュールを作る{bookGender === "diet" ? "（女の子デザイン）" : bookGender ? "" : "（女の子用）"}
             </button>
           )}
-          {bookGender !== "girl" && bookGender !== "diet" && (
+          {bookGender !== "girl" && (
             <button onClick={() => requestParentGate("createSchedule", "boy")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#8B5E34,#C89B3C)" }}>
-              🐉 新しいスケジュールを作る{bookGender ? "" : "（男の子用）"}
+              🐉 新しいスケジュールを作る{bookGender === "diet" ? "（男の子デザイン）" : bookGender ? "" : "（男の子用）"}
             </button>
           )}
           {/* 大人用（ダイエット）はどのスタンプ帳にも作れる。ためたスターやファミリアはそのまま */}
@@ -2949,7 +2951,7 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
           })}
         </div>
         <p style={{ color: "#7c98aa", fontSize: 12.5, marginTop: 0, marginBottom: 18, lineHeight: 1.5 }}>
-          女の子用は女の子の、男の子用は男の子のファミリアが登場します。ダイエットは大人だけで使う場合に選んでください。大人用（ダイエット）のスケジュールは、どの種類のスタンプ帳にも追加できます。あとから変更できません。
+          女の子用は女の子の、男の子用は男の子のファミリアが登場します。ダイエットは大人が使う場合に選んでください（女の子・男の子デザインのスケジュールも作れます）。大人用（ダイエット）のスケジュールは、どの種類のスタンプ帳にも追加できます。あとから変更できません。
         </p>
 
         <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>なまえ</label>
