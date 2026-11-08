@@ -542,7 +542,7 @@ export default function KidsScheduleApp() {
   const [achievements, setAchievements] = useState({});
   const [weights, setWeights] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 体重kg }
   const [calories, setCalories] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 消費カロリーkcal }
-  const [steps, setSteps] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 歩数 }
+  const [distances, setDistances] = useState({}); // ダイエット用：{ "YYYY-MM-DD": その日の走行距離km }
   const [noteModalDate, setNoteModalDate] = useState(null);
   const [linkedProfile, setLinkedProfile] = useState(null); // { name, totalStamps } | null
   // スタンプ帳（プロフィール）に設定された保護者用暗証番号。スケジュール自身の
@@ -584,7 +584,7 @@ export default function KidsScheduleApp() {
             setAchievements(data.achievements || {});
             setWeights(data.weights || {});
             setCalories(data.calories || {});
-            setSteps(data.steps || {});
+            setDistances(data.distances || {});
             // Another schedule on this device may have just been unlocked
             // with the same PIN — if so, start unlocked here too instead of
             // prompting again, and relock at that same shared expiry time.
@@ -660,13 +660,13 @@ export default function KidsScheduleApp() {
       try {
         await window.storage.set(
           STORAGE_KEY,
-          JSON.stringify({ config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, steps }),
+          JSON.stringify({ config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, distances }),
           false
         );
       } catch (e) {}
     }, 350);
     return () => clearTimeout(t);
-  }, [config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, steps, loaded]);
+  }, [config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, distances, loaded]);
 
   // iOS home-screen apps often get suspended instead of fully closed, and
   // reopening them can show whatever was last in memory instead of fetching
@@ -702,7 +702,7 @@ export default function KidsScheduleApp() {
             setAchievements(data.achievements || {});
             setWeights(data.weights || {});
             setCalories(data.calories || {});
-            setSteps(data.steps || {});
+            setDistances(data.distances || {});
           }
         } catch (e) {}
       })();
@@ -1181,7 +1181,7 @@ export default function KidsScheduleApp() {
       const comments = parentComments[dKey] || [];
       const achv = achievements[dKey];
       const hasAchv = achv && Object.keys(achv).length > 0;
-      entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null, weight: weights[dKey] || null, kcal: calories[dKey] || null, steps: steps[dKey] || null });
+      entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null, weight: weights[dKey] || null, kcal: calories[dKey] || null, dist: distances[dKey] || null });
     }
     entries.sort((a, b) => b.date.getTime() - a.date.getTime());
     return entries;
@@ -1232,12 +1232,12 @@ export default function KidsScheduleApp() {
     });
   }
 
-  function handleSaveNote(text, achv, weight, kcal, stepCount) {
+  function handleSaveNote(text, achv, weight, kcal, distKm) {
     if (!noteModalDate) return;
     const dKey = dateKey(noteModalDate);
-    if (stepCount !== undefined) {
-      const n = Math.round(parseFloat(stepCount));
-      setSteps((prev) => {
+    if (distKm !== undefined) {
+      const n = Math.round(parseFloat(distKm) * 100) / 100;
+      setDistances((prev) => {
         const next = { ...prev };
         if (n > 0) next[dKey] = n;
         else delete next[dKey];
@@ -1445,7 +1445,7 @@ export default function KidsScheduleApp() {
           achievements={achievements}
           weights={weights}
           calories={calories}
-          steps={steps}
+          distances={distances}
           onOpenNote={handleOpenNote}
           onOpenRecords={() => setShowRecordsList(true)}
           linkedProfile={linkedProfile}
@@ -1546,7 +1546,7 @@ export default function KidsScheduleApp() {
           showWeight={config.theme === "diet"}
           initialWeight={weights[dateKey(noteModalDate)]}
           initialCalories={calories[dateKey(noteModalDate)]}
-          initialSteps={steps[dateKey(noteModalDate)]}
+          initialDistance={distances[dateKey(noteModalDate)]}
           onSave={handleSaveNote}
           onClose={handleCloseNote}
         />
@@ -1909,6 +1909,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
   const [endDate, setEndDate] = useState(initial.endDate || defaultEndDateFor(initial.startDate || todayStr()));
   const [pin, setPin] = useState(initial.pin || "");
   const [reward, setReward] = useState(initial.reward || "");
+  const [targetWeight, setTargetWeight] = useState(initial.targetWeight ? String(initial.targetWeight) : "");
   const initialPalette = getTheme(initial.theme || "girl").palette;
   const [subjects, setSubjects] = useState(
     initial.subjects && initial.subjects.length ? initial.subjects : [DEFAULT_SUBJECT(initialPalette)]
@@ -2024,6 +2025,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       subjects: cleanSubjects,
       pin: pin.trim(),
       reward: reward.trim(),
+      ...(theme === "diet" && parseFloat(targetWeight) > 0 ? { targetWeight: Math.round(parseFloat(targetWeight) * 10) / 10 } : {}),
       ...(profileId ? { profileId } : {}),
     };
 
@@ -2137,6 +2139,25 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
           placeholder="例）焼肉を食べに行く！／お小遣いをもらう！"
           style={styles.input}
         />
+        {theme === "diet" && (
+          <>
+            <label style={{ ...styles.label, marginTop: 14 }}>⚖️ 目標体重（任意）</label>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.1"
+                value={targetWeight}
+                onChange={(e) => setTargetWeight(e.target.value)}
+                placeholder="例：75.0"
+                style={{ ...styles.input, width: 140 }}
+              />
+              <span style={{ fontWeight: 700, color: "#4a6c85" }}>kg</span>
+            </div>
+          </>
+        )}
+
         <label style={{ ...styles.label, marginTop: 14 }}>やること（教科・習い事）</label>
         <div style={styles.subjList}>
           {subjects.map((s) => (
@@ -2249,7 +2270,7 @@ function MainScreen({
   achievements,
   weights,
   calories,
-  steps,
+  distances,
   onOpenNote,
   onOpenRecords,
   linkedProfile,
@@ -2499,9 +2520,9 @@ function MainScreen({
       </div>
 
       {theme.key === "diet" && (
-        <CalorieTotal calories={calories || {}} steps={steps || {}} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
+        <CalorieTotal calories={calories || {}} distances={distances || {}} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
       )}
-      {theme.key === "diet" && <WeightChart weights={weights || {}} startDate={startDate} endDate={endDate} />}
+      {theme.key === "diet" && <WeightChart weights={weights || {}} startDate={startDate} endDate={endDate} target={config.targetWeight} />}
 
       <div style={styles.calendarLegendRow}>
         <span style={styles.calendarLegendItem}>
@@ -2575,7 +2596,7 @@ function MainScreen({
                             border: notes[dKey] || achievements[dKey] ? "1px solid #8B5E34" : "1px dashed #C4A876",
                             color: notes[dKey] || achievements[dKey] ? "#5C3A21" : "#8B6B47",
                           }
-                        : notes[dKey] || (weights && weights[dKey]) || (calories && calories[dKey]) || (steps && steps[dKey])
+                        : notes[dKey] || (weights && weights[dKey]) || (calories && calories[dKey]) || (distances && distances[dKey])
                         ? styles.memoBtnFilled
                         : {}),
                     }}
@@ -3071,12 +3092,12 @@ function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
   );
 }
 
-function NoteModal({ date, initialText, initialAchievements, comments, subjects, isMapTheme, showWeight, initialWeight, initialCalories, initialSteps, onSave, onClose }) {
+function NoteModal({ date, initialText, initialAchievements, comments, subjects, isMapTheme, showWeight, initialWeight, initialCalories, initialDistance, onSave, onClose }) {
   const [text, setText] = useState(initialText || "");
   const [achv, setAchv] = useState(initialAchievements || {});
   const [weight, setWeight] = useState(initialWeight !== undefined && initialWeight !== null ? String(initialWeight) : "");
   const [kcal, setKcal] = useState(initialCalories !== undefined && initialCalories !== null ? String(initialCalories) : "");
-  const [stepCount, setStepCount] = useState(initialSteps !== undefined && initialSteps !== null ? String(initialSteps) : "");
+  const [distKm, setDistKm] = useState(initialDistance !== undefined && initialDistance !== null ? String(initialDistance) : "");
   const dLabel = `${date.getMonth() + 1}月${date.getDate()}日`;
 
   function setField(subjId, field, value) {
@@ -3122,18 +3143,18 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
               kcal
             </label>
             <label style={{ ...styles.achievementField, fontSize: 15, color: "#1E4A3B" }}>
-              👟 歩数
+              🏃 走行距離
               <input
                 type="number"
-                inputMode="numeric"
+                inputMode="decimal"
                 min={0}
-                step="1"
-                placeholder="例：8000"
-                value={stepCount}
-                onChange={(e) => setStepCount(e.target.value)}
-                style={{ ...styles.achievementInput, width: 96, borderColor: "#A9DEC4", fontSize: 16 }}
+                step="0.1"
+                placeholder="例：5.2"
+                value={distKm}
+                onChange={(e) => setDistKm(e.target.value)}
+                style={{ ...styles.achievementInput, width: 84, borderColor: "#A9DEC4", fontSize: 16 }}
               />
-              歩
+              km
             </label>
             <div style={{ fontSize: 11.5, color: "#5d7d70", lineHeight: 1.5 }}>
               消費カロリーは、健康アプリの「アクティブカロリー」（運動で消費した分）を入れてください。
@@ -3255,7 +3276,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
           <button style={styles.modalCancel} onClick={onClose}>
             とじる
           </button>
-          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, showWeight ? weight : undefined, showWeight ? kcal : undefined, showWeight ? stepCount : undefined)}>
+          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, showWeight ? weight : undefined, showWeight ? kcal : undefined, showWeight ? distKm : undefined)}>
             保存する
           </button>
         </div>
@@ -3373,7 +3394,7 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
         {e.date.getMonth() + 1}月{e.date.getDate()}日
       </div>
       {e.weight && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>⚖️ 体重：{Number(e.weight).toFixed(1)}kg</div>}
-      {e.steps && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>👟 歩数：{Number(e.steps).toLocaleString()}歩</div>}
+      {e.dist && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>🏃 走行距離：{e.dist}km</div>}
       {e.kcal && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>🔥 消費カロリー：{Number(e.kcal).toLocaleString()}kcal</div>}
       {achvParts.map((a) => (
         <div key={a.name} style={{ ...styles.recordEntryAchv, color: a.color }}>
@@ -3479,13 +3500,14 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
 
 
 // ダイエット用：期間内の消費カロリー合計（スタンプの合計と同じように大きく表示）
-function CalorieTotal({ calories, steps, achievements, subjects, startDate, endDate }) {
+function CalorieTotal({ calories, distances, achievements, subjects, startDate, endDate }) {
   const startKey = dateKey(startDate);
   const endKey = dateKey(endDate);
   const inRange = (k) => k >= startKey && k <= endKey;
   const calEntries = Object.entries(calories).filter(([k, c]) => inRange(k) && c > 0);
   const totalKcal = calEntries.reduce((sum, [, c]) => sum + Number(c), 0);
-  const totalSteps = Object.entries(steps || {}).filter(([k, n]) => inRange(k) && n > 0).reduce((sum, [, n]) => sum + Number(n), 0);
+  // メモで入れたその日の走行距離（km）
+  const dailyKm = Object.entries(distances || {}).filter(([k, n]) => inRange(k) && n > 0).reduce((sum, [, n]) => sum + Number(n), 0);
 
   // 運動時間・距離は、各やることの「実際にどれだけできた？」の記録から合計する。
   // 距離は「🏃距離」の記録に加えて、自由目標の単位が km のものも数える。
@@ -3502,8 +3524,7 @@ function CalorieTotal({ calories, steps, achievements, subjects, startDate, endD
       if (km > 0) kmBySubj[sid] = (kmBySubj[sid] || 0) + km;
     });
   });
-  const totalKm = Math.round(Object.values(kmBySubj).reduce((a, b) => a + b, 0) * 10) / 10;
-  const hasDistanceSubj = subjects.some((x) => x.measureDistance) || totalKm > 0;
+  const totalKm = Math.round((dailyKm + Object.values(kmBySubj).reduce((a, b) => a + b, 0)) * 10) / 10;
   const h = Math.floor(totalMin / 60);
   const m = Math.round(totalMin % 60);
   const timeText = h > 0 ? `${h}時間${m > 0 ? m + "分" : ""}` : `${m}分`;
@@ -3526,13 +3547,12 @@ function CalorieTotal({ calories, steps, achievements, subjects, startDate, endD
   return (
     <div style={{ position: "relative", zIndex: 2, margin: "14px 18px 0", background: "#fff", borderRadius: 18, padding: "12px 10px", boxShadow: "0 10px 24px rgba(30,74,59,0.25)" }}>
       <div style={{ fontSize: 13, color: "#1E4A3B", fontWeight: 800, textAlign: "center", marginBottom: 4 }}>このスケジュールの合計</div>
-      <div style={{ display: "grid", gridTemplateColumns: hasDistanceSubj ? "1fr 1fr" : "1fr 1fr 1fr", rowGap: 8, columnGap: 6, alignItems: "flex-start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", rowGap: 8, columnGap: 6, alignItems: "flex-start" }}>
         {stat("⏱", "運動時間", timeText, "")}
-        {hasDistanceSubj && stat("🏃", "走行距離", totalKm, "km")}
-        {stat("👟", "歩数", totalSteps.toLocaleString(), "歩")}
+        {stat("🏃", "走行距離", totalKm, "km")}
         {stat("🔥", "消費カロリー", totalKcal.toLocaleString(), "kcal")}
       </div>
-      {kmBreakdown.length > 1 && (
+      {kmBreakdown.length > 1 && dailyKm === 0 && (
         <div style={{ fontSize: 11.5, color: "#5d7d70", textAlign: "center", marginTop: 4 }}>（{kmBreakdown.join("・")}）</div>
       )}
       <div style={{ fontSize: 11.5, color: "#8aa69a", textAlign: "center", marginTop: 4 }}>
@@ -3543,7 +3563,8 @@ function CalorieTotal({ calories, steps, achievements, subjects, startDate, endD
 }
 
 // ダイエット用：体重の推移グラフ（スケジュール期間内の記録だけを表示）
-function WeightChart({ weights, startDate, endDate }) {
+function WeightChart({ weights, startDate, endDate, target }) {
+  const goal = Number(target) > 0 ? Number(target) : null;
   const startKey = dateKey(startDate);
   const endKey = dateKey(endDate);
   const points = Object.entries(weights)
@@ -3562,6 +3583,7 @@ function WeightChart({ weights, startDate, endDate }) {
     return (
       <div style={card}>
         <div style={{ fontWeight: 800, color: "#1E4A3B", fontSize: 15 }}>⚖️ 体重の記録</div>
+        {goal && <div style={{ fontSize: 13, fontWeight: 800, color: "#E07A4F", marginTop: 4 }}>目標 {goal.toFixed(1)}kg</div>}
         <div style={{ fontSize: 12.5, color: "#5d7d70", marginTop: 4 }}>カレンダーの「📝 メモ」から体重を入れると、ここにグラフが出ます。</div>
       </div>
     );
@@ -3569,7 +3591,7 @@ function WeightChart({ weights, startDate, endDate }) {
   const first = points[0][1];
   const last = points[points.length - 1][1];
   const diff = Math.round((last - first) * 10) / 10;
-  const vals = points.map(([, w]) => w);
+  const vals = points.map(([, w]) => w).concat(goal ? [goal] : []);
   // 目盛りはきりのいい値（1kg単位）にそろえる
   let lo = Math.floor(Math.min(...vals) - 0.5);
   let hi = Math.ceil(Math.max(...vals) + 0.5);
@@ -3591,6 +3613,7 @@ function WeightChart({ weights, startDate, endDate }) {
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
         <div style={{ fontWeight: 800, color: "#1E4A3B", fontSize: 15 }}>⚖️ 体重の記録</div>
         <div style={{ fontSize: 13, fontWeight: 800, color: "#1E4A3B" }}>
+          {goal && <span style={{ marginRight: 8 }}>目標 {goal.toFixed(1)}kg</span>}
           いま {last.toFixed(1)}kg
           {points.length > 1 && (
             <span style={{ marginLeft: 6, color: diff < 0 ? "#2C8A5F" : diff > 0 ? "#C0603F" : "#5d7d70" }}>
@@ -3599,7 +3622,12 @@ function WeightChart({ weights, startDate, endDate }) {
           )}
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", marginTop: 6 }}>
+      {goal && (
+        <div style={{ fontSize: 13, fontWeight: 800, marginTop: 4, color: last <= goal ? "#2C8A5F" : "#E07A4F" }}>
+          {last <= goal ? "🎉 目標達成！" : `🎯 目標まで あと ${(Math.round((last - goal) * 10) / 10).toFixed(1)}kg`}
+        </div>
+      )}
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: 560, height: "auto", display: "block", margin: "6px auto 0" }}>
         {ticks.map((v, i) => (
           <g key={i}>
             <line x1={L} x2={W - R} y1={yOf(v)} y2={yOf(v)} stroke="#E3EFE8" strokeWidth="1" />
@@ -3608,6 +3636,12 @@ function WeightChart({ weights, startDate, endDate }) {
         ))}
         <text x={L} y={H - 6} fontSize="9.5" fill="#7a958a">{md(startDate)}</text>
         <text x={W - R} y={H - 6} fontSize="9.5" textAnchor="end" fill="#7a958a">{md(endDate)}</text>
+        {goal && (
+          <g>
+            <line x1={L} x2={W - R} y1={yOf(goal)} y2={yOf(goal)} stroke="#E07A4F" strokeWidth="1.5" strokeDasharray="5 4" />
+            <text x={W - R} y={yOf(goal) - 4} fontSize="9.5" textAnchor="end" fill="#E07A4F" fontWeight="700">目標 {goal}kg</text>
+          </g>
+        )}
         <path d={path} fill="none" stroke="#3E9A74" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
         {points.map(([k, w]) => (
           <circle key={k} cx={xOf(k)} cy={yOf(w)} r="3.5" fill="#fff" stroke="#3E9A74" strokeWidth="2" />

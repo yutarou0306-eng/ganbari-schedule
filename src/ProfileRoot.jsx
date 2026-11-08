@@ -116,7 +116,7 @@ function localTodayKey() {
 // total on a completed schedule (e.g. ⏱120分 📖45ページ ✏️80問).
 function totalAchievementsInBlob(blob) {
   const achievements = (blob && blob.achievements) || {};
-  const totals = { minutes: 0, pages: 0, problems: 0, custom: [] };
+  const totals = { minutes: 0, pages: 0, problems: 0, km: 0, custom: [] };
   // 自由目標は項目名・単位がやることごとに違うので、「項目名＋単位」ごとに合計する
   const subjects = (blob && blob.config && blob.config.subjects) || [];
   const customMap = {};
@@ -126,6 +126,7 @@ function totalAchievementsInBlob(blob) {
       totals.minutes += Number(vals.minutes) || 0;
       totals.pages += Number(vals.pages) || 0;
       totals.problems += Number(vals.problems) || 0;
+      totals.km += Number(vals.km) || 0;
       const n = Number(vals.custom) || 0;
       if (n > 0) {
         const subj = subjects.find((x) => x.id === subjId) || {};
@@ -288,6 +289,7 @@ export default function ProfileRoot() {
             endDate: row.blob.config.endDate || "",
             stamps: countStampsInBlob(row.blob),
             calories: countCaloriesInBlob(row.blob),
+            dailyKm: Object.values((row.blob && row.blob.distances) || {}).reduce((a, n) => a + (Number(n) || 0), 0),
             awardedCard: row.blob.config.awardedCard || null,
             // ファミリアが登場する条件：30日以上 かつ やること2つ以上
             cardEligible: (() => {
@@ -429,6 +431,10 @@ export default function ProfileRoot() {
 
   const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
   const totalCalories = schedules.reduce((sum, s) => sum + (s.calories || 0), 0);
+  // 大人用（ダイエット）スケジュールの運動時間・距離の合計
+  const dietSchedules = schedules.filter((s) => s.theme === "diet");
+  const dietMinutes = dietSchedules.reduce((sum, s) => sum + ((s.achvTotals && s.achvTotals.minutes) || 0), 0);
+  const dietKm = Math.round(dietSchedules.reduce((sum, s) => sum + ((s.achvTotals && s.achvTotals.km) || 0) + (s.dailyKm || 0), 0) * 10) / 10;
 
   // ⭐ ステータス割り振り用のプール。景品交換用の available（totalEarned -
   // totalSpent、下の方で計算）とは完全に別勘定 — ステータスに振っても交換
@@ -1039,11 +1045,23 @@ export default function ProfileRoot() {
           </div>
           {hasDietSchedules && (
             <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px dashed #D5E6EE" }}>
-              <div style={{ fontSize: 14, color: "#7c98aa", fontWeight: 700 }}>消費カロリーの合計</div>
-              <div style={{ fontSize: 36, fontWeight: 900, color: "#1E4A3B", fontFamily: "'Kaisei Decol', serif" }}>
-                🔥 {totalCalories.toLocaleString()}
-                <span style={{ fontSize: 16, marginLeft: 4 }}>kcal</span>
-              </div>
+            <div style={{ fontSize: 13, color: "#1E4A3B", fontWeight: 800, marginBottom: 4 }}>🌿 大人用（ダイエット）の合計</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", rowGap: 8, columnGap: 6 }}>
+              {[
+                ["運動時間", "⏱", dietMinutes >= 60 ? `${Math.floor(dietMinutes / 60)}時間${dietMinutes % 60 ? Math.round(dietMinutes % 60) + "分" : ""}` : `${Math.round(dietMinutes)}分`, ""],
+                ["走行距離", "🏃", dietKm, "km"],
+                ["消費カロリー", "🔥", totalCalories.toLocaleString(), "kcal"],
+              ].map(([label, icon, val, unit]) => (
+                <div key={label} style={{ flex: "1 1 0", minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, color: "#7c98aa", fontWeight: 700, whiteSpace: "nowrap" }}>{label}</div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: "#1E4A3B", whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: 16 }}>{icon}</span>
+                    {val}
+                    {unit && <span style={{ fontSize: 12, marginLeft: 2 }}>{unit}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
             </div>
           )}
         </div>
@@ -1173,7 +1191,9 @@ export default function ProfileRoot() {
                 if (t.minutes > 0) achvParts.push(`⏱${t.minutes}分`);
                 if (t.pages > 0) achvParts.push(`📖${t.pages}ページ`);
                 if (t.problems > 0) achvParts.push(`✏️${t.problems}問`);
+                if (t.km > 0) achvParts.push(`🏃${Math.round(t.km * 10) / 10}km`);
                 achvParts.push(...customTotalsText(t));
+                if (s.dailyKm > 0) achvParts.push(`🏃${Math.round(s.dailyKm * 10) / 10}km`);
                 if (s.calories > 0) achvParts.push(`🔥${s.calories.toLocaleString()}kcal`);
                 return (
                   <div
@@ -2192,12 +2212,13 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                 </div>
               )}
               <div>⭐ 獲得スタンプ：{card.stars}個</div>
-              {card.achvTotals && (card.achvTotals.minutes > 0 || card.achvTotals.pages > 0 || card.achvTotals.problems > 0 || customTotalsText(card.achvTotals).length > 0) && (
+              {card.achvTotals && (card.achvTotals.minutes > 0 || card.achvTotals.pages > 0 || card.achvTotals.problems > 0 || card.achvTotals.km > 0 || customTotalsText(card.achvTotals).length > 0) && (
                 <div>
                   取り組んだ内容：
                   {card.achvTotals.minutes > 0 ? `⏱${card.achvTotals.minutes}分 ` : ""}
                   {card.achvTotals.pages > 0 ? `📖${card.achvTotals.pages}ページ ` : ""}
                   {card.achvTotals.problems > 0 ? `✏️${card.achvTotals.problems}問 ` : ""}
+                  {card.achvTotals.km > 0 ? `🏃${Math.round(card.achvTotals.km * 10) / 10}km ` : ""}
                   {customTotalsText(card.achvTotals).join(" ")}
                 </div>
               )}
