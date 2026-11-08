@@ -331,7 +331,8 @@ export default function ProfileRoot() {
   }
 
   function handleCreateSchedule(themeKey) {
-    if (bookGender) themeKey = bookGender;
+    // 大人用（ダイエット）はどのスタンプ帳でも作れる。それ以外はスタンプ帳の種類に合わせる
+    if (bookGender && themeKey !== "diet") themeKey = bookGender;
     const id = generateScheduleId();
     window.location.href = `${window.location.pathname}?id=${id}&theme=${themeKey}&profileId=${profileId}`;
   }
@@ -463,13 +464,19 @@ export default function ProfileRoot() {
 
   // このスタンプ帳の性別。設定済みならそれ、古いスタンプ帳（未設定）は
   // 既存スケジュールがすべて同じ側ならそれに合わせる。混在・空なら null（制限なし）。
-  const inferredThemes = Array.from(new Set(schedules.map((s) => s.theme)));
+  // 大人用（ダイエット）スケジュールはどの種類のスタンプ帳にも足せるので、
+  // 種類の推定には使わない（女の子用＋大人用の古いスタンプ帳は「女の子用」のまま）。
+  const inferredThemes = Array.from(new Set(schedules.map((s) => s.theme).filter((t) => t !== "diet")));
   const bookGender =
     profile.gender === "boy" || profile.gender === "girl" || profile.gender === "diet"
       ? profile.gender
       : inferredThemes.length === 1
       ? inferredThemes[0]
+      : inferredThemes.length === 0 && schedules.length > 0
+      ? "diet"
       : null;
+  // このスタンプ帳に大人用（ダイエット）スケジュールがあるか
+  const hasDietSchedules = bookGender === "diet" || schedules.some((s) => s.theme === "diet");
 
   // Still-in-progress schedules — shown in "つながっているスケジュール".
   // Completed ones are checked via 完了したスケジュール instead, not here.
@@ -613,7 +620,7 @@ export default function ProfileRoot() {
   }));
 
   const allCards = [...myCards, ...growingCards, ...bredCards].filter(
-    (c) => !bookGender || !c.theme || c.theme === bookGender
+    (c) => !bookGender || !c.theme || c.theme === bookGender || c.theme === "diet"
   );
   sortCollectedCards(allCards, cardSortMode);
   // 配合に使えるのは「完了したスケジュール」に紐づくカードだけ（育成中のスケジュールのカードは対象外）。
@@ -845,7 +852,7 @@ export default function ProfileRoot() {
   );
 
   if (zukanPage) {
-    return <ZukanPage gender={bookGender} schedules={schedules} profile={profile} onClose={() => setZukanPage(false)} />;
+    return <ZukanPage gender={bookGender} hasDiet={hasDietSchedules} schedules={schedules} profile={profile} onClose={() => setZukanPage(false)} />;
   }
 
   if (breedPage) {
@@ -1030,7 +1037,7 @@ export default function ProfileRoot() {
           <div style={{ fontSize: 12.5, color: "#a8bcc9" }}>
             これまでに獲得 {totalEarned} － 交換した分 {totalSpent}
           </div>
-          {bookGender === "diet" && (
+          {hasDietSchedules && (
             <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px dashed #D5E6EE" }}>
               <div style={{ fontSize: 14, color: "#7c98aa", fontWeight: 700 }}>消費カロリーの合計</div>
               <div style={{ fontSize: 36, fontWeight: 900, color: "#1E4A3B", fontFamily: "'Kaisei Decol', serif" }}>
@@ -1261,11 +1268,7 @@ export default function ProfileRoot() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
-          {bookGender === "diet" && (
-            <button onClick={() => requestParentGate("createSchedule", "diet")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#4FA283,#A9DEC4)" }}>
-              🌿 新しいスケジュールを作る
-            </button>
-          )}
+
           {bookGender !== "boy" && bookGender !== "diet" && (
             <button onClick={() => requestParentGate("createSchedule", "girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
               🎀 新しいスケジュールを作る{bookGender ? "" : "（女の子用）"}
@@ -1274,6 +1277,12 @@ export default function ProfileRoot() {
           {bookGender !== "girl" && bookGender !== "diet" && (
             <button onClick={() => requestParentGate("createSchedule", "boy")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#8B5E34,#C89B3C)" }}>
               🐉 新しいスケジュールを作る{bookGender ? "" : "（男の子用）"}
+            </button>
+          )}
+          {/* 大人用（ダイエット）はどのスタンプ帳にも作れる。ためたスターやファミリアはそのまま */}
+          {true && (
+            <button onClick={() => requestParentGate("createSchedule", "diet")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#4FA283,#A9DEC4)" }}>
+              🌿 新しいスケジュールを作る{bookGender === "diet" ? "" : "（大人用）"}
             </button>
           )}
         </div>
@@ -2708,19 +2717,18 @@ const modalBtnStyle = {
   fontSize: 15,
 };
 
-function ZukanPage({ gender, schedules, profile, onClose }) {
+function ZukanPage({ gender, hasDiet, schedules, profile, onClose }) {
   const [tab, setTab] = useState(gender === "diet" || !gender ? "girl" : gender);
   const [zoom, setZoom] = useState(null); // { img, name, filter }
   // ダイエット用スタンプ帳は全種族が出るので、女の子／男の子のタブで分けて表示する。
-  // theme = 表示する種族のグループ、keyTheme = 入手記録のキー（ダイエットは "diet:"）
-  const isDiet = gender === "diet";
-  const theme = isDiet ? tab : gender || tab;
-  const keyTheme = isDiet ? "diet" : theme;
+  // 大人用スケジュールのあるスタンプ帳は、全種族が出るので女の子／男の子のタブで分ける
+  const isDiet = gender === "diet" || !!hasDiet;
+  const theme = isDiet || !gender ? tab : gender;
 
   // 色違いごとの「いちばん育ったステージ」（配合で消費されたカードも含む）。
   // ・正式にカードをもらった／配合に使った／認定前でもマスターまで育った → マスター
   // ・育成中 → いまの成長段階（卵は、かえってから載る＝何が生まれるかはナイショ）
-  const reached = {}; // `${theme}:${variantKey}` -> 最高ステージ番号（-1 = 未発見）
+  const reached = {}; // variantKey（全種族で重複なし）-> 最高ステージ番号（-1 = 未発見）
   const consumed = profile.consumedScheduleCards || [];
   const overrides = profile.cardOverrides || {};
   const bump = (key, idx) => {
@@ -2730,14 +2738,14 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
     if (s.awardedCard) {
       const t = s.awardedCard.theme || s.theme;
       const v = getVariant(t, s.awardedCard.variant);
-      bump(`${t}:${v.key}`, stageCount(v.species) - 1);
+      bump(v.key, stageCount(v.species) - 1);
       return;
     }
     if (!s.cardEligible && !overrides[s.id]) return;
     const v = getVariant(s.theme, s.mascotVariant);
     const last = stageCount(v.species) - 1;
     const idx = stageIndex(v.species, s.currentPct);
-    bump(`${s.theme}:${v.key}`, consumed.includes(s.id) || overrides[s.id] ? last : idx >= 1 ? idx : -1);
+    bump(v.key, consumed.includes(s.id) || overrides[s.id] ? last : idx >= 1 ? idx : -1);
   });
   const owned = { has: (k) => reached[k] !== undefined && reached[k] >= 0 };
   const stageLabels = (n) => (n >= 6 ? ["卵", "幼年期", "少年期", "青年期", "成熟期", "マスター"] : ["卵", "幼年期", "青年期", "成熟期", "マスター"]);
@@ -2748,9 +2756,9 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
 
   const groups = speciesGroupsForTheme(theme);
   const speciesKeys = groups.map((g) => g[0].species);
-  const speciesKnown = (sp) => groups.some((g) => g[0].species === sp && g.some((v) => owned.has(`${keyTheme}:${v.key}`)));
+  const speciesKnown = (sp) => groups.some((g) => g[0].species === sp && g.some((v) => owned.has(v.key)));
   const total = groups.reduce((n, g) => n + g.length, 0);
-  const got = groups.reduce((n, g) => n + g.filter((v) => reached[`${keyTheme}:${v.key}`] === stageCount(v.species) - 1).length, 0);
+  const got = groups.reduce((n, g) => n + g.filter((v) => reached[v.key] === stageCount(v.species) - 1).length, 0);
   let gmGot = 0;
   speciesKeys.forEach((b) => speciesKeys.forEach((f) => {
     const c = GRAND_MASTER_COMBOS[b] && GRAND_MASTER_COMBOS[b][f];
@@ -2784,9 +2792,9 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
         <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 8 }}>卵からマスターまで、育った姿が順番にひらいていきます。</div>
         {groups.map((g) => (
           <div key={g[0].species} style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#14588C", marginBottom: 4 }}>{g.some((v) => owned.has(`${keyTheme}:${v.key}`)) ? speciesLabel(g[0].species) : "？？？"}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#14588C", marginBottom: 4 }}>{g.some((v) => owned.has(v.key)) ? speciesLabel(g[0].species) : "？？？"}</div>
             {g.map((v) => {
-              const key = `${keyTheme}:${v.key}`;
+              const key = v.key;
               const top = reached[key] === undefined ? -1 : reached[key];
               const n = stageCount(v.species);
               const labels = stageLabels(n);
@@ -2941,7 +2949,7 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
           })}
         </div>
         <p style={{ color: "#7c98aa", fontSize: 12.5, marginTop: 0, marginBottom: 18, lineHeight: 1.5 }}>
-          女の子用は女の子の、男の子用は男の子のファミリアが登場します。ダイエットは大人向けで、体重も記録でき、全種族のファミリアが登場します。あとから変更できません。
+          女の子用は女の子の、男の子用は男の子のファミリアが登場します。ダイエットは大人だけで使う場合に選んでください。大人用（ダイエット）のスケジュールは、どの種類のスタンプ帳にも追加できます。あとから変更できません。
         </p>
 
         <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>なまえ</label>

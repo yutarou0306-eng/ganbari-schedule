@@ -240,6 +240,15 @@ const THEME_KEYS = ["girl", "boy", "diet"];
 
 const THEME_NAMES = { girl: "女の子", boy: "男の子", diet: "ダイエット" };
 
+// スケジュールをスタンプ帳につなげられるか。大人用（ダイエット）スケジュールは
+// どの種類のスタンプ帳にもつなげられる（ためたスター・ファミリアをそのまま使えるように）。
+// 子ども用（女の子／男の子）は同じ種類のスタンプ帳だけ。
+function canLinkTheme(bookGender, scheduleTheme) {
+  if (!bookGender) return true;
+  if (scheduleTheme === "diet") return true;
+  return bookGender === scheduleTheme;
+}
+
 function getTheme(key) {
   return THEMES[key] || THEMES.girl;
 }
@@ -1875,7 +1884,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
         const { data } = await supabase.from("profiles").select("blob").eq("id", profileId).maybeSingle();
         if (!cancelled && data && data.blob) {
           // 性別が違うスタンプ帳にはつなげない（URLで直接指定された場合も解除）
-          if (data.blob.gender && data.blob.gender !== theme) {
+          if (!canLinkTheme(data.blob.gender, theme)) {
             setProfileId("");
             setProfileName("");
             setLinkStatus("gendermismatch");
@@ -1903,7 +1912,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
         return;
       }
       const g = data[0].blob && data[0].blob.gender;
-      if (g && g !== theme) {
+      if (!canLinkTheme(g, theme)) {
         setLinkStatus("gendermismatch");
         return;
       }
