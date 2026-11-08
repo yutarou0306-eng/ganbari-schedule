@@ -82,6 +82,12 @@ function sortCollectedCards(cards, mode) {
 // Counts by total stamp VALUE, matching computeOverallStats in progress.js
 // — a "取り戻す" double-tap is worth 2, since it's covering a missed day
 // as well as today's, not just counted as one stamp slot filled.
+// ダイエット用：運動時間（分）を「2時間3分」の形に
+function formatMinutes(min) {
+  const m = Math.round(min || 0);
+  return m >= 60 ? `${Math.floor(m / 60)}時間${m % 60 ? (m % 60) + "分" : ""}` : `${m}分`;
+}
+
 // ダイエット用：スケジュールに記録された消費カロリーの合計（kcal）
 function countCaloriesInBlob(blob) {
   const cal = (blob && blob.calories) || {};
@@ -430,11 +436,6 @@ export default function ProfileRoot() {
   }
 
   const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
-  const totalCalories = schedules.reduce((sum, s) => sum + (s.calories || 0), 0);
-  // 大人用（ダイエット）スケジュールの運動時間・距離の合計
-  const dietSchedules = schedules.filter((s) => s.theme === "diet");
-  const dietMinutes = dietSchedules.reduce((sum, s) => sum + ((s.achvTotals && s.achvTotals.minutes) || 0), 0);
-  const dietKm = Math.round(dietSchedules.reduce((sum, s) => sum + ((s.achvTotals && s.achvTotals.km) || 0) + (s.dailyKm || 0), 0) * 10) / 10;
 
   // ⭐ ステータス割り振り用のプール。景品交換用の available（totalEarned -
   // totalSpent、下の方で計算）とは完全に別勘定 — ステータスに振っても交換
@@ -943,17 +944,9 @@ export default function ProfileRoot() {
               {(showAllSchedules ? activeSchedules : activeSchedules.slice(0, 5)).map((s) => (
                 <div
                   key={s.id}
-                  style={{
-                    background: "#fff",
-                    borderRadius: 14,
-                    padding: "10px 14px",
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    gap: 10,
-                    boxShadow: "0 4px 10px rgba(11,61,98,0.15)",
-                  }}
+                  style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}
                 >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                   <a
                     href={`${window.location.pathname}?id=${s.id}`}
                     style={{ textDecoration: "none", flex: 1, minWidth: 0, overflow: "hidden" }}
@@ -974,9 +967,6 @@ export default function ProfileRoot() {
                   </a>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                     <span style={{ color: "#B5651D", fontWeight: 800, fontSize: 13.5 }}>⭐️ {s.stamps}</span>
-                    {s.theme === "diet" && s.calories > 0 && (
-                      <span style={{ color: "#2C6E55", fontWeight: 800, fontSize: 13 }}>🔥 {s.calories.toLocaleString()}</span>
-                    )}
                     <a href={`${window.location.pathname}?id=${s.id}&records=1`} style={{ textDecoration: "none" }}>
                       <span
                         style={{
@@ -994,6 +984,15 @@ export default function ProfileRoot() {
                       </span>
                     </a>
                   </div>
+                </div>
+                {s.theme === "diet" && (
+                  // 大人用（ダイエット）は運動時間・走行距離・消費カロリーの合計をスケジュールごとに表示
+                  <div style={{ display: "flex", justifyContent: "flex-end", flexWrap: "wrap", gap: "2px 14px", marginTop: 6, paddingTop: 6, borderTop: "1px dashed #E3EEF3", fontSize: 13, fontWeight: 800, color: "#2C6E55" }}>
+                    <span>⏱ {formatMinutes(s.achvTotals && s.achvTotals.minutes)}</span>
+                    <span>🏃 {Math.round((((s.achvTotals && s.achvTotals.km) || 0) + (s.dailyKm || 0)) * 10) / 10}km</span>
+                    <span>🔥 {(s.calories || 0).toLocaleString()}kcal</span>
+                  </div>
+                )}
                 </div>
               ))}
               {!showAllSchedules && activeSchedules.length > 5 && (
@@ -1043,27 +1042,7 @@ export default function ProfileRoot() {
           <div style={{ fontSize: 12.5, color: "#a8bcc9" }}>
             これまでに獲得 {totalEarned} － 交換した分 {totalSpent}
           </div>
-          {hasDietSchedules && (
-            <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px dashed #D5E6EE" }}>
-            <div style={{ fontSize: 13, color: "#1E4A3B", fontWeight: 800, marginBottom: 4 }}>🌿 大人用（ダイエット）の合計</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", rowGap: 8, columnGap: 6 }}>
-              {[
-                ["運動時間", "⏱", dietMinutes >= 60 ? `${Math.floor(dietMinutes / 60)}時間${dietMinutes % 60 ? Math.round(dietMinutes % 60) + "分" : ""}` : `${Math.round(dietMinutes)}分`, ""],
-                ["走行距離", "🏃", dietKm, "km"],
-                ["消費カロリー", "🔥", totalCalories.toLocaleString(), "kcal"],
-              ].map(([label, icon, val, unit]) => (
-                <div key={label} style={{ flex: "1 1 0", minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, color: "#7c98aa", fontWeight: 700, whiteSpace: "nowrap" }}>{label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: "#1E4A3B", whiteSpace: "nowrap" }}>
-                    <span style={{ fontSize: 16 }}>{icon}</span>
-                    {val}
-                    {unit && <span style={{ fontSize: 12, marginLeft: 2 }}>{unit}</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-            </div>
-          )}
+
         </div>
 
         <SectionTitle>🎁 景品と交換</SectionTitle>
