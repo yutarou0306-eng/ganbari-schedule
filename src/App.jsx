@@ -1754,8 +1754,8 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
             🎯 自由に決める
           </button>
           {subject.measureCustom && (
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, width: "100%" }}>
-              <label style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 <span style={styles.customGoalCaption}>何を数える？（任意）</span>
                 <input
                   value={subject.customLabel || ""}
@@ -1765,29 +1765,29 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
                   style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box", textAlign: "left" }}
                 />
               </label>
-              <label style={{ width: 72, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={styles.customGoalCaption}>目標の数</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="any"
-                  value={subject.targetCustom ?? ""}
-                  onChange={(e) => set({ targetCustom: e.target.value === "" ? "" : Number(e.target.value) })}
-                  placeholder="50"
-                  style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box" }}
-                />
-              </label>
-              <label style={{ width: 64, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={styles.customGoalCaption}>単位</span>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
+                <label style={{ width: 80, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={styles.customGoalCaption}>目標の数</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="any"
+                    value={subject.targetCustom ?? ""}
+                    onChange={(e) => set({ targetCustom: e.target.value === "" ? "" : Number(e.target.value) })}
+                    placeholder="50"
+                    style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box" }}
+                  />
+                </label>
                 <input
                   value={subject.customUnit || ""}
                   onChange={(e) => set({ customUnit: e.target.value })}
-                  placeholder="回"
+                  placeholder="単位：回、分など"
                   maxLength={6}
-                  style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box" }}
+                  aria-label="単位"
+                  style={{ ...styles.measureSelect, flex: 1, minWidth: 0, maxWidth: 170, width: "auto", boxSizing: "border-box" }}
                 />
-              </label>
+              </div>
             </div>
           )}
         </div>
@@ -2062,7 +2062,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
           style={styles.input}
         />
 
-        <label style={{ ...styles.label, marginTop: 20 }}>期間（いつから、いつまで）</label>
+        <label style={{ ...styles.label, marginTop: 14 }}>期間（いつから、いつまで）</label>
         <div style={styles.dateRow}>
           <input
             type="date"
@@ -2080,22 +2080,14 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
           <span style={{ color: "#4a6c85", fontWeight: 700 }}>〜</span>
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={styles.dateInput} />
         </div>
-        {!hasExisting && (
-          <div style={{ fontSize: 12, color: "#7c98aa", marginTop: -12, marginBottom: 4 }}>
-            ※終了日は開始日の1か月後の前日を自動で入れています。変えたい場合は直接選んでください。
-          </div>
-        )}
-
-        <label style={{ ...styles.label, marginTop: 20 }}>🎁 全部達成したときのご褒美（任意）</label>
+        <label style={{ ...styles.label, marginTop: 14 }}>🎁 全部達成したときのご褒美（任意）</label>
         <input
           value={reward}
           onChange={(e) => setReward(e.target.value)}
           placeholder="例）焼肉を食べに行く！／お小遣いをもらう！"
           style={styles.input}
         />
-        <p style={styles.tinyNote}>期間の最後まで、すべてのやることを達成したときにお祝いのメッセージとして表示されます。</p>
-
-        <label style={{ ...styles.label, marginTop: 20 }}>やること（教科・習い事）</label>
+        <label style={{ ...styles.label, marginTop: 14 }}>やること（教科・習い事）</label>
         <div style={styles.subjList}>
           {subjects.map((s) => (
             <SubjectCard
@@ -2110,9 +2102,14 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
             />
           ))}
         </div>
-        <button style={styles.addBtn} onClick={addSubject}>
-          <Plus size={20} /> やることを追加
-        </button>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center", marginBottom: 20 }}>
+          <button style={{ ...styles.addBtn, marginBottom: 0 }} onClick={addSubject}>
+            <Plus size={20} /> やることを追加
+          </button>
+          <button style={{ ...styles.saveBtn, width: "auto", flex: "1 1 auto", padding: "12px 18px", fontSize: 18, borderRadius: 14 }} onClick={handleSave}>
+            このスケジュールで始める
+          </button>
+        </div>
 
         {(() => {
           const sdo = parseDate(startDate);
@@ -4083,7 +4080,7 @@ const styles = {
   weekdayToggle: { width: 42, height: 42, borderRadius: 10, border: "2px solid", cursor: "pointer", fontSize: 16, color: "#0B3D62", fontFamily: "inherit" },
 
   addBtn: { display: "inline-flex", alignItems: "center", gap: 4, background: "#14588C", color: "#fff", border: "none", borderRadius: 14, padding: "12px 20px", fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 18, marginBottom: 20 },
-  saveBtn: { width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "linear-gradient(135deg, #FFB6C9, #F4C95D)", color: "#fff", fontWeight: 900, fontSize: 20, cursor: "pointer", boxShadow: "0 10px 20px rgba(255,143,163,0.4)", fontFamily: "inherit" },
+  saveBtn: { width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "linear-gradient(135deg, #2FA36B, #1F7A4F)", color: "#fff", fontWeight: 900, fontSize: 20, cursor: "pointer", boxShadow: "0 8px 18px rgba(31,122,79,0.35)", fontFamily: "inherit" },
   deleteScheduleBtn: { width: "100%", padding: "14px 0", borderRadius: 16, border: "2px solid #FBD4DB", background: "#fff", color: "#E0526B", fontWeight: 700, fontSize: 17, cursor: "pointer", fontFamily: "inherit", marginTop: 14 },
 
   mainWrap: { position: "relative", background: oceanBg, minHeight: 560, overflow: "hidden", paddingBottom: 30 },
