@@ -1754,31 +1754,40 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
             🎯 自由に決める
           </button>
           {subject.measureCustom && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%" }}>
-              <input
-                value={subject.customLabel || ""}
-                onChange={(e) => set({ customLabel: e.target.value })}
-                placeholder="例：なわとび"
-                maxLength={12}
-                style={{ ...styles.measureSelect, flex: 1, minWidth: 0, width: "auto", boxSizing: "border-box", textAlign: "left" }}
-              />
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="any"
-                value={subject.targetCustom ?? ""}
-                onChange={(e) => set({ targetCustom: e.target.value === "" ? "" : Number(e.target.value) })}
-                placeholder="50"
-                style={{ ...styles.measureSelect, width: 72, flexShrink: 0, boxSizing: "border-box" }}
-              />
-              <input
-                value={subject.customUnit || ""}
-                onChange={(e) => set({ customUnit: e.target.value })}
-                placeholder="例：回"
-                maxLength={6}
-                style={{ ...styles.measureSelect, width: 64, flexShrink: 0, boxSizing: "border-box" }}
-              />
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, width: "100%" }}>
+              <label style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={styles.customGoalCaption}>何を数える？（任意）</span>
+                <input
+                  value={subject.customLabel || ""}
+                  onChange={(e) => set({ customLabel: e.target.value })}
+                  placeholder="例：なわとび"
+                  maxLength={12}
+                  style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box", textAlign: "left" }}
+                />
+              </label>
+              <label style={{ width: 72, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={styles.customGoalCaption}>目標の数</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="any"
+                  value={subject.targetCustom ?? ""}
+                  onChange={(e) => set({ targetCustom: e.target.value === "" ? "" : Number(e.target.value) })}
+                  placeholder="50"
+                  style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box" }}
+                />
+              </label>
+              <label style={{ width: 64, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={styles.customGoalCaption}>単位</span>
+                <input
+                  value={subject.customUnit || ""}
+                  onChange={(e) => set({ customUnit: e.target.value })}
+                  placeholder="回"
+                  maxLength={6}
+                  style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box" }}
+                />
+              </label>
             </div>
           )}
         </div>
@@ -2109,7 +2118,9 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
           const sdo = parseDate(startDate);
           const edo = parseDate(endDate);
           const days = sdo && edo ? Math.round((edo.getTime() - sdo.getTime()) / 86400000) + 1 : 0;
-          const nSubj = subjects.length;
+          // 保存時と同じく、名前が入っている「やること」だけを数える
+          const nSubj = subjects.filter((x) => (x.name || "").trim().length > 0).length;
+          const nUnnamed = subjects.length - nSubj;
           const okDays = days >= MIN_CARD_DAYS;
           const okSubj = nSubj >= MIN_CARD_SUBJECTS;
           const ok = okDays && okSubj;
@@ -2121,6 +2132,11 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
               ファミリア（キャラクター）が登場してカードがもらえるのは、次の<b>両方</b>を満たすスケジュールだけです。
               <div>{okDays ? "✅" : "❌"} 期間が{MIN_CARD_DAYS}日以上（いま{days}日）</div>
               <div>{okSubj ? "✅" : "❌"} 「やること」が{MIN_CARD_SUBJECTS}つ以上（いま{nSubj}つ）</div>
+              {nUnnamed > 0 && (
+                <div style={{ color: "#B4432F", fontWeight: 700 }}>
+                  ※名前が空の「やること」が{nUnnamed}つあります。いちばん上の「何を頑張る？」の欄に名前を入れてください（名前が空のものは保存されません）。
+                </div>
+              )}
               <div style={{ marginTop: 4, fontSize: 12, color: "#7c98aa" }}>条件を満たさないスケジュールでは、キャラクターは表示されません。</div>
             </div>
           );
@@ -2139,7 +2155,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       {pendingLowCardSave && (
         <ConfirmModal
           title="ファミリアが登場しません"
-          message="スケジュールが30日未満、または「やること」が1つだけだと、ファミリア（キャラクター）は表示されず、カードももらえないよ。それでもスケジュールを作る？"
+          message="スケジュールが30日未満、または「やること」が1つだけだと、ファミリア（キャラクター）は表示されず、カードももらえないよ（名前が空の「やること」は数えません）。それでもスケジュールを作る？"
           confirmLabel="作る"
           cancelLabel="編集にもどる"
           onConfirm={() => {
@@ -4060,6 +4076,7 @@ const styles = {
   measureToggleOn: { background: "#8B5E34", color: "#fff" },
   measureInput: { width: 72, padding: "8px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 17, fontFamily: "inherit", textAlign: "center" },
   measureSelect: { width: 80, padding: "8px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 16, fontFamily: "inherit", textAlign: "center", background: "#fff", color: "#0B3D62", fontWeight: 700 },
+  customGoalCaption: { fontSize: 11, fontWeight: 700, color: "#7c98aa", whiteSpace: "nowrap" },
   measureUnit: { fontSize: 14, fontWeight: 700, color: "#4a6c85" },
   intervalInput: { width: 68, padding: "8px 8px", borderRadius: 10, border: "2px solid #BFE3F0", fontSize: 18, fontFamily: "inherit", textAlign: "center" },
   weekdayPicker: { display: "flex", gap: 6, flexWrap: "wrap" },
