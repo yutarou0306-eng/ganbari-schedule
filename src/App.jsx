@@ -365,6 +365,7 @@ function describeTargets(subject) {
   if (subject.measureTime !== false) parts.push(`⏱${subject.targetMinutes || subject.durationMinutes || 30}分`);
   if (subject.measurePages) parts.push(`📖${subject.targetPages || 5}ページ`);
   if (subject.measureProblems) parts.push(`✏️${subject.targetProblems || 10}問`);
+  if (subject.measureDistance) parts.push(`🏃${subject.targetKm ?? 3}km`);
   if (subject.measureCustom) parts.push(`🎯${customGoalText(subject, subject.targetCustom)}`);
   return parts;
 }
@@ -378,7 +379,7 @@ function customGoalText(subject, amount) {
 }
 
 function subjectIsMeasurable(subject) {
-  return !!(subject.measureTime !== false || subject.measurePages || subject.measureProblems || subject.measureCustom);
+  return !!(subject.measureTime !== false || subject.measurePages || subject.measureProblems || subject.measureDistance || subject.measureCustom);
 }
 
 function formatAchvShort(vals, subject) {
@@ -386,6 +387,7 @@ function formatAchvShort(vals, subject) {
   if (vals.minutes) parts.push(`⏱${vals.minutes}分`);
   if (vals.pages) parts.push(`📖${vals.pages}p`);
   if (vals.problems) parts.push(`✏️${vals.problems}問`);
+  if (vals.km) parts.push(`🏃${vals.km}km`);
   if (vals.custom) parts.push(`🎯${vals.custom}${(subject && subject.customUnit) || ""}`);
   return parts.join(" ");
 }
@@ -473,6 +475,8 @@ const DEFAULT_SUBJECT = (palette) => ({
   targetPages: 5,
   measureProblems: false,
   targetProblems: 10,
+  measureDistance: false,
+  targetKm: 3,
   measureCustom: false,
   customLabel: "",
   customUnit: "",
@@ -538,6 +542,7 @@ export default function KidsScheduleApp() {
   const [achievements, setAchievements] = useState({});
   const [weights, setWeights] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 体重kg }
   const [calories, setCalories] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 消費カロリーkcal }
+  const [steps, setSteps] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 歩数 }
   const [noteModalDate, setNoteModalDate] = useState(null);
   const [linkedProfile, setLinkedProfile] = useState(null); // { name, totalStamps } | null
   // スタンプ帳（プロフィール）に設定された保護者用暗証番号。スケジュール自身の
@@ -579,6 +584,7 @@ export default function KidsScheduleApp() {
             setAchievements(data.achievements || {});
             setWeights(data.weights || {});
             setCalories(data.calories || {});
+            setSteps(data.steps || {});
             // Another schedule on this device may have just been unlocked
             // with the same PIN — if so, start unlocked here too instead of
             // prompting again, and relock at that same shared expiry time.
@@ -654,13 +660,13 @@ export default function KidsScheduleApp() {
       try {
         await window.storage.set(
           STORAGE_KEY,
-          JSON.stringify({ config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories }),
+          JSON.stringify({ config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, steps }),
           false
         );
       } catch (e) {}
     }, 350);
     return () => clearTimeout(t);
-  }, [config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, loaded]);
+  }, [config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, steps, loaded]);
 
   // iOS home-screen apps often get suspended instead of fully closed, and
   // reopening them can show whatever was last in memory instead of fetching
@@ -696,6 +702,7 @@ export default function KidsScheduleApp() {
             setAchievements(data.achievements || {});
             setWeights(data.weights || {});
             setCalories(data.calories || {});
+            setSteps(data.steps || {});
           }
         } catch (e) {}
       })();
@@ -1174,7 +1181,7 @@ export default function KidsScheduleApp() {
       const comments = parentComments[dKey] || [];
       const achv = achievements[dKey];
       const hasAchv = achv && Object.keys(achv).length > 0;
-      entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null, weight: weights[dKey] || null, kcal: calories[dKey] || null });
+      entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null, weight: weights[dKey] || null, kcal: calories[dKey] || null, steps: steps[dKey] || null });
     }
     entries.sort((a, b) => b.date.getTime() - a.date.getTime());
     return entries;
@@ -1225,9 +1232,18 @@ export default function KidsScheduleApp() {
     });
   }
 
-  function handleSaveNote(text, achv, weight, kcal) {
+  function handleSaveNote(text, achv, weight, kcal, stepCount) {
     if (!noteModalDate) return;
     const dKey = dateKey(noteModalDate);
+    if (stepCount !== undefined) {
+      const n = Math.round(parseFloat(stepCount));
+      setSteps((prev) => {
+        const next = { ...prev };
+        if (n > 0) next[dKey] = n;
+        else delete next[dKey];
+        return next;
+      });
+    }
     if (kcal !== undefined) {
       const c = Math.round(parseFloat(kcal));
       setCalories((prev) => {
@@ -1257,7 +1273,7 @@ export default function KidsScheduleApp() {
         // drop subjects whose fields are all empty so we don't store clutter
         const cleaned = {};
         Object.entries(achv).forEach(([subjId, vals]) => {
-          const hasAny = ["minutes", "pages", "problems", "custom"].some(
+          const hasAny = ["minutes", "pages", "problems", "km", "custom"].some(
             (k) => vals[k] !== undefined && vals[k] !== "" && vals[k] !== null
           );
           if (hasAny) cleaned[subjId] = vals;
@@ -1429,6 +1445,7 @@ export default function KidsScheduleApp() {
           achievements={achievements}
           weights={weights}
           calories={calories}
+          steps={steps}
           onOpenNote={handleOpenNote}
           onOpenRecords={() => setShowRecordsList(true)}
           linkedProfile={linkedProfile}
@@ -1529,6 +1546,7 @@ export default function KidsScheduleApp() {
           showWeight={config.theme === "diet"}
           initialWeight={weights[dateKey(noteModalDate)]}
           initialCalories={calories[dateKey(noteModalDate)]}
+          initialSteps={steps[dateKey(noteModalDate)]}
           onSave={handleSaveNote}
           onClose={handleCloseNote}
         />
@@ -1622,7 +1640,7 @@ export default function KidsScheduleApp() {
 
 /* ---------------- Setup Screen ---------------- */
 
-function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapTheme, isFocused }) {
+function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapTheme, isFocused, showDistance }) {
   function set(patch) {
     onChange({ ...subject, ...patch });
   }
@@ -1642,8 +1660,14 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
       <div style={styles.subjCardTop}>
         <input
           value={subject.name}
-          onChange={(e) => set({ name: e.target.value })}
-          placeholder="何を頑張る？（例：ピアノ）"
+          onChange={(e) => {
+            const name = e.target.value;
+            // ダイエット用：ランニング・ウォーキングなどは距離の目標を自動でオンにする（あとから外せる）
+            const autoDist =
+              showDistance && !subject.measureDistance && !subject.distanceTouched && /ランニング|ウォーキング|ジョギング|ラン|ウォーク|走|歩/.test(name);
+            set({ name, ...(autoDist ? { measureDistance: true } : {}) });
+          }}
+          placeholder={showDistance ? "何を頑張る？（例：ウォーキング）" : "何を頑張る？（例：ピアノ）"}
           style={styles.subjNameInput}
         />
         {canRemove && (
@@ -1745,6 +1769,32 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
             </>
           )}
         </div>
+
+        {(showDistance || subject.measureDistance) && (
+          <div style={styles.measureRow}>
+            <button
+              onClick={() => set({ measureDistance: !subject.measureDistance, distanceTouched: true })}
+              style={{ ...styles.measureToggle, ...(subject.measureDistance ? styles.measureToggleOn : {}) }}
+            >
+              🏃 距離
+            </button>
+            {subject.measureDistance && (
+              <>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.1"
+                  value={subject.targetKm ?? ""}
+                  onChange={(e) => set({ targetKm: e.target.value === "" ? "" : Number(e.target.value) })}
+                  placeholder="3"
+                  style={{ ...styles.measureSelect, boxSizing: "border-box" }}
+                />
+                <span style={styles.measureUnit}>km</span>
+              </>
+            )}
+          </div>
+        )}
 
         <div style={{ ...styles.measureRow, flexWrap: "wrap" }}>
           <button
@@ -2098,6 +2148,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
               canRemove={subjects.length > 1}
               palette={palette}
               isMapTheme={themeObj.isMapTheme}
+              showDistance={theme === "diet"}
               isFocused={s.id === focusSubjectId}
             />
           ))}
@@ -2198,6 +2249,7 @@ function MainScreen({
   achievements,
   weights,
   calories,
+  steps,
   onOpenNote,
   onOpenRecords,
   linkedProfile,
@@ -2446,7 +2498,9 @@ function MainScreen({
         })}
       </div>
 
-      {theme.key === "diet" && <CalorieTotal calories={calories || {}} startDate={startDate} endDate={endDate} />}
+      {theme.key === "diet" && (
+        <CalorieTotal calories={calories || {}} steps={steps || {}} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
+      )}
       {theme.key === "diet" && <WeightChart weights={weights || {}} startDate={startDate} endDate={endDate} />}
 
       <div style={styles.calendarLegendRow}>
@@ -2459,7 +2513,23 @@ function MainScreen({
       </div>
 
       <div style={styles.calendarPanel}>
-        <p style={styles.tableHint}>💡 今日のマスは「本スタンプ」。他の日は自由に「仮スタンプ」で練習できるよ！</p>
+        {/* スタンプの凡例：カレンダーをスクロールしても画面上部に残る */}
+        <div style={styles.stampLegend}>
+          {subjects.map((s, idx) => (
+            <span key={s.id} style={styles.stampLegendItem}>
+              <span style={{ ...styles.stampLegendIcon, background: s.color }}>
+                <StampIcon
+                  index={taskIconIndex(idx, theme.isMapTheme, theme.shapes.length)}
+                  color="#ffffff"
+                  size="70%"
+                  shapes={theme.shapes}
+                  withFace={theme.withFace}
+                />
+              </span>
+              <span style={styles.stampLegendName}>{s.name}</span>
+            </span>
+          ))}
+        </div>
         <div style={styles.calendarGrid}>
           {DAY_LABELS.map((label, i) =>
             theme.isMapTheme ? (
@@ -2505,7 +2575,7 @@ function MainScreen({
                             border: notes[dKey] || achievements[dKey] ? "1px solid #8B5E34" : "1px dashed #C4A876",
                             color: notes[dKey] || achievements[dKey] ? "#5C3A21" : "#8B6B47",
                           }
-                        : notes[dKey] || (weights && weights[dKey]) || (calories && calories[dKey])
+                        : notes[dKey] || (weights && weights[dKey]) || (calories && calories[dKey]) || (steps && steps[dKey])
                         ? styles.memoBtnFilled
                         : {}),
                     }}
@@ -3001,11 +3071,12 @@ function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
   );
 }
 
-function NoteModal({ date, initialText, initialAchievements, comments, subjects, isMapTheme, showWeight, initialWeight, initialCalories, onSave, onClose }) {
+function NoteModal({ date, initialText, initialAchievements, comments, subjects, isMapTheme, showWeight, initialWeight, initialCalories, initialSteps, onSave, onClose }) {
   const [text, setText] = useState(initialText || "");
   const [achv, setAchv] = useState(initialAchievements || {});
   const [weight, setWeight] = useState(initialWeight !== undefined && initialWeight !== null ? String(initialWeight) : "");
   const [kcal, setKcal] = useState(initialCalories !== undefined && initialCalories !== null ? String(initialCalories) : "");
+  const [stepCount, setStepCount] = useState(initialSteps !== undefined && initialSteps !== null ? String(initialSteps) : "");
   const dLabel = `${date.getMonth() + 1}月${date.getDate()}日`;
 
   function setField(subjId, field, value) {
@@ -3050,6 +3121,23 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
               />
               kcal
             </label>
+            <label style={{ ...styles.achievementField, fontSize: 15, color: "#1E4A3B" }}>
+              👟 歩数
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step="1"
+                placeholder="例：8000"
+                value={stepCount}
+                onChange={(e) => setStepCount(e.target.value)}
+                style={{ ...styles.achievementInput, width: 96, borderColor: "#A9DEC4", fontSize: 16 }}
+              />
+              歩
+            </label>
+            <div style={{ fontSize: 11.5, color: "#5d7d70", lineHeight: 1.5 }}>
+              消費カロリーは、健康アプリの「アクティブカロリー」（運動で消費した分）を入れてください。
+            </div>
           </div>
         )}
 
@@ -3102,6 +3190,22 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       問
                     </label>
                   )}
+                  {s.measureDistance && (
+                    <label style={styles.achievementField}>
+                      🏃
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="0.1"
+                        placeholder={String(s.targetKm ?? 3)}
+                        value={achv[s.id]?.km ?? ""}
+                        onChange={(e) => setField(s.id, "km", e.target.value)}
+                        style={styles.achievementInput}
+                      />
+                      km
+                    </label>
+                  )}
                   {s.measureCustom && (
                     <label style={styles.achievementField}>
                       🎯{(s.customLabel || "").trim()}
@@ -3151,7 +3255,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
           <button style={styles.modalCancel} onClick={onClose}>
             とじる
           </button>
-          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, showWeight ? weight : undefined, showWeight ? kcal : undefined)}>
+          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, showWeight ? weight : undefined, showWeight ? kcal : undefined, showWeight ? stepCount : undefined)}>
             保存する
           </button>
         </div>
@@ -3232,6 +3336,7 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
       if (vals.minutes) parts.push(`⏱${vals.minutes}分`);
       if (vals.pages) parts.push(`📖${vals.pages}ページ`);
       if (vals.problems) parts.push(`✏️${vals.problems}問`);
+      if (vals.km) parts.push(`🏃${vals.km}km`);
       if (vals.custom) parts.push(`🎯${customGoalText(s, vals.custom)}`);
       if (parts.length > 0) achvParts.push({ name: s.name, color: s.color, text: parts.join(" ") });
     });
@@ -3268,6 +3373,7 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
         {e.date.getMonth() + 1}月{e.date.getDate()}日
       </div>
       {e.weight && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>⚖️ 体重：{Number(e.weight).toFixed(1)}kg</div>}
+      {e.steps && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>👟 歩数：{Number(e.steps).toLocaleString()}歩</div>}
       {e.kcal && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>🔥 消費カロリー：{Number(e.kcal).toLocaleString()}kcal</div>}
       {achvParts.map((a) => (
         <div key={a.name} style={{ ...styles.recordEntryAchv, color: a.color }}>
@@ -3373,19 +3479,64 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
 
 
 // ダイエット用：期間内の消費カロリー合計（スタンプの合計と同じように大きく表示）
-function CalorieTotal({ calories, startDate, endDate }) {
+function CalorieTotal({ calories, steps, achievements, subjects, startDate, endDate }) {
   const startKey = dateKey(startDate);
   const endKey = dateKey(endDate);
-  const entries = Object.entries(calories).filter(([k, c]) => k >= startKey && k <= endKey && c > 0);
-  const total = entries.reduce((sum, [, c]) => sum + Number(c), 0);
-  return (
-    <div style={{ position: "relative", zIndex: 2, margin: "14px 18px 0", background: "#fff", borderRadius: 18, padding: "12px 14px", boxShadow: "0 10px 24px rgba(30,74,59,0.25)", textAlign: "center" }}>
-      <div style={{ fontSize: 13, color: "#5d7d70", fontWeight: 700 }}>消費カロリーの合計</div>
-      <div style={{ fontSize: 34, fontWeight: 900, color: "#1E4A3B", lineHeight: 1.2 }}>
-        🔥 {total.toLocaleString()}<span style={{ fontSize: 16, marginLeft: 4 }}>kcal</span>
+  const inRange = (k) => k >= startKey && k <= endKey;
+  const calEntries = Object.entries(calories).filter(([k, c]) => inRange(k) && c > 0);
+  const totalKcal = calEntries.reduce((sum, [, c]) => sum + Number(c), 0);
+  const totalSteps = Object.entries(steps || {}).filter(([k, n]) => inRange(k) && n > 0).reduce((sum, [, n]) => sum + Number(n), 0);
+
+  // 運動時間・距離は、各やることの「実際にどれだけできた？」の記録から合計する。
+  // 距離は「🏃距離」の記録に加えて、自由目標の単位が km のものも数える。
+  let totalMin = 0;
+  const kmBySubj = {};
+  Object.entries(achievements).forEach(([k, day]) => {
+    if (!inRange(k)) return;
+    Object.entries(day || {}).forEach(([sid, v]) => {
+      if (!v) return;
+      totalMin += Number(v.minutes) || 0;
+      const subj = subjects.find((x) => x.id === sid);
+      let km = Number(v.km) || 0;
+      if (subj && /^(km|キロ|ｋｍ)$/i.test((subj.customUnit || "").trim())) km += Number(v.custom) || 0;
+      if (km > 0) kmBySubj[sid] = (kmBySubj[sid] || 0) + km;
+    });
+  });
+  const totalKm = Math.round(Object.values(kmBySubj).reduce((a, b) => a + b, 0) * 10) / 10;
+  const hasDistanceSubj = subjects.some((x) => x.measureDistance) || totalKm > 0;
+  const h = Math.floor(totalMin / 60);
+  const m = Math.round(totalMin % 60);
+  const timeText = h > 0 ? `${h}時間${m > 0 ? m + "分" : ""}` : `${m}分`;
+  const kmBreakdown = Object.entries(kmBySubj).map(([sid, km]) => {
+    const subj = subjects.find((x) => x.id === sid);
+    return `${(subj && subj.name) || "？"} ${Math.round(km * 10) / 10}km`;
+  });
+
+  const stat = (icon, label, value, unit) => (
+    <div style={{ flex: "1 1 0", minWidth: 0, textAlign: "center" }}>
+      <div style={{ fontSize: 12, color: "#5d7d70", fontWeight: 700, whiteSpace: "nowrap" }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 900, color: "#1E4A3B", lineHeight: 1.25, whiteSpace: "nowrap" }}>
+        <span style={{ fontSize: 18 }}>{icon}</span>
+        {value}
+        {unit && <span style={{ fontSize: 13, marginLeft: 2 }}>{unit}</span>}
       </div>
-      <div style={{ fontSize: 11.5, color: "#8aa69a" }}>
-        {entries.length > 0 ? `${entries.length}日分の記録` : "「📝 メモ」から消費カロリーを入れると合計されます"}
+    </div>
+  );
+
+  return (
+    <div style={{ position: "relative", zIndex: 2, margin: "14px 18px 0", background: "#fff", borderRadius: 18, padding: "12px 10px", boxShadow: "0 10px 24px rgba(30,74,59,0.25)" }}>
+      <div style={{ fontSize: 13, color: "#1E4A3B", fontWeight: 800, textAlign: "center", marginBottom: 4 }}>このスケジュールの合計</div>
+      <div style={{ display: "grid", gridTemplateColumns: hasDistanceSubj ? "1fr 1fr" : "1fr 1fr 1fr", rowGap: 8, columnGap: 6, alignItems: "flex-start" }}>
+        {stat("⏱", "運動時間", timeText, "")}
+        {hasDistanceSubj && stat("🏃", "走行距離", totalKm, "km")}
+        {stat("👟", "歩数", totalSteps.toLocaleString(), "歩")}
+        {stat("🔥", "消費カロリー", totalKcal.toLocaleString(), "kcal")}
+      </div>
+      {kmBreakdown.length > 1 && (
+        <div style={{ fontSize: 11.5, color: "#5d7d70", textAlign: "center", marginTop: 4 }}>（{kmBreakdown.join("・")}）</div>
+      )}
+      <div style={{ fontSize: 11.5, color: "#8aa69a", textAlign: "center", marginTop: 4 }}>
+        「📝 メモ」で記録した内容が合計されます
       </div>
     </div>
   );
@@ -4083,7 +4234,8 @@ const styles = {
   saveBtn: { width: "100%", padding: "16px 0", borderRadius: 16, border: "none", background: "linear-gradient(135deg, #2FA36B, #1F7A4F)", color: "#fff", fontWeight: 900, fontSize: 20, cursor: "pointer", boxShadow: "0 8px 18px rgba(31,122,79,0.35)", fontFamily: "inherit" },
   deleteScheduleBtn: { width: "100%", padding: "14px 0", borderRadius: 16, border: "2px solid #FBD4DB", background: "#fff", color: "#E0526B", fontWeight: 700, fontSize: 17, cursor: "pointer", fontFamily: "inherit", marginTop: 14 },
 
-  mainWrap: { position: "relative", background: oceanBg, minHeight: 560, overflow: "hidden", paddingBottom: 30 },
+  // overflow は "clip"（"hidden" だと凡例の position: sticky が効かないため）
+  mainWrap: { position: "relative", background: oceanBg, minHeight: 560, overflow: "clip", paddingBottom: 30 },
   header: { position: "relative", padding: "24px 18px 16px", zIndex: 2 },
   headerTop: { display: "flex", alignItems: "flex-start", justifyContent: "center", gap: 10, position: "relative" },
   titleBanner: { background: "#fff", borderRadius: 999, padding: "10px 22px", boxShadow: "0 8px 18px rgba(11,61,98,0.3)", maxWidth: "72%", position: "relative", zIndex: 1 },
@@ -4133,6 +4285,10 @@ const styles = {
   legendDot: { width: 12, height: 12, borderRadius: "50%", display: "inline-block" },
 
   calendarPanel: { position: "relative", zIndex: 2, margin: "12px 18px 0", background: "linear-gradient(180deg,#FFFDF8,#FFF3E4)", borderRadius: 22, padding: 12, boxShadow: "0 16px 34px rgba(11,61,98,0.3)" },
+  stampLegend: { position: "sticky", top: 56, zIndex: 5, display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px 12px", margin: "0 0 10px", padding: "8px 10px", background: "rgba(255,253,248,0.96)", borderRadius: 14, boxShadow: "0 4px 12px rgba(11,61,98,0.18)", border: "1px solid #F0E3CC" },
+  stampLegendItem: { display: "inline-flex", alignItems: "center", gap: 5, minWidth: 0 },
+  stampLegendIcon: { width: 22, height: 22, borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  stampLegendName: { fontSize: 13, fontWeight: 800, color: "#0B3D62", whiteSpace: "nowrap", maxWidth: 130, overflow: "hidden", textOverflow: "ellipsis" },
   tableHint: { fontSize: 15, color: "#5a7d94", fontWeight: 700, margin: "0 4px 10px", textAlign: "center" },
   calendarGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 6 },
   weekdayHeadCell: { textAlign: "center", fontSize: 15, fontWeight: 900, color: "#0B3D62", background: "#fff", borderRadius: 10, padding: "6px 0", boxShadow: "inset 0 0 0 2px #EAF7FB" },
