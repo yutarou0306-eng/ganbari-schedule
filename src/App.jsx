@@ -2425,11 +2425,6 @@ function MainScreen({
             </a>
           )}
         </div>
-        <div style={{ ...styles.lockNote, color: theme.headerTextColor }}>
-          {locked
-            ? "🔒 本スタンプは保護者の方がロックを開けてから押せます"
-            : "🔓 本スタンプが押せます。過去の押し忘れもタップで記録できます（3分後に自動ロック）"}
-        </div>
 
         <div style={styles.mascotRow}>
           <div
@@ -2549,6 +2544,12 @@ function MainScreen({
       )}
       {theme.key === "diet" && <WeightChart weights={weights || {}} startDate={startDate} endDate={endDate} target={config.targetWeight} onSaveWeight={onSaveWeight} onSaveTarget={onSaveTargetWeight} />}
 
+      {/* ロックの案内はカレンダーのすぐ上（スタンプの説明と一緒）に表示 */}
+      <div style={{ ...styles.lockNote, color: theme.headerTextColor, fontSize: 14, margin: "14px 18px 0", position: "relative", zIndex: 2 }}>
+        {locked
+          ? "🔒 本スタンプは保護者の方がロックを開けてから押せます"
+          : "🔓 本スタンプが押せます。過去の押し忘れもタップで記録できます（3分後に自動ロック）"}
+      </div>
       <div style={styles.calendarLegendRow}>
         <span style={styles.calendarLegendItem}>
           <span style={{ ...styles.legendDot, background: "#14588C" }} /> 本スタンプ（今日だけ）
@@ -4473,11 +4474,11 @@ const styles = {
   parentCommentLabel: { fontSize: 12.5, fontWeight: 800, color: "#B5651D", marginBottom: 4 },
   parentCommentText: { fontSize: 15, color: "#5C3A21", whiteSpace: "pre-wrap", lineHeight: 1.5 },
   achievementSection: { textAlign: "left", background: "#FFF7EC", border: "2px solid #F0DBA6", borderRadius: 14, padding: 12, marginBottom: 16 },
-  achievementSectionLabel: { fontSize: 13, fontWeight: 800, color: "#8B5E34", margin: "0 0 8px" },
+  achievementSectionLabel: { fontSize: 13, fontWeight: 600, color: "#A27C55", margin: "0 0 8px" },
   achievementSubjectRow: { marginBottom: 8 },
   achievementSubjectName: { fontWeight: 900, fontSize: 14.5, marginBottom: 4 },
   achievementFieldsRow: { display: "flex", flexWrap: "wrap", gap: 10 },
-  achievementField: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13.5, fontWeight: 700, color: "#5C3A21" },
+  achievementField: { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13.5, fontWeight: 500, color: "#8A6D55" },
   achievementInput: { width: 56, padding: "5px 6px", borderRadius: 8, border: "2px solid #E0C68A", fontSize: 14, fontFamily: "inherit", textAlign: "center" },
   recordsListCard: { background: "#fff", borderRadius: 20, padding: 24, maxWidth: 420, width: "100%", textAlign: "left", animation: "popIn 0.25s ease-out", maxHeight: "82vh", display: "flex", flexDirection: "column" },
   recordsListScroll: { overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, marginBottom: 16, paddingRight: 2 },
