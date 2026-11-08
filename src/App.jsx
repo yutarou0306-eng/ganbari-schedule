@@ -2776,7 +2776,7 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
   const icon = useDragonStamp ? (
     <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
   ) : (
-    <StampIcon index={iconIndex} color={color} size="86%" shapes={shapes} withFace={withFace} />
+    <StampIcon index={iconIndex} color="#ffffff" size="80%" shapes={shapes} withFace={withFace} />
   );
   const hintIdx = taskIconIndex(iconIndex, useDragonStamp, shapes ? shapes.length : 1);
   const hintIcon = (
@@ -2794,9 +2794,7 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
           style={{
             ...styles.stampCircle,
             cursor: "default",
-            borderColor: color,
-            borderStyle: "solid",
-            background: color + "22",
+            ...stampedCircleStyle(color, useDragonStamp),
           }}
         >
           {icon}
@@ -2820,9 +2818,7 @@ function HistoryCell({ count, color, iconIndex, label, missed, fun, onToggleFun,
         onTouchMove={longPress.onTouchMove}
         style={{
           ...styles.stampCircle,
-          borderColor: color,
-          borderStyle: "solid",
-          background: color + "22",
+          ...stampedCircleStyle(color, useDragonStamp),
           cursor: "pointer",
         }}
         aria-label={`${label} の記録をあとから直す（長押しで保護者用）`}
@@ -2946,6 +2942,16 @@ function WeekdayShield({ label, color, iconIndex, shapes }) {
   );
 }
 
+// 押したスタンプの丸：その色でぬりつぶし＋実線の枠（押していないマスの点線・白地とはっきり区別する）
+function stampedCircleStyle(color, useDragonStamp) {
+  return {
+    borderColor: color,
+    borderStyle: "solid",
+    background: useDragonStamp ? color + "55" : color,
+    boxShadow: `0 2px 6px ${color}88`,
+  };
+}
+
 function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, withFace, useDragonStamp }) {
   const [popKey, setPopKey] = useState(0);
   const [comment, setComment] = useState(null);
@@ -2970,8 +2976,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, wit
         onClick={onTap}
         style={{
           ...styles.stampCircle,
-          borderColor: color,
-          background: count >= 1 ? color + "22" : "#ffffff",
+          ...(count >= 1 ? stampedCircleStyle(color, useDragonStamp) : { borderColor: color, background: "#ffffff" }),
         }}
         aria-label={`${label} スタンプ`}
       >
@@ -2980,7 +2985,7 @@ function StampCell({ count, color, iconIndex, label, onTap, onClear, shapes, wit
             {useDragonStamp ? (
               <img src="/dragon-stamp.png" alt="" style={styles.dragonStampImg} />
             ) : (
-              <StampIcon index={iconIndex} color={color} size="88%" shapes={shapes} withFace={withFace} />
+              <StampIcon index={iconIndex} color="#ffffff" size="80%" shapes={shapes} withFace={withFace} />
             )}
           </span>
         ) : (
@@ -4445,7 +4450,8 @@ const styles = {
   celebrateDragonImg: { width: 120, height: 120, borderRadius: "50%", marginBottom: 10, boxShadow: "0 8px 20px rgba(0,0,0,0.35)" },
   dragonStampImg: { width: "82%", height: "82%", borderRadius: "50%", objectFit: "cover" },
   backfillHint: { fontSize: 20, fontWeight: 900, color: "#c9d8e0" },
-  stampHintIcon: { width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.7 },
+  // まだ押していないマスの目印は薄く（押したスタンプと見分けやすくするため）
+  stampHintIcon: { width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.35, filter: "grayscale(0.4)" },
   weekCelebrateTitle: { fontFamily: "'Kaisei Decol', serif", color: "#0B3D62", fontSize: 27, margin: "4px 0" },
   weekCelebrateSub: { fontSize: 17, color: "#5a7d94", marginBottom: 16, lineHeight: 1.6 },
   bigStamp: { display: "inline-block", border: "4px solid #FF8FA3", color: "#FF8FA3", fontWeight: 900, fontSize: 26, padding: "10px 26px", borderRadius: 14, transform: "rotate(-8deg)", marginBottom: 18, fontFamily: "'Kaisei Decol', serif" },
