@@ -1930,6 +1930,10 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
 function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, focusSubjectId }) {
   const [title, setTitle] = useState(initial.title || "");
   const [theme, setTheme] = useState(initial.theme || "girl");
+  // 女の子用／男の子用 → 大人用 への変更（保存するまでは確定しない）
+  const [confirmToDiet, setConfirmToDiet] = useState(false);
+  const canConvertToDiet = hasExisting && (initial.theme || "girl") !== "diet";
+  const convertingToDiet = canConvertToDiet && theme === "diet";
   const [startDate, setStartDate] = useState(initial.startDate || todayStr());
   const [endDate, setEndDate] = useState(initial.endDate || defaultEndDateFor(initial.startDate || todayStr()));
   const [pin, setPin] = useState(initial.pin || "");
@@ -2050,6 +2054,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       subjects: cleanSubjects,
       pin: pin.trim(),
       reward: reward.trim(),
+      ...(convertingToDiet ? { convertedFrom: initial.theme || "girl" } : initial.convertedFrom ? { convertedFrom: initial.convertedFrom } : {}),
       ...(theme === "diet" && parseFloat(targetWeight) > 0 ? { targetWeight: Math.round(parseFloat(targetWeight) * 10) / 10 } : {}),
       ...(profileId ? { profileId } : {}),
     };
@@ -2157,6 +2162,32 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
           <span style={{ color: "#4a6c85", fontWeight: 700 }}>〜</span>
           <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={styles.dateInput} />
         </div>
+        {canConvertToDiet && (
+          <div style={{ marginTop: 14, borderRadius: 14, padding: "10px 12px", background: convertingToDiet ? "#EAF7EE" : "#F4FAF6", border: `2px ${convertingToDiet ? "solid #9AD5AE" : "dashed #BFE6C9"}` }}>
+            {convertingToDiet ? (
+              <div style={{ fontSize: 13.5, color: "#1E4A3B", fontWeight: 700, lineHeight: 1.6 }}>
+                🌿 大人用に変更します。下の「このスケジュールで始める」を押すと確定します。
+                <button
+                  onClick={() => {
+                    setTheme(initial.theme || "girl");
+                    setSubjects((prev) => prev.map((x, i) => ({ ...x, color: (initial.subjects && initial.subjects[i] && initial.subjects[i].color) || x.color })));
+                  }}
+                  style={{ marginLeft: 8, background: "none", border: "none", color: "#7c98aa", textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", fontSize: 12.5 }}
+                >
+                  やめる
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmToDiet(true)}
+                style={{ border: "none", borderRadius: 12, padding: "10px 14px", background: "linear-gradient(135deg,#4FA283,#2C8A5F)", color: "#fff", fontWeight: 800, fontSize: 15, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                🌿 大人用に変更する
+              </button>
+            )}
+          </div>
+        )}
+
         <label style={{ ...styles.label, marginTop: 14 }}>🎁 全部達成したときのご褒美（任意）</label>
         <input
           value={reward}
@@ -2246,6 +2277,21 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
           </button>
         )}
       </div>
+      {confirmToDiet && (
+        <ConfirmModal
+          title="大人用に変更しますか？"
+          message="スタンプ・⭐・メモ・育てているファミリアはそのまま引き継がれます。見た目が大人用のデザインに変わり、体重・消費カロリー・走行距離を記録できるようになります。やることの色も大人用の色に変わります。保存したあとは、女の子用・男の子用に戻せません。"
+          confirmLabel="大人用にする"
+          cancelLabel="やめる"
+          onConfirm={() => {
+            setTheme("diet");
+            setSubjects((prev) => prev.map((x, i) => ({ ...x, color: THEMES.diet.palette[i % THEMES.diet.palette.length].hex })));
+            setConfirmToDiet(false);
+          }}
+          onCancel={() => setConfirmToDiet(false)}
+        />
+      )}
+
       {pendingLowCardSave && (
         <ConfirmModal
           title="ファミリアが登場しません"

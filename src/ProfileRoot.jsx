@@ -291,6 +291,7 @@ export default function ProfileRoot() {
             id: row.id,
             title: row.blob.config.title,
             theme: row.blob.config.theme || "girl",
+            convertedFrom: row.blob.config.convertedFrom || null,
             startDate: row.blob.config.startDate || "",
             endDate: row.blob.config.endDate || "",
             stamps: countStampsInBlob(row.blob),
@@ -475,7 +476,8 @@ export default function ProfileRoot() {
   // 既存スケジュールがすべて同じ側ならそれに合わせる。混在・空なら null（制限なし）。
   // 大人用（ダイエット）スケジュールはどの種類のスタンプ帳にも足せるので、
   // 種類の推定には使わない（女の子用＋大人用の古いスタンプ帳は「女の子用」のまま）。
-  const inferredThemes = Array.from(new Set(schedules.map((s) => s.theme).filter((t) => t !== "diet")));
+  // 女の子用／男の子用から大人用に変えたスケジュールは、元の種類で数える
+  const inferredThemes = Array.from(new Set(schedules.map((s) => (s.theme === "diet" ? s.convertedFrom : s.theme)).filter((t) => t && t !== "diet")));
   const bookGender =
     profile.gender === "boy" || profile.gender === "girl" || profile.gender === "diet"
       ? profile.gender
