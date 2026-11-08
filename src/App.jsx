@@ -1232,6 +1232,27 @@ export default function KidsScheduleApp() {
     });
   }
 
+  // ダイエット用：体重はグラフのカードから直接記録する
+  function handleSaveWeight(dKey, value) {
+    const w = parseFloat(value);
+    setWeights((prev) => {
+      const next = { ...prev };
+      if (w > 0) next[dKey] = Math.round(w * 10) / 10;
+      else delete next[dKey];
+      return next;
+    });
+  }
+
+  function handleSaveTargetWeight(value) {
+    const w = parseFloat(value);
+    setConfig((prev) => {
+      const next = { ...prev };
+      if (w > 0) next.targetWeight = Math.round(w * 10) / 10;
+      else delete next.targetWeight;
+      return next;
+    });
+  }
+
   function handleSaveNote(text, achv, weight, kcal, distKm) {
     if (!noteModalDate) return;
     const dKey = dateKey(noteModalDate);
@@ -1446,6 +1467,8 @@ export default function KidsScheduleApp() {
           weights={weights}
           calories={calories}
           distances={distances}
+          onSaveWeight={handleSaveWeight}
+          onSaveTargetWeight={handleSaveTargetWeight}
           onOpenNote={handleOpenNote}
           onOpenRecords={() => setShowRecordsList(true)}
           linkedProfile={linkedProfile}
@@ -2271,6 +2294,8 @@ function MainScreen({
   weights,
   calories,
   distances,
+  onSaveWeight,
+  onSaveTargetWeight,
   onOpenNote,
   onOpenRecords,
   linkedProfile,
@@ -2522,7 +2547,7 @@ function MainScreen({
       {theme.key === "diet" && (
         <CalorieTotal calories={calories || {}} distances={distances || {}} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
       )}
-      {theme.key === "diet" && <WeightChart weights={weights || {}} startDate={startDate} endDate={endDate} target={config.targetWeight} />}
+      {theme.key === "diet" && <WeightChart weights={weights || {}} startDate={startDate} endDate={endDate} target={config.targetWeight} onSaveWeight={onSaveWeight} onSaveTarget={onSaveTargetWeight} />}
 
       <div style={styles.calendarLegendRow}>
         <span style={styles.calendarLegendItem}>
@@ -3119,20 +3144,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
 
         {showWeight && (
           <div style={{ ...styles.achievementSection, background: "#EEF8F2", borderColor: "#BFE6C9", display: "flex", flexDirection: "column", gap: 10 }}>
-            <label style={{ ...styles.achievementField, fontSize: 15, color: "#1E4A3B" }}>
-              ⚖️ 体重
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.1"
-                placeholder="例：62.5"
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-                style={{ ...styles.achievementInput, width: 84, borderColor: "#A9DEC4", fontSize: 16 }}
-              />
-              kg
-            </label>
+            
             <label style={{ ...styles.achievementField, fontSize: 15, color: "#1E4A3B" }}>
               🔥 消費カロリー
               <input
@@ -3281,7 +3293,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
           <button style={styles.modalCancel} onClick={onClose}>
             とじる
           </button>
-          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, showWeight ? weight : undefined, showWeight ? kcal : undefined, showWeight ? distKm : undefined)}>
+          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, undefined, showWeight ? kcal : undefined, showWeight ? distKm : undefined)}>
             保存する
           </button>
         </div>
@@ -3568,10 +3580,81 @@ function CalorieTotal({ calories, distances, achievements, subjects, startDate, 
 }
 
 // ダイエット用：体重の推移グラフ（スケジュール期間内の記録だけを表示）
-function WeightChart({ weights, startDate, endDate, target }) {
+function WeightChart({ weights, startDate, endDate, target, onSaveWeight, onSaveTarget }) {
   const goal = Number(target) > 0 ? Number(target) : null;
   const startKey = dateKey(startDate);
   const endKey = dateKey(endDate);
+  // 入力欄：日付は今日（期間外なら期間の端）を初期値に
+  const todayK = todayStr();
+  const defaultDay = todayK < startKey ? startKey : todayK > endKey ? endKey : todayK;
+  const [day, setDay] = useState(defaultDay);
+  const [val, setVal] = useState(weights[defaultDay] ? String(weights[defaultDay]) : "");
+  const [goalVal, setGoalVal] = useState(goal ? String(goal) : "");
+  const [editGoal, setEditGoal] = useState(false);
+  const [savedMsg, setSavedMsg] = useState("");
+  function pickDay(k) {
+    setDay(k);
+    setVal(weights[k] ? String(weights[k]) : "");
+  }
+  function save() {
+    onSaveWeight(day, val);
+    setSavedMsg(parseFloat(val) > 0 ? "記録しました" : "この日の記録を消しました");
+    setTimeout(() => setSavedMsg(""), 1500);
+  }
+  const inputStyle = { padding: "8px 10px", borderRadius: 10, border: "2px solid #A9DEC4", fontSize: 16, fontFamily: "inherit", boxSizing: "border-box", background: "#fff", color: "#1E4A3B" };
+  const btnStyle = { padding: "8px 14px", borderRadius: 10, border: "none", background: "#2C8A5F", color: "#fff", fontWeight: 800, fontSize: 14, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" };
+  const entry = (
+    <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px dashed #CFE6D8" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+        <input type="date" value={day} min={startKey} max={endKey} onChange={(e) => e.target.value && pickDay(e.target.value)} style={{ ...inputStyle, width: 150 }} />
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          step="0.1"
+          placeholder="例：62.5"
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          style={{ ...inputStyle, width: 90 }}
+        />
+        <span style={{ fontWeight: 700, color: "#1E4A3B" }}>kg</span>
+        <button onClick={save} style={btnStyle}>記録する</button>
+        {savedMsg && <span style={{ fontSize: 12.5, color: "#2C8A5F", fontWeight: 700 }}>✓ {savedMsg}</span>}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 8, fontSize: 13, color: "#5d7d70" }}>
+        {editGoal ? (
+          <>
+            🎯 目標体重
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.1"
+              placeholder="例：75.0"
+              value={goalVal}
+              onChange={(e) => setGoalVal(e.target.value)}
+              style={{ ...inputStyle, width: 90, fontSize: 15, padding: "6px 8px" }}
+            />
+            kg
+            <button
+              onClick={() => {
+                onSaveTarget(goalVal);
+                setEditGoal(false);
+              }}
+              style={{ ...btnStyle, padding: "6px 12px", fontSize: 13 }}
+            >
+              決定
+            </button>
+          </>
+        ) : (
+          <button onClick={() => setEditGoal(true)} style={{ background: "none", border: "none", color: "#2C8A5F", fontWeight: 700, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit", fontSize: 13, padding: 0 }}>
+            🎯 {goal ? `目標体重を変える（いま ${goal.toFixed(1)}kg）` : "目標体重を決める"}
+          </button>
+        )}
+      </div>
+      <div style={{ fontSize: 11.5, color: "#8aa69a", marginTop: 6 }}>グラフの点をタップすると、その日の体重を直せます。空にして「記録する」で消せます。</div>
+    </div>
+  );
   const points = Object.entries(weights)
     .filter(([k, w]) => k >= startKey && k <= endKey && w > 0)
     .sort(([a], [b]) => (a < b ? -1 : 1));
@@ -3589,7 +3672,8 @@ function WeightChart({ weights, startDate, endDate, target }) {
       <div style={card}>
         <div style={{ fontWeight: 800, color: "#1E4A3B", fontSize: 15 }}>⚖️ 体重の記録</div>
         {goal && <div style={{ fontSize: 13, fontWeight: 800, color: "#E07A4F", marginTop: 4 }}>目標 {goal.toFixed(1)}kg</div>}
-        <div style={{ fontSize: 12.5, color: "#5d7d70", marginTop: 4 }}>カレンダーの「📝 メモ」から体重を入れると、ここにグラフが出ます。</div>
+        <div style={{ fontSize: 12.5, color: "#5d7d70", marginTop: 4 }}>下の欄に体重を入れると、ここにグラフが出ます。</div>
+        {entry}
       </div>
     );
   }
@@ -3649,9 +3733,13 @@ function WeightChart({ weights, startDate, endDate, target }) {
         )}
         <path d={path} fill="none" stroke="#3E9A74" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
         {points.map(([k, w]) => (
-          <circle key={k} cx={xOf(k)} cy={yOf(w)} r="3.5" fill="#fff" stroke="#3E9A74" strokeWidth="2" />
+          <g key={k} onClick={() => pickDay(k)} style={{ cursor: "pointer" }}>
+            <circle cx={xOf(k)} cy={yOf(w)} r="9" fill="transparent" />
+            <circle cx={xOf(k)} cy={yOf(w)} r="3.5" fill={k === day ? "#3E9A74" : "#fff"} stroke="#3E9A74" strokeWidth="2" />
+          </g>
         ))}
       </svg>
+      {entry}
     </div>
   );
 }
