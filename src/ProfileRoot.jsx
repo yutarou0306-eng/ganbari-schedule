@@ -110,19 +110,36 @@ function localTodayKey() {
 // total on a completed schedule (e.g. ⏱120分 📖45ページ ✏️80問).
 function totalAchievementsInBlob(blob) {
   const achievements = (blob && blob.achievements) || {};
-  const totals = { minutes: 0, pages: 0, problems: 0 };
+  const totals = { minutes: 0, pages: 0, problems: 0, custom: [] };
+  // 自由目標は項目名・単位がやることごとに違うので、「項目名＋単位」ごとに合計する
+  const subjects = (blob && blob.config && blob.config.subjects) || [];
+  const customMap = {};
   Object.values(achievements).forEach((day) => {
-    Object.values(day || {}).forEach((vals) => {
+    Object.entries(day || {}).forEach(([subjId, vals]) => {
       if (!vals) return;
       totals.minutes += Number(vals.minutes) || 0;
       totals.pages += Number(vals.pages) || 0;
       totals.problems += Number(vals.problems) || 0;
+      const n = Number(vals.custom) || 0;
+      if (n > 0) {
+        const subj = subjects.find((x) => x.id === subjId) || {};
+        const label = (subj.customLabel || "").trim();
+        const unit = (subj.customUnit || "").trim();
+        const key = `${label}|${unit}`;
+        if (!customMap[key]) customMap[key] = { label, unit, total: 0 };
+        customMap[key].total += n;
+      }
     });
   });
+  totals.custom = Object.values(customMap).map((c) => ({ ...c, total: Math.round(c.total * 100) / 100 }));
   return totals;
 }
 
-const BIRTH_YEAR_OPTIONS = Array.from({ length: 57 }, (_, i) => 2026 - i); // 2026 down to 1970
+function customTotalsText(t) {
+  return ((t && t.custom) || []).map((c) => `🎯${c.label ? c.label + " " : ""}${c.total}${c.unit}`);
+}
+
+const BIRTH_YEAR_OPTIONS = Array.from({ length: 97 }, (_, i) => 2026 - i); // 2026 down to 1930
 const BIRTH_MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 const BIRTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1);
 
@@ -300,7 +317,7 @@ export default function ProfileRoot() {
   async function handleCreateOrEditProfile(name, birthdate, pin, gender) {
     const next = { ...profile, name: name.trim(), birthdate, pin: (pin || "").trim() };
     // 男の子／女の子は一度決めたら変更不可（未設定の古いスタンプ帳だけ後から設定できる）
-    if (!profile.gender && (gender === "boy" || gender === "girl")) next.gender = gender;
+    if (!profile.gender && (gender === "boy" || gender === "girl" || gender === "diet")) next.gender = gender;
     await saveProfile(next);
     setView("main");
     if (!exists) await loadSchedules();
@@ -440,7 +457,7 @@ export default function ProfileRoot() {
   // 既存スケジュールがすべて同じ側ならそれに合わせる。混在・空なら null（制限なし）。
   const inferredThemes = Array.from(new Set(schedules.map((s) => s.theme)));
   const bookGender =
-    profile.gender === "boy" || profile.gender === "girl"
+    profile.gender === "boy" || profile.gender === "girl" || profile.gender === "diet"
       ? profile.gender
       : inferredThemes.length === 1
       ? inferredThemes[0]
@@ -868,7 +885,7 @@ export default function ProfileRoot() {
                   <a key={s.id} href={`${window.location.pathname}?id=${s.id}`} style={{ textDecoration: "none" }}>
                     <div style={{ background: "#fff", borderRadius: 14, padding: "10px 14px", boxShadow: "0 4px 10px rgba(11,61,98,0.15)" }}>
                       <div style={{ fontWeight: 800, color: "#0B3D62", fontSize: 14, marginBottom: 6 }}>
-                        {s.theme === "boy" ? "🐉" : "🎀"} {s.title || "無題のスケジュール"}
+                        {s.theme === "boy" ? "🐉" : s.theme === "diet" ? "🌿" : "🎀"} {s.title || "無題のスケジュール"}
                       </div>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {s.pendingToday.map((subj) => (
@@ -931,7 +948,7 @@ export default function ProfileRoot() {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      {s.theme === "boy" ? "🐉" : "🎀"} {s.title || "無題のスケジュール"}
+                      {s.theme === "boy" ? "🐉" : s.theme === "diet" ? "🌿" : "🎀"} {s.title || "無題のスケジュール"}
                     </span>
                   </a>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -1129,6 +1146,7 @@ export default function ProfileRoot() {
                 if (t.minutes > 0) achvParts.push(`⏱${t.minutes}分`);
                 if (t.pages > 0) achvParts.push(`📖${t.pages}ページ`);
                 if (t.problems > 0) achvParts.push(`✏️${t.problems}問`);
+                achvParts.push(...customTotalsText(t));
                 return (
                   <div
                     key={s.id}
@@ -1222,12 +1240,17 @@ export default function ProfileRoot() {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 22 }}>
-          {bookGender !== "boy" && (
+          {bookGender === "diet" && (
+            <button onClick={() => requestParentGate("createSchedule", "diet")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#4FA283,#A9DEC4)" }}>
+              🌿 新しいスケジュールを作る
+            </button>
+          )}
+          {bookGender !== "boy" && bookGender !== "diet" && (
             <button onClick={() => requestParentGate("createSchedule", "girl")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#FFB6C9,#F4C95D)" }}>
               🎀 新しいスケジュールを作る{bookGender ? "" : "（女の子用）"}
             </button>
           )}
-          {bookGender !== "girl" && (
+          {bookGender !== "girl" && bookGender !== "diet" && (
             <button onClick={() => requestParentGate("createSchedule", "boy")} style={{ ...actionBtnStyle, background: "linear-gradient(135deg,#8B5E34,#C89B3C)" }}>
               🐉 新しいスケジュールを作る{bookGender ? "" : "（男の子用）"}
             </button>
@@ -2139,12 +2162,13 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
                 </div>
               )}
               <div>⭐ 獲得スタンプ：{card.stars}個</div>
-              {card.achvTotals && (card.achvTotals.minutes > 0 || card.achvTotals.pages > 0 || card.achvTotals.problems > 0) && (
+              {card.achvTotals && (card.achvTotals.minutes > 0 || card.achvTotals.pages > 0 || card.achvTotals.problems > 0 || customTotalsText(card.achvTotals).length > 0) && (
                 <div>
                   取り組んだ内容：
                   {card.achvTotals.minutes > 0 ? `⏱${card.achvTotals.minutes}分 ` : ""}
                   {card.achvTotals.pages > 0 ? `📖${card.achvTotals.pages}ページ ` : ""}
-                  {card.achvTotals.problems > 0 ? `✏️${card.achvTotals.problems}問` : ""}
+                  {card.achvTotals.problems > 0 ? `✏️${card.achvTotals.problems}問 ` : ""}
+                  {customTotalsText(card.achvTotals).join(" ")}
                 </div>
               )}
               {card.earnedAt && <div>達成日：{card.earnedAt}</div>}
@@ -2664,9 +2688,13 @@ const modalBtnStyle = {
 };
 
 function ZukanPage({ gender, schedules, profile, onClose }) {
-  const [tab, setTab] = useState(gender || "girl");
+  const [tab, setTab] = useState(gender === "diet" || !gender ? "girl" : gender);
   const [zoom, setZoom] = useState(null); // { img, name, filter }
-  const theme = gender || tab;
+  // ダイエット用スタンプ帳は全種族が出るので、女の子／男の子のタブで分けて表示する。
+  // theme = 表示する種族のグループ、keyTheme = 入手記録のキー（ダイエットは "diet:"）
+  const isDiet = gender === "diet";
+  const theme = isDiet ? tab : gender || tab;
+  const keyTheme = isDiet ? "diet" : theme;
 
   // 色違いごとの「いちばん育ったステージ」（配合で消費されたカードも含む）。
   // ・正式にカードをもらった／配合に使った／認定前でもマスターまで育った → マスター
@@ -2699,9 +2727,9 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
 
   const groups = speciesGroupsForTheme(theme);
   const speciesKeys = groups.map((g) => g[0].species);
-  const speciesKnown = (sp) => groups.some((g) => g[0].species === sp && g.some((v) => owned.has(`${theme}:${v.key}`)));
+  const speciesKnown = (sp) => groups.some((g) => g[0].species === sp && g.some((v) => owned.has(`${keyTheme}:${v.key}`)));
   const total = groups.reduce((n, g) => n + g.length, 0);
-  const got = groups.reduce((n, g) => n + g.filter((v) => reached[`${theme}:${v.key}`] === stageCount(v.species) - 1).length, 0);
+  const got = groups.reduce((n, g) => n + g.filter((v) => reached[`${keyTheme}:${v.key}`] === stageCount(v.species) - 1).length, 0);
   let gmGot = 0;
   speciesKeys.forEach((b) => speciesKeys.forEach((f) => {
     const c = GRAND_MASTER_COMBOS[b] && GRAND_MASTER_COMBOS[b][f];
@@ -2718,7 +2746,7 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
           ← もどる
         </button>
         <h2 style={{ margin: "0 0 10px", color: "#0B3D62", fontSize: 22 }}>📚 ファミリアずかん</h2>
-        {!gender && (
+        {(!gender || isDiet) && (
           <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             {[["girl", "👧 女の子"], ["boy", "👦 男の子"]].map(([k, l]) => (
               <button key={k} onClick={() => setTab(k)} style={{ flex: 1, border: "none", borderRadius: 10, padding: "8px 0", fontWeight: 800, fontFamily: "inherit", cursor: "pointer", background: tab === k ? "#14588C" : "#EAF4F9", color: tab === k ? "#fff" : "#14588C" }}>
@@ -2735,9 +2763,9 @@ function ZukanPage({ gender, schedules, profile, onClose }) {
         <div style={{ fontSize: 11.5, color: "#7c98aa", marginBottom: 8 }}>卵からマスターまで、育った姿が順番にひらいていきます。</div>
         {groups.map((g) => (
           <div key={g[0].species} style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: "#14588C", marginBottom: 4 }}>{g.some((v) => owned.has(`${theme}:${v.key}`)) ? speciesLabel(g[0].species) : "？？？"}</div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: "#14588C", marginBottom: 4 }}>{g.some((v) => owned.has(`${keyTheme}:${v.key}`)) ? speciesLabel(g[0].species) : "？？？"}</div>
             {g.map((v) => {
-              const key = `${theme}:${v.key}`;
+              const key = `${keyTheme}:${v.key}`;
               const top = reached[key] === undefined ? -1 : reached[key];
               const n = stageCount(v.species);
               const labels = stageLabels(n);
@@ -2860,10 +2888,10 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
         </p>
 
         <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>
-          男の子 / 女の子{isNew ? "" : genderLocked ? "（変更できません）" : "（未設定）"}
+          スタンプ帳の種類{isNew ? "" : genderLocked ? "（変更できません）" : "（未設定）"}
         </label>
         <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
-          {[["girl", "👧 女の子"], ["boy", "👦 男の子"]].map(([k, label]) => {
+          {[["girl", "👧 女の子"], ["boy", "👦 男の子"], ["diet", "🌿 ダイエット"]].map(([k, label]) => {
             const on = gender === k;
             return (
               <button
@@ -2876,10 +2904,11 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
                   padding: "14px 0",
                   borderRadius: 14,
                   border: on ? "3px solid #14588C" : "2px solid #BFE3F0",
-                  background: on ? (k === "girl" ? "linear-gradient(135deg,#FFD6E2,#FFE9B8)" : "linear-gradient(135deg,#D9C09A,#F0D9A8)") : "#fff",
+                  background: on ? (k === "girl" ? "linear-gradient(135deg,#FFD6E2,#FFE9B8)" : k === "diet" ? "linear-gradient(135deg,#CFF3DE,#A9DEC4)" : "linear-gradient(135deg,#D9C09A,#F0D9A8)") : "#fff",
                   color: on ? "#0B3D62" : "#7c98aa",
                   fontWeight: 900,
-                  fontSize: 16,
+                  fontSize: 15,
+                  whiteSpace: "nowrap",
                   fontFamily: "inherit",
                   cursor: genderLocked ? "default" : "pointer",
                   opacity: genderLocked && !on ? 0.4 : 1,
@@ -2891,7 +2920,7 @@ function ProfileSetupScreen({ initial, isNew, onSave, onCancel, onRequestDelete 
           })}
         </div>
         <p style={{ color: "#7c98aa", fontSize: 12.5, marginTop: 0, marginBottom: 18, lineHeight: 1.5 }}>
-          女の子用は女の子のファミリア、男の子用は男の子のファミリアだけが登場します。あとから変更できません。
+          女の子用は女の子の、男の子用は男の子のファミリアが登場します。ダイエットは大人向けで、体重も記録でき、全種族のファミリアが登場します。あとから変更できません。
         </p>
 
         <label style={{ display: "block", fontWeight: 700, fontSize: 15, marginBottom: 6, color: "#14588C" }}>なまえ</label>

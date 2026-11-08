@@ -36,6 +36,18 @@ const BOY_PALETTE = [
   { name: "アース", hex: "#6B4226" },
 ];
 
+// ダイエット（大人向け）テーマ用：落ち着いたグリーン〜コーラル系
+const DIET_PALETTE = [
+  { name: "ミント", hex: "#A8DCC4" },
+  { name: "セージ", hex: "#C9DDB3" },
+  { name: "アクア", hex: "#A9DCE3" },
+  { name: "スカイ", hex: "#B9D3F0" },
+  { name: "コーラル", hex: "#F6B9A6" },
+  { name: "サンド", hex: "#EED9B4" },
+  { name: "ライラック", hex: "#D4C6EC" },
+  { name: "ストーン", hex: "#CBD3D1" },
+];
+
 const SHAPES = [
   // seal
   (c) => (
@@ -203,7 +215,30 @@ const THEMES = {
     overlayBg: "rgba(255,251,240,0.55)",
     isMapTheme: true,
   },
+  diet: {
+    key: "diet",
+    label: "ダイエット",
+    emoji: "🌿",
+    bg: "linear-gradient(180deg, #1E4A3B 0%, #2C6E55 38%, #4FA283 74%, #A9DEC4 100%)",
+    accentGradient: "linear-gradient(90deg,#BFE6C9,#7FCFAE)",
+    palette: DIET_PALETTE,
+    headingFont: "'Zen Maru Gothic', sans-serif",
+    headingColor: "#1E4A3B",
+    headingShadow: "none",
+    mascotBg: "#DFF3E6",
+    mascotIconIndex: 0,
+    shapes: SHAPES,
+    withFace: false,
+    headerTextColor: "#F0FAF4",
+    overlayBg: "rgba(255,255,255,0.15)",
+    isMapTheme: false,
+  },
 };
+
+// スケジュールのテーマ（スタンプ帳の種類）として有効なキー
+const THEME_KEYS = ["girl", "boy", "diet"];
+
+const THEME_NAMES = { girl: "女の子", boy: "男の子", diet: "ダイエット" };
 
 function getTheme(key) {
   return THEMES[key] || THEMES.girl;
@@ -321,18 +356,28 @@ function describeTargets(subject) {
   if (subject.measureTime !== false) parts.push(`⏱${subject.targetMinutes || subject.durationMinutes || 30}分`);
   if (subject.measurePages) parts.push(`📖${subject.targetPages || 5}ページ`);
   if (subject.measureProblems) parts.push(`✏️${subject.targetProblems || 10}問`);
+  if (subject.measureCustom) parts.push(`🎯${customGoalText(subject, subject.targetCustom)}`);
   return parts;
 }
 
-function subjectIsMeasurable(subject) {
-  return !!(subject.measureTime !== false || subject.measurePages || subject.measureProblems);
+// 自由目標（項目名・数・単位を自由に決められる目標）の表示用テキスト。例：「なわとび 50回」
+function customGoalText(subject, amount) {
+  const label = (subject.customLabel || "").trim();
+  const unit = (subject.customUnit || "").trim();
+  const n = amount === "" || amount === null || amount === undefined ? "" : amount;
+  return `${label ? label + " " : ""}${n}${unit}`;
 }
 
-function formatAchvShort(vals) {
+function subjectIsMeasurable(subject) {
+  return !!(subject.measureTime !== false || subject.measurePages || subject.measureProblems || subject.measureCustom);
+}
+
+function formatAchvShort(vals, subject) {
   const parts = [];
   if (vals.minutes) parts.push(`⏱${vals.minutes}分`);
   if (vals.pages) parts.push(`📖${vals.pages}p`);
   if (vals.problems) parts.push(`✏️${vals.problems}問`);
+  if (vals.custom) parts.push(`🎯${vals.custom}${(subject && subject.customUnit) || ""}`);
   return parts.join(" ");
 }
 
@@ -350,7 +395,7 @@ function taskIconIndex(idx, useDragonStamp, shapesLength) {
 const DURATION_OPTIONS = Array.from({ length: 10 }, (_, i) => (i + 1) * 10);
 const PAGE_OPTIONS = Array.from({ length: 50 }, (_, i) => i + 1);
 const PROBLEM_OPTIONS = Array.from({ length: 100 }, (_, i) => i + 1);
-const BIRTH_YEAR_OPTIONS = Array.from({ length: 57 }, (_, i) => 2026 - i); // 2026 down to 1970
+const BIRTH_YEAR_OPTIONS = Array.from({ length: 97 }, (_, i) => 2026 - i); // 2026 down to 1930（保護者のダイエット用スタンプ帳にも対応）
 const BIRTH_MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 const BIRTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1);
 
@@ -419,6 +464,10 @@ const DEFAULT_SUBJECT = (palette) => ({
   targetPages: 5,
   measureProblems: false,
   targetProblems: 10,
+  measureCustom: false,
+  customLabel: "",
+  customUnit: "",
+  targetCustom: 10,
 });
 
 function freshConfig() {
@@ -478,6 +527,7 @@ export default function KidsScheduleApp() {
   const [notes, setNotes] = useState({});
   const [parentComments, setParentComments] = useState({});
   const [achievements, setAchievements] = useState({});
+  const [weights, setWeights] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 体重kg }
   const [noteModalDate, setNoteModalDate] = useState(null);
   const [linkedProfile, setLinkedProfile] = useState(null); // { name, totalStamps } | null
   // スタンプ帳（プロフィール）に設定された保護者用暗証番号。スケジュール自身の
@@ -517,6 +567,7 @@ export default function KidsScheduleApp() {
             setNotes(data.notes || {});
             setParentComments(normalizeParentComments(data.parentComments));
             setAchievements(data.achievements || {});
+            setWeights(data.weights || {});
             // Another schedule on this device may have just been unlocked
             // with the same PIN — if so, start unlocked here too instead of
             // prompting again, and relock at that same shared expiry time.
@@ -568,10 +619,10 @@ export default function KidsScheduleApp() {
         const t = params.get("theme");
         const p = params.get("profileId");
         setConfig((prev) => {
-          const nextTheme = t === "girl" || t === "boy" ? t : prev.theme;
+          const nextTheme = THEME_KEYS.includes(t) ? t : prev.theme;
           return {
             ...prev,
-            ...(t === "girl" || t === "boy" ? { theme: t } : {}),
+            ...(THEME_KEYS.includes(t) ? { theme: t } : {}),
             ...(p ? { profileId: p } : {}),
             // New schedule (this only runs when nothing was loaded from
             // storage yet) — roll which color egg this schedule will grow.
@@ -592,13 +643,13 @@ export default function KidsScheduleApp() {
       try {
         await window.storage.set(
           STORAGE_KEY,
-          JSON.stringify({ config, completions, recoveries, funStamps, excused, notes, parentComments, achievements }),
+          JSON.stringify({ config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights }),
           false
         );
       } catch (e) {}
     }, 350);
     return () => clearTimeout(t);
-  }, [config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, loaded]);
+  }, [config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, loaded]);
 
   // iOS home-screen apps often get suspended instead of fully closed, and
   // reopening them can show whatever was last in memory instead of fetching
@@ -632,6 +683,7 @@ export default function KidsScheduleApp() {
             setNotes(data.notes || {});
             setParentComments(normalizeParentComments(data.parentComments));
             setAchievements(data.achievements || {});
+            setWeights(data.weights || {});
           }
         } catch (e) {}
       })();
@@ -1110,7 +1162,7 @@ export default function KidsScheduleApp() {
       const comments = parentComments[dKey] || [];
       const achv = achievements[dKey];
       const hasAchv = achv && Object.keys(achv).length > 0;
-      entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null });
+      entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null, weight: weights[dKey] || null });
     }
     entries.sort((a, b) => b.date.getTime() - a.date.getTime());
     return entries;
@@ -1161,9 +1213,18 @@ export default function KidsScheduleApp() {
     });
   }
 
-  function handleSaveNote(text, achv) {
+  function handleSaveNote(text, achv, weight) {
     if (!noteModalDate) return;
     const dKey = dateKey(noteModalDate);
+    if (weight !== undefined) {
+      const w = parseFloat(weight);
+      setWeights((prev) => {
+        const next = { ...prev };
+        if (w > 0) next[dKey] = Math.round(w * 10) / 10;
+        else delete next[dKey];
+        return next;
+      });
+    }
     setNotes((prev) => {
       const next = { ...prev };
       if (text.trim()) next[dKey] = text;
@@ -1175,7 +1236,7 @@ export default function KidsScheduleApp() {
         // drop subjects whose fields are all empty so we don't store clutter
         const cleaned = {};
         Object.entries(achv).forEach(([subjId, vals]) => {
-          const hasAny = ["minutes", "pages", "problems"].some(
+          const hasAny = ["minutes", "pages", "problems", "custom"].some(
             (k) => vals[k] !== undefined && vals[k] !== "" && vals[k] !== null
           );
           if (hasAny) cleaned[subjId] = vals;
@@ -1345,6 +1406,7 @@ export default function KidsScheduleApp() {
           onClearPastStamp={handleClearPastStamp}
           notes={notes}
           achievements={achievements}
+          weights={weights}
           onOpenNote={handleOpenNote}
           onOpenRecords={() => setShowRecordsList(true)}
           linkedProfile={linkedProfile}
@@ -1442,6 +1504,8 @@ export default function KidsScheduleApp() {
           comments={parentComments[dateKey(noteModalDate)] || []}
           subjects={config.subjects}
           isMapTheme={getTheme(config.theme).isMapTheme}
+          showWeight={config.theme === "diet"}
+          initialWeight={weights[dateKey(noteModalDate)]}
           onSave={handleSaveNote}
           onClose={handleCloseNote}
         />
@@ -1656,6 +1720,43 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
               </select>
               <span style={styles.measureUnit}>問</span>
             </>
+          )}
+        </div>
+
+        <div style={{ ...styles.measureRow, flexWrap: "wrap" }}>
+          <button
+            onClick={() => set({ measureCustom: !subject.measureCustom })}
+            style={{ ...styles.measureToggle, ...(subject.measureCustom ? styles.measureToggleOn : {}) }}
+          >
+            🎯 自由に決める
+          </button>
+          {subject.measureCustom && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%" }}>
+              <input
+                value={subject.customLabel || ""}
+                onChange={(e) => set({ customLabel: e.target.value })}
+                placeholder="例：なわとび"
+                maxLength={12}
+                style={{ ...styles.measureSelect, flex: 1, minWidth: 0, width: "auto", boxSizing: "border-box", textAlign: "left" }}
+              />
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="any"
+                value={subject.targetCustom ?? ""}
+                onChange={(e) => set({ targetCustom: e.target.value === "" ? "" : Number(e.target.value) })}
+                placeholder="50"
+                style={{ ...styles.measureSelect, width: 72, flexShrink: 0, boxSizing: "border-box" }}
+              />
+              <input
+                value={subject.customUnit || ""}
+                onChange={(e) => set({ customUnit: e.target.value })}
+                placeholder="例：回"
+                maxLength={6}
+                style={{ ...styles.measureSelect, width: 64, flexShrink: 0, boxSizing: "border-box" }}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -1915,7 +2016,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
             {linkStatus === "notfound" && <p style={styles.profileLinkError}>見つかりませんでした。</p>}
             {linkStatus === "gendermismatch" && (
               <p style={styles.profileLinkError}>
-                このスタンプ帳は{theme === "boy" ? "女の子" : "男の子"}用なので、{theme === "boy" ? "男の子" : "女の子"}用スケジュールはつなげられません。
+                このスタンプ帳は、{THEME_NAMES[theme] || "女の子"}用のスケジュールとは種類が違うため、つなげられません。
               </p>
             )}
           </div>
@@ -2059,6 +2160,7 @@ function MainScreen({
   streak,
   notes,
   achievements,
+  weights,
   onOpenNote,
   onOpenRecords,
   linkedProfile,
@@ -2307,6 +2409,8 @@ function MainScreen({
         })}
       </div>
 
+      {theme.key === "diet" && <WeightChart weights={weights || {}} startDate={startDate} endDate={endDate} />}
+
       <div style={styles.calendarLegendRow}>
         <span style={styles.calendarLegendItem}>
           <span style={{ ...styles.legendDot, background: "#14588C" }} /> 本スタンプ（今日だけ）
@@ -2363,13 +2467,20 @@ function MainScreen({
                             border: notes[dKey] || achievements[dKey] ? "1px solid #8B5E34" : "1px dashed #C4A876",
                             color: notes[dKey] || achievements[dKey] ? "#5C3A21" : "#8B6B47",
                           }
-                        : notes[dKey]
+                        : notes[dKey] || (weights && weights[dKey])
                         ? styles.memoBtnFilled
                         : {}),
                     }}
                     aria-label={`${d.getMonth() + 1}月${d.getDate()}日 の メモ`}
                   >
-                    📝 メモ
+                    {theme.key === "diet" && weights && weights[dKey] ? (
+                      <span style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.15 }}>
+                        <span>⚖️</span>
+                        <span>{Number(weights[dKey]).toFixed(1)}</span>
+                      </span>
+                    ) : (
+                      "📝 メモ"
+                    )}
                   </button>
                 )}
 
@@ -2383,7 +2494,7 @@ function MainScreen({
                       const stableIdx = subjects.findIndex((x) => x.id === s.id);
                       const count = countFor(dKey, s.id);
                       const achv = achievements[dKey] && achievements[dKey][s.id];
-                      const achvLabel = achv ? formatAchvShort(achv) : "";
+                      const achvLabel = achv ? formatAchvShort(achv, s) : "";
                       const excusedHere = isExcused(dKey, s.id);
                       // お休みスタンプ：今日・過去の日の、まだ押していないマス（または
                       // お休みを押したマス）に小さなボタンを出す。押すと毎回暗証番号を聞く。
@@ -2852,9 +2963,10 @@ function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
   );
 }
 
-function NoteModal({ date, initialText, initialAchievements, comments, subjects, isMapTheme, onSave, onClose }) {
+function NoteModal({ date, initialText, initialAchievements, comments, subjects, isMapTheme, showWeight, initialWeight, onSave, onClose }) {
   const [text, setText] = useState(initialText || "");
   const [achv, setAchv] = useState(initialAchievements || {});
+  const [weight, setWeight] = useState(initialWeight !== undefined && initialWeight !== null ? String(initialWeight) : "");
   const dLabel = `${date.getMonth() + 1}月${date.getDate()}日`;
 
   function setField(subjId, field, value) {
@@ -2868,6 +2980,25 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
       <div style={styles.noteModalCard}>
       <div style={styles.noteModalScrollBody}>
         <h3 style={styles.modalTitle}>📝 {dLabel} の記録</h3>
+
+        {showWeight && (
+          <div style={{ ...styles.achievementSection, background: "#EEF8F2", borderColor: "#BFE6C9" }}>
+            <label style={{ ...styles.achievementField, fontSize: 15, color: "#1E4A3B" }}>
+              ⚖️ 体重
+              <input
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.1"
+                placeholder="例：62.5"
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                style={{ ...styles.achievementInput, width: 84, borderColor: "#A9DEC4", fontSize: 16 }}
+              />
+              kg
+            </label>
+          </div>
+        )}
 
         {measurableSubjects.length > 0 && (
           <div style={styles.achievementSection}>
@@ -2918,6 +3049,22 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       問
                     </label>
                   )}
+                  {s.measureCustom && (
+                    <label style={styles.achievementField}>
+                      🎯{(s.customLabel || "").trim()}
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        min={0}
+                        step="any"
+                        placeholder={String(s.targetCustom ?? "")}
+                        value={achv[s.id]?.custom ?? ""}
+                        onChange={(e) => setField(s.id, "custom", e.target.value)}
+                        style={styles.achievementInput}
+                      />
+                      {(s.customUnit || "").trim()}
+                    </label>
+                  )}
                 </div>
               </div>
             ))}
@@ -2951,7 +3098,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
           <button style={styles.modalCancel} onClick={onClose}>
             とじる
           </button>
-          <button style={styles.modalConfirm} onClick={() => onSave(text, achv)}>
+          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, showWeight ? weight : undefined)}>
             保存する
           </button>
         </div>
@@ -3032,6 +3179,7 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
       if (vals.minutes) parts.push(`⏱${vals.minutes}分`);
       if (vals.pages) parts.push(`📖${vals.pages}ページ`);
       if (vals.problems) parts.push(`✏️${vals.problems}問`);
+      if (vals.custom) parts.push(`🎯${customGoalText(s, vals.custom)}`);
       if (parts.length > 0) achvParts.push({ name: s.name, color: s.color, text: parts.join(" ") });
     });
   }
@@ -3066,6 +3214,7 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
       <div style={styles.recordEntryDate}>
         {e.date.getMonth() + 1}月{e.date.getDate()}日
       </div>
+      {e.weight && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>⚖️ 体重：{Number(e.weight).toFixed(1)}kg</div>}
       {achvParts.map((a) => (
         <div key={a.name} style={{ ...styles.recordEntryAchv, color: a.color }}>
           {a.name}：{a.text}
@@ -3169,6 +3318,81 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
 }
 
 
+// ダイエット用：体重の推移グラフ（スケジュール期間内の記録だけを表示）
+function WeightChart({ weights, startDate, endDate }) {
+  const startKey = dateKey(startDate);
+  const endKey = dateKey(endDate);
+  const points = Object.entries(weights)
+    .filter(([k, w]) => k >= startKey && k <= endKey && w > 0)
+    .sort(([a], [b]) => (a < b ? -1 : 1));
+  const card = {
+    position: "relative",
+    zIndex: 2,
+    margin: "14px 18px 0",
+    background: "#fff",
+    borderRadius: 18,
+    padding: "12px 14px",
+    boxShadow: "0 10px 24px rgba(30,74,59,0.25)",
+  };
+  if (points.length === 0) {
+    return (
+      <div style={card}>
+        <div style={{ fontWeight: 800, color: "#1E4A3B", fontSize: 15 }}>⚖️ 体重の記録</div>
+        <div style={{ fontSize: 12.5, color: "#5d7d70", marginTop: 4 }}>カレンダーの「📝 メモ」から体重を入れると、ここにグラフが出ます。</div>
+      </div>
+    );
+  }
+  const first = points[0][1];
+  const last = points[points.length - 1][1];
+  const diff = Math.round((last - first) * 10) / 10;
+  const vals = points.map(([, w]) => w);
+  // 目盛りはきりのいい値（1kg単位）にそろえる
+  let lo = Math.floor(Math.min(...vals) - 0.5);
+  let hi = Math.ceil(Math.max(...vals) + 0.5);
+  if ((hi - lo) % 2 === 1) hi += 1;
+  const W = 320, H = 140, L = 34, R = 10, T = 10, B = 22;
+  const span = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000));
+  const xOf = (k) => {
+    const [y, m, d] = k.split("-").map(Number);
+    const t = new Date(y, m - 1, d).getTime();
+    const day = Math.round((t - startDate.getTime()) / 86400000);
+    return L + ((W - L - R) * Math.min(span, Math.max(0, day))) / span;
+  };
+  const yOf = (w) => T + ((H - T - B) * (hi - w)) / (hi - lo);
+  const path = points.map(([k, w], i) => `${i === 0 ? "M" : "L"}${xOf(k).toFixed(1)} ${yOf(w).toFixed(1)}`).join(" ");
+  const ticks = [hi, (hi + lo) / 2, lo];
+  const md = (dt) => `${dt.getMonth() + 1}/${dt.getDate()}`;
+  return (
+    <div style={card}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ fontWeight: 800, color: "#1E4A3B", fontSize: 15 }}>⚖️ 体重の記録</div>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "#1E4A3B" }}>
+          いま {last.toFixed(1)}kg
+          {points.length > 1 && (
+            <span style={{ marginLeft: 6, color: diff < 0 ? "#2C8A5F" : diff > 0 ? "#C0603F" : "#5d7d70" }}>
+              （最初から {diff > 0 ? "+" : ""}{diff.toFixed(1)}kg）
+            </span>
+          )}
+        </div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", marginTop: 6 }}>
+        {ticks.map((v, i) => (
+          <g key={i}>
+            <line x1={L} x2={W - R} y1={yOf(v)} y2={yOf(v)} stroke="#E3EFE8" strokeWidth="1" />
+            <text x={L - 4} y={yOf(v) + 3.5} fontSize="9.5" textAnchor="end" fill="#7a958a">{v}</text>
+          </g>
+        ))}
+        <text x={L} y={H - 6} fontSize="9.5" fill="#7a958a">{md(startDate)}</text>
+        <text x={W - R} y={H - 6} fontSize="9.5" textAnchor="end" fill="#7a958a">{md(endDate)}</text>
+        <path d={path} fill="none" stroke="#3E9A74" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
+        {points.map(([k, w]) => (
+          <circle key={k} cx={xOf(k)} cy={yOf(w)} r="3.5" fill="#fff" stroke="#3E9A74" strokeWidth="2" />
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 function DayCelebration({ onClose, theme }) {
   useEffect(() => {
     const t = setTimeout(onClose, 1800);
@@ -3177,7 +3401,7 @@ function DayCelebration({ onClose, theme }) {
   return (
     <div style={styles.dayCelebrateOverlay} onClick={onClose}>
       <div style={styles.dayCelebrateBadge}>
-        <span style={{ fontSize: 46 }}>{theme === "boy" ? "⚔️" : "🐚"}</span>
+        <span style={{ fontSize: 46 }}>{theme === "boy" ? "⚔️" : theme === "diet" ? "💪" : "🐚"}</span>
         <div style={{ fontSize: 18, fontWeight: 700, color: "#0B3D62", marginTop: 4 }}>今日は全部できたね！</div>
       </div>
     </div>
@@ -3499,6 +3723,25 @@ function CornerDecor({ theme }) {
       </>
     );
   }
+  if (theme === "diet") {
+    return (
+      <>
+        {/* leaves, top right */}
+        <svg style={{ position: "absolute", top: 8, right: -6, opacity: 0.45 }} width="110" height="90" viewBox="0 0 110 90">
+          <path d="M20 70C30 30 60 12 100 10 98 48 70 74 20 70z" fill="#CFF3DE" />
+          <path d="M22 68C46 48 70 30 96 14" stroke="#2C6E55" strokeWidth="2" fill="none" />
+        </svg>
+        {/* water drop, bottom right */}
+        <svg style={{ position: "absolute", bottom: 8, right: 4, opacity: 0.45 }} width="70" height="90" viewBox="0 0 70 90">
+          <path d="M35 6C48 28 60 42 60 58a25 25 0 01-50 0C10 42 22 28 35 6z" fill="#E6F7F9" />
+        </svg>
+        {/* small leaf, left */}
+        <svg style={{ position: "absolute", top: "50%", left: -8, opacity: 0.35 }} width="70" height="70" viewBox="0 0 70 70">
+          <path d="M10 60C14 30 34 12 62 8 60 36 42 58 10 60z" fill="#fff" />
+        </svg>
+      </>
+    );
+  }
   return (
     <>
       <svg style={{ position: "absolute", top: 6, right: -10, opacity: 0.5 }} width="150" height="90" viewBox="0 0 150 90">
@@ -3526,7 +3769,7 @@ function CornerDecor({ theme }) {
 // on every device, instead of a fixed-pixel absolute box.
 function GrowthMascotArt({ theme, pct, variantKey, mascotName }) {
   const isBoy = theme === "boy";
-  const variant = getVariant(isBoy ? "boy" : "girl", variantKey);
+  const variant = getVariant(theme, variantKey);
   const src = stageImage(variant.species, pct);
   const colorFilter = variant.filter;
   const shadow = isBoy ? "drop-shadow(0 4px 8px rgba(0,0,0,0.35))" : "drop-shadow(0 4px 8px rgba(11,61,98,0.3))";
@@ -3846,7 +4089,7 @@ const styles = {
   excusedStamp: { width: "100%", aspectRatio: "1", borderRadius: "50%", border: "3px solid #B9A8E0", background: "radial-gradient(circle at 35% 30%, #F4F0FF, #D9CFF5)", display: "flex", alignItems: "center", justifyContent: "center", boxSizing: "border-box" },
   achvMiniLabel: { fontSize: 8.5, fontWeight: 800, color: "#5C3A21", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%", textAlign: "center" },
   stampCellWrap: { position: "relative", width: "100%" },
-  stampCircle: { width: "100%", aspectRatio: "1", borderRadius: "50%", border: "3px dashed", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", overflow: "visible", boxSizing: "border-box" },
+  stampCircle: { width: "100%", aspectRatio: "1", padding: 0, borderRadius: "50%", border: "3px dashed", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", position: "relative", overflow: "visible", boxSizing: "border-box" },
   stampPopWrap: { width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", animation: "stampPop 0.45s cubic-bezier(.34,1.56,.64,1)" },
   x2Badge: { position: "absolute", top: -8, right: -8, background: "#FF6B8A", color: "#fff", fontSize: 11, fontWeight: 900, borderRadius: 999, padding: "2px 6px", boxShadow: "0 2px 5px rgba(0,0,0,0.3)" },
   undoBadge: { position: "absolute", top: -8, left: -8, width: 22, height: 22, borderRadius: "50%", background: "#8aa4b4", color: "#fff", fontSize: 14, fontWeight: 900, border: "2px solid #fff", boxShadow: "0 2px 5px rgba(0,0,0,0.3)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1, padding: 0 },

@@ -16,7 +16,7 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-const BIRTH_YEAR_OPTIONS = Array.from({ length: 57 }, (_, i) => 2026 - i); // 2026 down to 1970
+const BIRTH_YEAR_OPTIONS = Array.from({ length: 97 }, (_, i) => 2026 - i); // 2026 down to 1930
 const BIRTH_MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 const BIRTH_DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1);
 

@@ -509,16 +509,20 @@ const BOY_SPECIES_GROUPS = [DRAGON_VARIANTS, TIGER_VARIANTS, PHOENIX_VARIANTS, F
 const GIRL_SPECIES_GROUPS = [PEGASUS_VARIANTS, FAIRY_VARIANTS, CAT_VARIANTS, SWAMP_VARIANTS, MERMAID_VARIANTS, FAIRY_FOX_VARIANTS, CRYSTAL_BUTTERFLY_VARIANTS];
 
 // 種族ごとにまとめた色違い一覧（ずかん表示用）。
+// ダイエット（大人向け）は男の子・女の子の全種族から出る
+const DIET_SPECIES_GROUPS = [...GIRL_SPECIES_GROUPS, ...BOY_SPECIES_GROUPS];
+const DIET_VARIANTS = [...GIRL_VARIANTS, ...BOY_VARIANTS];
+
 export function speciesGroupsForTheme(themeKey) {
-  return themeKey === "boy" ? BOY_SPECIES_GROUPS : GIRL_SPECIES_GROUPS;
+  return themeKey === "boy" ? BOY_SPECIES_GROUPS : themeKey === "diet" ? DIET_SPECIES_GROUPS : GIRL_SPECIES_GROUPS;
 }
 
 export function variantsForTheme(themeKey) {
-  return themeKey === "boy" ? BOY_VARIANTS : GIRL_VARIANTS;
+  return themeKey === "boy" ? BOY_VARIANTS : themeKey === "diet" ? DIET_VARIANTS : GIRL_VARIANTS;
 }
 
 export function pickRandomVariant(themeKey) {
-  const groups = themeKey === "boy" ? BOY_SPECIES_GROUPS : GIRL_SPECIES_GROUPS;
+  const groups = speciesGroupsForTheme(themeKey);
   const group = groups[Math.floor(Math.random() * groups.length)];
   return group[Math.floor(Math.random() * group.length)].key;
 }
