@@ -528,6 +528,7 @@ export default function KidsScheduleApp() {
   const [parentComments, setParentComments] = useState({});
   const [achievements, setAchievements] = useState({});
   const [weights, setWeights] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 体重kg }
+  const [calories, setCalories] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 消費カロリーkcal }
   const [noteModalDate, setNoteModalDate] = useState(null);
   const [linkedProfile, setLinkedProfile] = useState(null); // { name, totalStamps } | null
   // スタンプ帳（プロフィール）に設定された保護者用暗証番号。スケジュール自身の
@@ -568,6 +569,7 @@ export default function KidsScheduleApp() {
             setParentComments(normalizeParentComments(data.parentComments));
             setAchievements(data.achievements || {});
             setWeights(data.weights || {});
+            setCalories(data.calories || {});
             // Another schedule on this device may have just been unlocked
             // with the same PIN — if so, start unlocked here too instead of
             // prompting again, and relock at that same shared expiry time.
@@ -643,13 +645,13 @@ export default function KidsScheduleApp() {
       try {
         await window.storage.set(
           STORAGE_KEY,
-          JSON.stringify({ config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights }),
+          JSON.stringify({ config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories }),
           false
         );
       } catch (e) {}
     }, 350);
     return () => clearTimeout(t);
-  }, [config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, loaded]);
+  }, [config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, loaded]);
 
   // iOS home-screen apps often get suspended instead of fully closed, and
   // reopening them can show whatever was last in memory instead of fetching
@@ -684,6 +686,7 @@ export default function KidsScheduleApp() {
             setParentComments(normalizeParentComments(data.parentComments));
             setAchievements(data.achievements || {});
             setWeights(data.weights || {});
+            setCalories(data.calories || {});
           }
         } catch (e) {}
       })();
@@ -1162,7 +1165,7 @@ export default function KidsScheduleApp() {
       const comments = parentComments[dKey] || [];
       const achv = achievements[dKey];
       const hasAchv = achv && Object.keys(achv).length > 0;
-      entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null, weight: weights[dKey] || null });
+      entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null, weight: weights[dKey] || null, kcal: calories[dKey] || null });
     }
     entries.sort((a, b) => b.date.getTime() - a.date.getTime());
     return entries;
@@ -1213,9 +1216,18 @@ export default function KidsScheduleApp() {
     });
   }
 
-  function handleSaveNote(text, achv, weight) {
+  function handleSaveNote(text, achv, weight, kcal) {
     if (!noteModalDate) return;
     const dKey = dateKey(noteModalDate);
+    if (kcal !== undefined) {
+      const c = Math.round(parseFloat(kcal));
+      setCalories((prev) => {
+        const next = { ...prev };
+        if (c > 0) next[dKey] = c;
+        else delete next[dKey];
+        return next;
+      });
+    }
     if (weight !== undefined) {
       const w = parseFloat(weight);
       setWeights((prev) => {
@@ -1407,6 +1419,7 @@ export default function KidsScheduleApp() {
           notes={notes}
           achievements={achievements}
           weights={weights}
+          calories={calories}
           onOpenNote={handleOpenNote}
           onOpenRecords={() => setShowRecordsList(true)}
           linkedProfile={linkedProfile}
@@ -1506,6 +1519,7 @@ export default function KidsScheduleApp() {
           isMapTheme={getTheme(config.theme).isMapTheme}
           showWeight={config.theme === "diet"}
           initialWeight={weights[dateKey(noteModalDate)]}
+          initialCalories={calories[dateKey(noteModalDate)]}
           onSave={handleSaveNote}
           onClose={handleCloseNote}
         />
@@ -2161,6 +2175,7 @@ function MainScreen({
   notes,
   achievements,
   weights,
+  calories,
   onOpenNote,
   onOpenRecords,
   linkedProfile,
@@ -2409,6 +2424,7 @@ function MainScreen({
         })}
       </div>
 
+      {theme.key === "diet" && <CalorieTotal calories={calories || {}} startDate={startDate} endDate={endDate} />}
       {theme.key === "diet" && <WeightChart weights={weights || {}} startDate={startDate} endDate={endDate} />}
 
       <div style={styles.calendarLegendRow}>
@@ -2467,7 +2483,7 @@ function MainScreen({
                             border: notes[dKey] || achievements[dKey] ? "1px solid #8B5E34" : "1px dashed #C4A876",
                             color: notes[dKey] || achievements[dKey] ? "#5C3A21" : "#8B6B47",
                           }
-                        : notes[dKey] || (weights && weights[dKey])
+                        : notes[dKey] || (weights && weights[dKey]) || (calories && calories[dKey])
                         ? styles.memoBtnFilled
                         : {}),
                     }}
@@ -2963,10 +2979,11 @@ function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
   );
 }
 
-function NoteModal({ date, initialText, initialAchievements, comments, subjects, isMapTheme, showWeight, initialWeight, onSave, onClose }) {
+function NoteModal({ date, initialText, initialAchievements, comments, subjects, isMapTheme, showWeight, initialWeight, initialCalories, onSave, onClose }) {
   const [text, setText] = useState(initialText || "");
   const [achv, setAchv] = useState(initialAchievements || {});
   const [weight, setWeight] = useState(initialWeight !== undefined && initialWeight !== null ? String(initialWeight) : "");
+  const [kcal, setKcal] = useState(initialCalories !== undefined && initialCalories !== null ? String(initialCalories) : "");
   const dLabel = `${date.getMonth() + 1}月${date.getDate()}日`;
 
   function setField(subjId, field, value) {
@@ -2982,7 +2999,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
         <h3 style={styles.modalTitle}>📝 {dLabel} の記録</h3>
 
         {showWeight && (
-          <div style={{ ...styles.achievementSection, background: "#EEF8F2", borderColor: "#BFE6C9" }}>
+          <div style={{ ...styles.achievementSection, background: "#EEF8F2", borderColor: "#BFE6C9", display: "flex", flexDirection: "column", gap: 10 }}>
             <label style={{ ...styles.achievementField, fontSize: 15, color: "#1E4A3B" }}>
               ⚖️ 体重
               <input
@@ -2996,6 +3013,20 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                 style={{ ...styles.achievementInput, width: 84, borderColor: "#A9DEC4", fontSize: 16 }}
               />
               kg
+            </label>
+            <label style={{ ...styles.achievementField, fontSize: 15, color: "#1E4A3B" }}>
+              🔥 消費カロリー
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step="1"
+                placeholder="例：250"
+                value={kcal}
+                onChange={(e) => setKcal(e.target.value)}
+                style={{ ...styles.achievementInput, width: 84, borderColor: "#A9DEC4", fontSize: 16 }}
+              />
+              kcal
             </label>
           </div>
         )}
@@ -3098,7 +3129,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
           <button style={styles.modalCancel} onClick={onClose}>
             とじる
           </button>
-          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, showWeight ? weight : undefined)}>
+          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, showWeight ? weight : undefined, showWeight ? kcal : undefined)}>
             保存する
           </button>
         </div>
@@ -3215,6 +3246,7 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
         {e.date.getMonth() + 1}月{e.date.getDate()}日
       </div>
       {e.weight && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>⚖️ 体重：{Number(e.weight).toFixed(1)}kg</div>}
+      {e.kcal && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>🔥 消費カロリー：{Number(e.kcal).toLocaleString()}kcal</div>}
       {achvParts.map((a) => (
         <div key={a.name} style={{ ...styles.recordEntryAchv, color: a.color }}>
           {a.name}：{a.text}
@@ -3317,6 +3349,25 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
   );
 }
 
+
+// ダイエット用：期間内の消費カロリー合計（スタンプの合計と同じように大きく表示）
+function CalorieTotal({ calories, startDate, endDate }) {
+  const startKey = dateKey(startDate);
+  const endKey = dateKey(endDate);
+  const entries = Object.entries(calories).filter(([k, c]) => k >= startKey && k <= endKey && c > 0);
+  const total = entries.reduce((sum, [, c]) => sum + Number(c), 0);
+  return (
+    <div style={{ position: "relative", zIndex: 2, margin: "14px 18px 0", background: "#fff", borderRadius: 18, padding: "12px 14px", boxShadow: "0 10px 24px rgba(30,74,59,0.25)", textAlign: "center" }}>
+      <div style={{ fontSize: 13, color: "#5d7d70", fontWeight: 700 }}>消費カロリーの合計</div>
+      <div style={{ fontSize: 34, fontWeight: 900, color: "#1E4A3B", lineHeight: 1.2 }}>
+        🔥 {total.toLocaleString()}<span style={{ fontSize: 16, marginLeft: 4 }}>kcal</span>
+      </div>
+      <div style={{ fontSize: 11.5, color: "#8aa69a" }}>
+        {entries.length > 0 ? `${entries.length}日分の記録` : "「📝 メモ」から消費カロリーを入れると合計されます"}
+      </div>
+    </div>
+  );
+}
 
 // ダイエット用：体重の推移グラフ（スケジュール期間内の記録だけを表示）
 function WeightChart({ weights, startDate, endDate }) {

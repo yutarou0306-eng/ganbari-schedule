@@ -82,6 +82,12 @@ function sortCollectedCards(cards, mode) {
 // Counts by total stamp VALUE, matching computeOverallStats in progress.js
 // — a "取り戻す" double-tap is worth 2, since it's covering a missed day
 // as well as today's, not just counted as one stamp slot filled.
+// ダイエット用：スケジュールに記録された消費カロリーの合計（kcal）
+function countCaloriesInBlob(blob) {
+  const cal = (blob && blob.calories) || {};
+  return Object.values(cal).reduce((sum, c) => sum + (Number(c) || 0), 0);
+}
+
 function countStampsInBlob(blob) {
   const completions = (blob && blob.completions) || {};
   const excused = (blob && blob.excused) || {};
@@ -281,6 +287,7 @@ export default function ProfileRoot() {
             startDate: row.blob.config.startDate || "",
             endDate: row.blob.config.endDate || "",
             stamps: countStampsInBlob(row.blob),
+            calories: countCaloriesInBlob(row.blob),
             awardedCard: row.blob.config.awardedCard || null,
             // ファミリアが登場する条件：30日以上 かつ やること2つ以上
             cardEligible: (() => {
@@ -420,6 +427,7 @@ export default function ProfileRoot() {
   }
 
   const totalEarned = schedules.reduce((sum, s) => sum + s.stamps, 0);
+  const totalCalories = schedules.reduce((sum, s) => sum + (s.calories || 0), 0);
 
   // ⭐ ステータス割り振り用のプール。景品交換用の available（totalEarned -
   // totalSpent、下の方で計算）とは完全に別勘定 — ステータスに振っても交換
@@ -953,6 +961,9 @@ export default function ProfileRoot() {
                   </a>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                     <span style={{ color: "#B5651D", fontWeight: 800, fontSize: 13.5 }}>⭐️ {s.stamps}</span>
+                    {s.theme === "diet" && s.calories > 0 && (
+                      <span style={{ color: "#2C6E55", fontWeight: 800, fontSize: 13 }}>🔥 {s.calories.toLocaleString()}</span>
+                    )}
                     <a href={`${window.location.pathname}?id=${s.id}&records=1`} style={{ textDecoration: "none" }}>
                       <span
                         style={{
@@ -1019,6 +1030,15 @@ export default function ProfileRoot() {
           <div style={{ fontSize: 12.5, color: "#a8bcc9" }}>
             これまでに獲得 {totalEarned} － 交換した分 {totalSpent}
           </div>
+          {bookGender === "diet" && (
+            <div style={{ marginTop: 12, paddingTop: 10, borderTop: "1px dashed #D5E6EE" }}>
+              <div style={{ fontSize: 14, color: "#7c98aa", fontWeight: 700 }}>消費カロリーの合計</div>
+              <div style={{ fontSize: 36, fontWeight: 900, color: "#1E4A3B", fontFamily: "'Kaisei Decol', serif" }}>
+                🔥 {totalCalories.toLocaleString()}
+                <span style={{ fontSize: 16, marginLeft: 4 }}>kcal</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <SectionTitle>🎁 景品と交換</SectionTitle>
@@ -1147,6 +1167,7 @@ export default function ProfileRoot() {
                 if (t.pages > 0) achvParts.push(`📖${t.pages}ページ`);
                 if (t.problems > 0) achvParts.push(`✏️${t.problems}問`);
                 achvParts.push(...customTotalsText(t));
+                if (s.calories > 0) achvParts.push(`🔥${s.calories.toLocaleString()}kcal`);
                 return (
                   <div
                     key={s.id}
