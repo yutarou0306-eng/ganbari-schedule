@@ -3029,8 +3029,8 @@ function MainScreen({
       {/* ロックの案内はカレンダーのすぐ上（スタンプの説明と一緒）に表示 */}
       <div style={{ ...styles.lockNote, color: theme.headerTextColor, fontSize: 14, margin: "14px 18px 0", position: "relative", zIndex: 2 }}>
         {locked
-          ? "🔒 本スタンプは保護者の方がロックを開けてから押せます"
-          : "🔓 本スタンプが押せます。過去の押し忘れもタップで記録できます（3分後に自動ロック）"}
+          ? "🔒 マスを長押しすると、保護者の方がロックを開けて本スタンプを押せます"
+          : "🔓 本スタンプが押せます（3分後に自動ロック）"}
       </div>
       <div style={styles.calendarLegendRow}>
         <span style={styles.calendarLegendItem}>
