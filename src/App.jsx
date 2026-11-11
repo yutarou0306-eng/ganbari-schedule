@@ -1030,7 +1030,7 @@ export default function KidsScheduleApp() {
     if (subject.measureTime !== false && Number(subject.targetMinutes) > 0) v.minutes = Number(subject.targetMinutes);
     if (subject.measureDistance && Number(subject.targetKm) > 0) v.km = Number(subject.targetKm);
     const walkRun = subject.exType === "walk" || subject.exType === "run";
-    if ((tr.steps || walkRun) && subject.exType !== "strength" && Number(subject.perSteps) > 0) v.steps = Number(subject.perSteps);
+    if ((tr.steps || walkRun || subject.exType === "other") && subject.exType !== "strength" && Number(subject.perSteps) > 0) v.steps = Number(subject.perSteps);
     if (subject.exType === "other" && Number(subject.targetCustom) > 0) v.custom = Number(subject.targetCustom);
     if (subject.exType === "strength") {
       const items = strengthItems(subject).filter((x) => Number(x.reps) > 0);
@@ -2234,6 +2234,8 @@ function ExerciseGoalPanel({ subject, set }) {
             />
           </label>
         </div>
+        {num("perSteps", "歩", "3000", 1, "👟 歩数")}
+        {num("perKcal", "kcal", "150", 1, "🔥 カロリー")}
         {note}
       </div>
     );
@@ -3801,7 +3803,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       km
                     </label>
                   )}
-                  {showWeight && (s.exType === "walk" || s.exType === "run") && (
+                  {showWeight && ["walk", "run", "other"].includes(s.exType) && (
                     <label style={styles.achievementField}>
                       👟
                       <input
@@ -3816,7 +3818,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       歩
                     </label>
                   )}
-                  {showWeight && ["strength", "walk", "run"].includes(s.exType) && (
+                  {showWeight && ["strength", "walk", "run", "other"].includes(s.exType) && (
                     <label style={styles.achievementField}>
                       🔥
                       <input
@@ -4133,7 +4135,7 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
   // メモで入れたその日の走行距離（km）
   const tr0 = track || { steps: false, distance: true };
   const tr = {
-    steps: tr0.steps || subjects.some((x) => x.exType === "walk" || x.exType === "run"),
+    steps: tr0.steps || subjects.some((x) => x.exType === "walk" || x.exType === "run" || (x.exType === "other" && Number(x.perSteps) > 0)),
     distance: tr0.distance || subjects.some((x) => x.measureDistance),
   };
   let totalSteps = Object.entries(steps || {}).filter(([k, n]) => inRange(k) && n > 0).reduce((sum, [, n]) => sum + Number(n), 0);
