@@ -371,11 +371,13 @@ function describeTargets(subject) {
   // measureTime defaults on — older schedules (from before pages/problems
   // existed) never set this explicitly, so treat "not explicitly off" as on
   // rather than requiring a truthy value.
-  if (subject.measureTime !== false) parts.push(`⏱${subject.targetMinutes || subject.durationMinutes || 30}分`);
+  if (subject.measureTime !== false) parts.push(`⏱${fmtMinSec(subject.targetMinutes || subject.durationMinutes || 30)}`);
   if (subject.measurePages) parts.push(`📖${subject.targetPages || 5}ページ`);
   if (subject.measureProblems) parts.push(`✏️${subject.targetProblems || 10}問`);
   if (subject.measureDistance) parts.push(`🏃${subject.targetKm ?? 3}km`);
-  if (subject.measureCustom) parts.push(`🎯${customGoalText(subject, subject.targetCustom)}`);
+  if (subject.measureCustom) parts.push(`${subject.exType === "strength" ? "💪" : "🎯"}${customGoalText(subject, subject.targetCustom)}`);
+  if (Number(subject.perSteps) > 0 && subject.exType !== "strength") parts.push(`👟${Number(subject.perSteps).toLocaleString()}歩`);
+  if (Number(subject.perKcal) > 0) parts.push(`🔥${Number(subject.perKcal).toLocaleString()}kcal`);
   return parts;
 }
 
@@ -390,6 +392,15 @@ function customGoalText(subject, amount) {
 function subjectIsMeasurable(subject) {
   return !!(subject.measureTime !== false || subject.measurePages || subject.measureProblems || subject.measureDistance || subject.measureCustom);
 }
+
+// 大人用：やることの種類（選ぶと目標の入力欄が切り替わる）
+const EX_TYPES = [
+  { k: "", label: "自由" },
+  { k: "strength", label: "💪 筋トレ", name: "筋トレ" },
+  { k: "walk", label: "🚶 ウォーキング", name: "ウォーキング" },
+  { k: "run", label: "🏃 ランニング", name: "ランニング" },
+];
+const BODY_PARTS = ["腕", "肩", "胸", "背中", "お腹", "お尻", "脚", "全身"];
 
 // 分（小数で秒を含む）を「35分30秒」の形に
 function fmtMinSec(min) {
@@ -980,7 +991,9 @@ export default function KidsScheduleApp() {
     const v = { auto: true };
     if (subject.measureTime !== false && Number(subject.targetMinutes) > 0) v.minutes = Number(subject.targetMinutes);
     if (subject.measureDistance && Number(subject.targetKm) > 0) v.km = Number(subject.targetKm);
-    if (tr.steps && Number(subject.perSteps) > 0) v.steps = Number(subject.perSteps);
+    const walkRun = subject.exType === "walk" || subject.exType === "run";
+    if ((tr.steps || walkRun) && subject.exType !== "strength" && Number(subject.perSteps) > 0) v.steps = Number(subject.perSteps);
+    if (subject.exType === "strength" && subject.measureCustom && Number(subject.targetCustom) > 0) v.custom = Number(subject.targetCustom);
     if (Number(subject.perKcal) > 0) v.kcal = Number(subject.perKcal);
     if (Object.keys(v).length === 1) return;
     setAchievements((prev) => {
@@ -1739,6 +1752,45 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
   function set(patch) {
     onChange({ ...subject, ...patch });
   }
+  // 種類を選んだら、その種類に合う目標の項目に切り替える（名前が空なら種類名を入れる）
+  function chooseType(t) {
+    const name = (subject.name || "").trim() ? subject.name : t.name || subject.name;
+    if (t.k === "strength") {
+      set({
+        exType: "strength",
+        name,
+        measureTime: Number(subject.targetMinutes) > 0 && subject.exType === "strength" ? subject.measureTime : false,
+        measurePages: false,
+        measureProblems: false,
+        measureDistance: false,
+        measureCustom: true,
+        customLabel: (subject.exParts || []).join("・") || "筋トレ",
+        customUnit: "回",
+        targetCustom: subject.exType === "strength" ? subject.targetCustom : 20,
+      });
+    } else if (t.k === "walk" || t.k === "run") {
+      set({
+        exType: t.k,
+        name,
+        measureTime: true,
+        targetMinutes: subject.targetMinutes || 30,
+        measurePages: false,
+        measureProblems: false,
+        measureDistance: true,
+        targetKm: subject.targetKm || (t.k === "run" ? 5 : 3),
+        measureCustom: false,
+        distanceTouched: true,
+      });
+    } else {
+      set({ exType: "" });
+    }
+  }
+  function togglePart(part) {
+    const cur = subject.exParts || [];
+    const next = cur.includes(part) ? cur.filter((x) => x !== part) : [...cur, part];
+    const ordered = BODY_PARTS.filter((x) => next.includes(x));
+    set({ exParts: ordered, customLabel: ordered.join("・") || "筋トレ" });
+  }
   function toggleWeekday(i) {
     const cur = subject.weekdays || [];
     const next = cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i].sort();
@@ -1772,6 +1824,34 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
         )}
       </div>
 
+      {isDiet && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", margin: "6px 0 2px" }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: "#4a6c85" }}>種類</span>
+          {EX_TYPES.map((t) => {
+            const on = (subject.exType || "") === t.k;
+            return (
+              <button
+                key={t.k || "free"}
+                onClick={() => chooseType(t)}
+                style={{
+                  border: "2px solid #4FA283",
+                  borderRadius: 999,
+                  padding: "5px 11px",
+                  fontSize: 13,
+                  fontWeight: 800,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                  background: on ? "#2C8A5F" : "#fff",
+                  color: on ? "#fff" : "#2C6E55",
+                }}
+              >
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <div style={styles.swatchRow}>
         {(palette || PASTELS).map((p) => (
           <button
@@ -1787,6 +1867,9 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
         ))}
       </div>
 
+      {isDiet && subject.exType ? (
+        <ExerciseGoalPanel subject={subject} set={set} togglePart={togglePart} />
+      ) : (
       <div style={styles.measureSection}>
         <span style={styles.measureSectionLabel}>目標（複数選べます）</span>
 
@@ -1961,6 +2044,7 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
           )}
         </div>
       </div>
+      )}
 
       <div style={styles.freqRow}>
         {[
@@ -2017,6 +2101,102 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// 大人用：種類（筋トレ／ウォーキング／ランニング）ごとの目標入力。
+// ここで入れた値はスタンプを押すとその日の記録に自動で入り、メモで直せる。
+function ExerciseGoalPanel({ subject, set, togglePart }) {
+  const box = { background: "#F4FAF6", borderRadius: 12, padding: "10px 12px", margin: "8px 0", border: "1.5px solid #CFE6D8" };
+  const labelSt = { width: 92, fontSize: 13.5, fontWeight: 700, color: "#1E4A3B", whiteSpace: "nowrap" };
+  const inputSt = { ...styles.measureSelect, width: 110, minWidth: 0, boxSizing: "border-box" };
+  const num = (key, unit, ph, step = 1, label) => (
+    <div key={key} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+      <span style={labelSt}>{label}</span>
+      <input
+        type="number"
+        inputMode={step < 1 ? "decimal" : "numeric"}
+        min={0}
+        step={step}
+        value={subject[key] ?? ""}
+        onChange={(e) => set({ [key]: e.target.value === "" ? "" : Number(e.target.value) })}
+        placeholder={`例：${ph}`}
+        style={inputSt}
+      />
+      <span style={styles.measureUnit}>{unit}</span>
+    </div>
+  );
+  const totalSec = Math.round((Number(subject.targetMinutes) || 0) * 60);
+  const mm = subject.targetMinutes === "" || subject.targetMinutes === undefined ? "" : String(Math.floor(totalSec / 60));
+  const ss = subject.targetMinutes === "" || subject.targetMinutes === undefined ? "" : String(totalSec % 60);
+  function setTime(m, sec, extra = {}) {
+    if (m === "" && sec === "") return set({ targetMinutes: "", ...extra });
+    const v = (parseFloat(m) || 0) + Math.min(59, parseFloat(sec) || 0) / 60;
+    set({ targetMinutes: Math.round(v * 10000) / 10000, ...extra });
+  }
+  const timeRow = (label, optional) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+      <span style={labelSt}>{label}</span>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        value={optional && subject.measureTime === false ? "" : mm}
+        onChange={(e) => setTime(e.target.value, ss, optional ? { measureTime: e.target.value !== "" || ss !== "" } : {})}
+        placeholder="30"
+        style={{ ...inputSt, width: 70 }}
+      />
+      <span style={styles.measureUnit}>分</span>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        max={59}
+        value={optional && subject.measureTime === false ? "" : ss}
+        onChange={(e) => setTime(mm, e.target.value, optional ? { measureTime: mm !== "" || e.target.value !== "" } : {})}
+        placeholder="0"
+        style={{ ...inputSt, width: 60 }}
+      />
+      <span style={styles.measureUnit}>秒</span>
+    </div>
+  );
+  const note = <div style={{ fontSize: 11.5, color: "#5d7d70", marginTop: 8 }}>スタンプを押すと、この値がその日の記録に自動で入ります（「📝 メモ」で直せます）。</div>;
+
+  if (subject.exType === "strength") {
+    const parts = subject.exParts || [];
+    return (
+      <div style={box}>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#2C6E55" }}>💪 鍛える部位（複数選べます）</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+          {BODY_PARTS.map((p) => {
+            const on = parts.includes(p);
+            return (
+              <button
+                key={p}
+                onClick={() => togglePart(p)}
+                style={{ border: "2px solid #4FA283", borderRadius: 999, padding: "5px 12px", fontSize: 13.5, fontWeight: 800, fontFamily: "inherit", cursor: "pointer", background: on ? "#2C8A5F" : "#fff", color: on ? "#fff" : "#2C6E55" }}
+              >
+                {p}
+              </button>
+            );
+          })}
+        </div>
+        {num("targetCustom", "回", "20", 1, "💪 回数")}
+        {num("perKcal", "kcal", "80", 1, "🔥 カロリー")}
+        {timeRow("⏱ 時間（任意）", true)}
+        {note}
+      </div>
+    );
+  }
+  return (
+    <div style={box}>
+      <div style={{ fontSize: 13.5, fontWeight: 800, color: "#2C6E55" }}>{subject.exType === "run" ? "🏃 ランニング" : "🚶 ウォーキング"}の目標（1回あたり）</div>
+      {timeRow("⏱ 時間")}
+      {num("targetKm", "km", subject.exType === "run" ? "5" : "3", 0.1, "🏃 距離")}
+      {num("perSteps", "歩", subject.exType === "run" ? "6000" : "4000", 1, "👟 歩数")}
+      {num("perKcal", "kcal", subject.exType === "run" ? "300" : "150", 1, "🔥 カロリー")}
+      {note}
     </div>
   );
 }
@@ -3484,7 +3664,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                           type="number"
                           inputMode="numeric"
                           min={0}
-                          placeholder={String(s.targetMinutes || 30)}
+                          placeholder={minSecParts(s.targetMinutes || 30)[0]}
                           value={mm}
                           onChange={(e) => setMinSec(s.id, e.target.value, ss)}
                           style={{ ...styles.achievementInput, width: 56 }}
@@ -3495,7 +3675,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                           inputMode="numeric"
                           min={0}
                           max={59}
-                          placeholder="0"
+                          placeholder={minSecParts(s.targetMinutes || 30)[1]}
                           value={ss}
                           onChange={(e) => setMinSec(s.id, mm, String(Math.min(59, Math.max(0, parseInt(e.target.value || "0", 10) || 0))))}
                           style={{ ...styles.achievementInput, width: 48 }}
@@ -3548,7 +3728,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       km
                     </label>
                   )}
-                  {showWeight && tr.steps && (
+                  {showWeight && s.exType !== "strength" && (tr.steps || s.exType === "walk" || s.exType === "run") && (
                     <label style={styles.achievementField}>
                       👟
                       <input
@@ -3580,7 +3760,8 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                   )}
                   {s.measureCustom && (
                     <label style={styles.achievementField}>
-                      🎯{(s.customLabel || "").trim()}
+                      {s.exType === "strength" ? "💪" : "🎯"}
+                      {(s.customLabel || "").trim()}
                       <input
                         type="number"
                         inputMode="decimal"
@@ -3711,7 +3892,7 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
       if (vals.km) parts.push(`🏃${vals.km}km`);
       if (vals.steps) parts.push(`👟${Number(vals.steps).toLocaleString()}歩`);
       if (vals.kcal) parts.push(`🔥${Number(vals.kcal).toLocaleString()}kcal`);
-      if (vals.custom) parts.push(`🎯${customGoalText(s, vals.custom)}`);
+      if (vals.custom) parts.push(`${s.exType === "strength" ? "💪" : "🎯"}${customGoalText(s, vals.custom)}`);
       if (parts.length > 0) achvParts.push({ name: s.name, color: s.color, text: parts.join(" ") });
     });
   }
@@ -3861,7 +4042,11 @@ function CalorieTotal({ calories, distances, steps, track, goals, isExcused, ach
   const calEntries = Object.entries(calories).filter(([k, c]) => inRange(k) && c > 0);
   let totalKcal = calEntries.reduce((sum, [, c]) => sum + Number(c), 0);
   // メモで入れたその日の走行距離（km）
-  const tr = track || { steps: false, distance: true };
+  const tr0 = track || { steps: false, distance: true };
+  const tr = {
+    steps: tr0.steps || subjects.some((x) => x.exType === "walk" || x.exType === "run"),
+    distance: tr0.distance || subjects.some((x) => x.measureDistance),
+  };
   let totalSteps = Object.entries(steps || {}).filter(([k, n]) => inRange(k) && n > 0).reduce((sum, [, n]) => sum + Number(n), 0);
   const dailyKm = Object.entries(distances || {}).filter(([k, n]) => inRange(k) && n > 0).reduce((sum, [, n]) => sum + Number(n), 0);
 
