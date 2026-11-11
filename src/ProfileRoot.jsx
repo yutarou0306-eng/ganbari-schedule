@@ -91,7 +91,8 @@ function formatMinutes(min) {
 // ダイエット用：スケジュールに記録された消費カロリーの合計（kcal）
 function countCaloriesInBlob(blob) {
   const cal = (blob && blob.calories) || {};
-  return Object.values(cal).reduce((sum, c) => sum + (Number(c) || 0), 0);
+  // その日の入力分＋やることごとの記録（スタンプで自動入力した分を含む）
+  return Object.values(cal).reduce((sum, c) => sum + (Number(c) || 0), 0) + totalAchievementsInBlob(blob).kcal;
 }
 
 function countStampsInBlob(blob) {
@@ -122,7 +123,7 @@ function localTodayKey() {
 // total on a completed schedule (e.g. ⏱120分 📖45ページ ✏️80問).
 function totalAchievementsInBlob(blob) {
   const achievements = (blob && blob.achievements) || {};
-  const totals = { minutes: 0, pages: 0, problems: 0, km: 0, custom: [] };
+  const totals = { minutes: 0, pages: 0, problems: 0, km: 0, steps: 0, kcal: 0, custom: [] };
   // 自由目標は項目名・単位がやることごとに違うので、「項目名＋単位」ごとに合計する
   const subjects = (blob && blob.config && blob.config.subjects) || [];
   const customMap = {};
@@ -133,6 +134,8 @@ function totalAchievementsInBlob(blob) {
       totals.pages += Number(vals.pages) || 0;
       totals.problems += Number(vals.problems) || 0;
       totals.km += Number(vals.km) || 0;
+      totals.steps += Number(vals.steps) || 0;
+      totals.kcal += Number(vals.kcal) || 0;
       const n = Number(vals.custom) || 0;
       if (n > 0) {
         const subj = subjects.find((x) => x.id === subjId) || {};
@@ -296,7 +299,7 @@ export default function ProfileRoot() {
             endDate: row.blob.config.endDate || "",
             stamps: countStampsInBlob(row.blob),
             calories: countCaloriesInBlob(row.blob),
-            dailySteps: Object.values((row.blob && row.blob.steps) || {}).reduce((a, n) => a + (Number(n) || 0), 0),
+            dailySteps: Object.values((row.blob && row.blob.steps) || {}).reduce((a, n) => a + (Number(n) || 0), 0) + totalAchievementsInBlob(row.blob).steps,
             trackSteps: !!row.blob.config.trackSteps,
             trackDistance: row.blob.config.trackDistance !== undefined ? !!row.blob.config.trackDistance : !row.blob.config.trackSteps,
             dailyKm: Object.values((row.blob && row.blob.distances) || {}).reduce((a, n) => a + (Number(n) || 0), 0),
@@ -1175,7 +1178,7 @@ export default function ProfileRoot() {
               {(showAllCompleted ? completedSchedules : completedSchedules.slice(0, 5)).map((s) => {
                 const t = s.achvTotals;
                 const achvParts = [];
-                if (t.minutes > 0) achvParts.push(`⏱${t.minutes}分`);
+                if (t.minutes > 0) achvParts.push(`⏱${formatMinutes(t.minutes)}`);
                 if (t.pages > 0) achvParts.push(`📖${t.pages}ページ`);
                 if (t.problems > 0) achvParts.push(`✏️${t.problems}問`);
                 if (t.km > 0) achvParts.push(`🏃${Math.round(t.km * 10) / 10}km`);
@@ -2203,7 +2206,7 @@ function CardDetailModal({ card, onClose, onPrev, onNext, starsForStats, onAlloc
               {card.achvTotals && (card.achvTotals.minutes > 0 || card.achvTotals.pages > 0 || card.achvTotals.problems > 0 || card.achvTotals.km > 0 || customTotalsText(card.achvTotals).length > 0) && (
                 <div>
                   取り組んだ内容：
-                  {card.achvTotals.minutes > 0 ? `⏱${card.achvTotals.minutes}分 ` : ""}
+                  {card.achvTotals.minutes > 0 ? `⏱${formatMinutes(card.achvTotals.minutes)} ` : ""}
                   {card.achvTotals.pages > 0 ? `📖${card.achvTotals.pages}ページ ` : ""}
                   {card.achvTotals.problems > 0 ? `✏️${card.achvTotals.problems}問 ` : ""}
                   {card.achvTotals.km > 0 ? `🏃${Math.round(card.achvTotals.km * 10) / 10}km ` : ""}
