@@ -296,6 +296,9 @@ export default function ProfileRoot() {
             endDate: row.blob.config.endDate || "",
             stamps: countStampsInBlob(row.blob),
             calories: countCaloriesInBlob(row.blob),
+            dailySteps: Object.values((row.blob && row.blob.steps) || {}).reduce((a, n) => a + (Number(n) || 0), 0),
+            trackSteps: !!row.blob.config.trackSteps,
+            trackDistance: row.blob.config.trackDistance !== undefined ? !!row.blob.config.trackDistance : !row.blob.config.trackSteps,
             dailyKm: Object.values((row.blob && row.blob.distances) || {}).reduce((a, n) => a + (Number(n) || 0), 0),
             awardedCard: row.blob.config.awardedCard || null,
             // ファミリアが登場する条件：30日以上 かつ やること2つ以上
@@ -993,7 +996,8 @@ export default function ProfileRoot() {
                   // 大人用（ダイエット）は運動時間・走行距離・消費カロリーの合計をスケジュールごとに表示
                   <div style={{ display: "flex", justifyContent: "flex-end", flexWrap: "wrap", gap: "2px 14px", marginTop: 6, paddingTop: 6, borderTop: "1px dashed #E3EEF3", fontSize: 13, fontWeight: 800, color: "#2C6E55" }}>
                     <span>⏱ {formatMinutes(s.achvTotals && s.achvTotals.minutes)}</span>
-                    <span>🏃 {Math.round((((s.achvTotals && s.achvTotals.km) || 0) + (s.dailyKm || 0)) * 10) / 10}km</span>
+                    {(s.trackSteps || s.dailySteps > 0) && <span>👟 {(s.dailySteps || 0).toLocaleString()}歩</span>}
+                    {(s.trackDistance || s.dailyKm > 0) && <span>🏃 {Math.round((((s.achvTotals && s.achvTotals.km) || 0) + (s.dailyKm || 0)) * 10) / 10}km</span>}
                     <span>🔥 {(s.calories || 0).toLocaleString()}kcal</span>
                   </div>
                 )}
@@ -1176,6 +1180,7 @@ export default function ProfileRoot() {
                 if (t.problems > 0) achvParts.push(`✏️${t.problems}問`);
                 if (t.km > 0) achvParts.push(`🏃${Math.round(t.km * 10) / 10}km`);
                 achvParts.push(...customTotalsText(t));
+                if (s.dailySteps > 0) achvParts.push(`👟${s.dailySteps.toLocaleString()}歩`);
                 if (s.dailyKm > 0) achvParts.push(`🏃${Math.round(s.dailyKm * 10) / 10}km`);
                 if (s.calories > 0) achvParts.push(`🔥${s.calories.toLocaleString()}kcal`);
                 return (
