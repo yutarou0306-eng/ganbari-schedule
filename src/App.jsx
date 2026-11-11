@@ -375,7 +375,11 @@ function describeTargets(subject) {
   if (subject.measurePages) parts.push(`📖${subject.targetPages || 5}ページ`);
   if (subject.measureProblems) parts.push(`✏️${subject.targetProblems || 10}問`);
   if (subject.measureDistance) parts.push(`🏃${subject.targetKm ?? 3}km`);
-  if (subject.measureCustom) parts.push(`${subject.exType === "strength" ? "💪" : "🎯"}${customGoalText(subject, subject.targetCustom)}`);
+  if (subject.exType === "strength" && strengthItems(subject).length) {
+    strengthItems(subject)
+      .filter((x) => (x.part || "").trim())
+      .forEach((x) => parts.push(`💪${x.part}${x.reps ? " " + x.reps + "回" : ""}`));
+  } else if (subject.measureCustom) parts.push(`${subject.exType === "strength" ? "💪" : "🎯"}${customGoalText(subject, subject.targetCustom)}`);
   if (Number(subject.perSteps) > 0 && subject.exType !== "strength") parts.push(`👟${Number(subject.perSteps).toLocaleString()}歩`);
   if (Number(subject.perKcal) > 0) parts.push(`🔥${Number(subject.perKcal).toLocaleString()}kcal`);
   return parts;
@@ -412,6 +416,28 @@ const BODY_PART_GROUPS = [
   { g: "その他", parts: ["全身", "有酸素（HIIT など）"] },
 ];
 const BODY_PARTS = BODY_PART_GROUPS.flatMap((x) => x.parts);
+const CUSTOM_GROUP = "自由入力";
+
+// 筋トレ：部位ごとの行（{ id, group, part, reps }）。古い形（exParts だけ）からも作る
+function strengthItems(subject) {
+  if (Array.isArray(subject.exItems) && subject.exItems.length) return subject.exItems;
+  const parts = subject.exParts || [];
+  return parts.map((p, i) => {
+    const grp = BODY_PART_GROUPS.find((g) => g.parts.includes(p));
+    return { id: "p" + i, group: grp ? grp.g : CUSTOM_GROUP, part: p, reps: Number(subject.targetCustom) || "" };
+  });
+}
+
+// 部位の行から、表示用のラベル・回数の合計をまとめて返す
+function strengthDerived(items) {
+  const named = items.filter((x) => (x.part || "").trim());
+  return {
+    exItems: items,
+    exParts: named.map((x) => x.part),
+    customLabel: named.map((x) => x.part).join("・") || "筋トレ",
+    targetCustom: named.reduce((a, x) => a + (Number(x.reps) || 0), 0),
+  };
+}
 
 // 分（小数で秒を含む）を「35分30秒」の形に
 function fmtMinSec(min) {
@@ -1004,7 +1030,13 @@ export default function KidsScheduleApp() {
     if (subject.measureDistance && Number(subject.targetKm) > 0) v.km = Number(subject.targetKm);
     const walkRun = subject.exType === "walk" || subject.exType === "run";
     if ((tr.steps || walkRun) && subject.exType !== "strength" && Number(subject.perSteps) > 0) v.steps = Number(subject.perSteps);
-    if (subject.exType === "strength" && subject.measureCustom && Number(subject.targetCustom) > 0) v.custom = Number(subject.targetCustom);
+    if (subject.exType === "strength") {
+      const items = strengthItems(subject).filter((x) => Number(x.reps) > 0);
+      if (items.length) {
+        v.parts = Object.fromEntries(items.map((x) => [x.id, Number(x.reps)]));
+        v.custom = items.reduce((a, x) => a + Number(x.reps), 0);
+      }
+    }
     if (Number(subject.perKcal) > 0) v.kcal = Number(subject.perKcal);
     if (Object.keys(v).length === 1) return;
     setAchievements((prev) => {
@@ -1775,9 +1807,12 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
         measureProblems: false,
         measureDistance: false,
         measureCustom: true,
-        customLabel: (subject.exParts || []).join("・") || "筋トレ",
         customUnit: "回",
-        targetCustom: subject.exType === "strength" ? subject.targetCustom : 20,
+        ...strengthDerived(
+          subject.exType === "strength" && strengthItems(subject).length
+            ? strengthItems(subject)
+            : [{ id: "p" + Date.now(), group: "胸", part: "大胸筋（中部）", reps: 20 }]
+        ),
       });
     } else if (t.k === "walk" || t.k === "run") {
       set({
@@ -1796,13 +1831,6 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
       set({ exType: "" });
     }
   }
-  function togglePart(part) {
-    const cur = subject.exParts || [];
-    const next = cur.includes(part) ? cur.filter((x) => x !== part) : [...cur, part];
-    const all = [...BODY_PARTS, ...(subject.exCustomParts || [])];
-    const ordered = [...all.filter((x) => next.includes(x)), ...next.filter((x) => !all.includes(x))];
-    set({ exParts: ordered, customLabel: ordered.join("・") || "筋トレ" });
-  }
   function toggleWeekday(i) {
     const cur = subject.weekdays || [];
     const next = cur.includes(i) ? cur.filter((x) => x !== i) : [...cur, i].sort();
@@ -1816,29 +1844,9 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
         ...(isFocused ? { boxShadow: "0 0 0 3px #F4C95D, 0 0 20px rgba(244,201,93,0.6)", borderColor: "#F4C95D" } : {}),
       }}
     >
-      <div style={styles.subjCardTop}>
-        <input
-          value={subject.name}
-          onChange={(e) => {
-            const name = e.target.value;
-            // ダイエット用：ランニング・ウォーキングなどは距離の目標を自動でオンにする（あとから外せる）
-            const autoDist =
-              showDistance && !subject.measureDistance && !subject.distanceTouched && /ランニング|ウォーキング|ジョギング|ラン|ウォーク|走|歩/.test(name);
-            set({ name, ...(autoDist ? { measureDistance: true } : {}) });
-          }}
-          placeholder={showDistance ? "何を頑張る？（例：ウォーキング）" : "何を頑張る？（例：ピアノ）"}
-          style={styles.subjNameInput}
-        />
-        {canRemove && (
-          <button style={styles.chipX} onClick={onRemove} aria-label="削除">
-            <X size={16} />
-          </button>
-        )}
-      </div>
-
       {isDiet && (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", margin: "6px 0 2px" }}>
-          <span style={{ fontSize: 12.5, fontWeight: 700, color: "#4a6c85" }}>種類</span>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center", margin: "0 0 8px" }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: "#4a6c85" }}>① 種類を選ぶ</span>
           {EX_TYPES.map((t) => {
             const on = (subject.exType || "") === t.k;
             return (
@@ -1864,6 +1872,26 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
         </div>
       )}
 
+      <div style={styles.subjCardTop}>
+        <input
+          value={subject.name}
+          onChange={(e) => {
+            const name = e.target.value;
+            // ダイエット用：ランニング・ウォーキングなどは距離の目標を自動でオンにする（あとから外せる）
+            const autoDist =
+              showDistance && !subject.measureDistance && !subject.distanceTouched && /ランニング|ウォーキング|ジョギング|ラン|ウォーク|走|歩/.test(name);
+            set({ name, ...(autoDist ? { measureDistance: true } : {}) });
+          }}
+          placeholder={isDiet ? "② 名前をつける（例：胸の日）" : showDistance ? "何を頑張る？（例：ウォーキング）" : "何を頑張る？（例：ピアノ）"}
+          style={styles.subjNameInput}
+        />
+        {canRemove && (
+          <button style={styles.chipX} onClick={onRemove} aria-label="削除">
+            <X size={16} />
+          </button>
+        )}
+      </div>
+
       <div style={styles.swatchRow}>
         {(palette || PASTELS).map((p) => (
           <button
@@ -1880,7 +1908,7 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
       </div>
 
       {isDiet && subject.exType ? (
-        <ExerciseGoalPanel subject={subject} set={set} togglePart={togglePart} />
+        <ExerciseGoalPanel subject={subject} set={set} />
       ) : (
       <div style={styles.measureSection}>
         <span style={styles.measureSectionLabel}>目標（複数選べます）</span>
@@ -2117,42 +2145,15 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
   );
 }
 
-// 筋トレの部位を自分で追加する小さな入力欄
-function AddPartInput({ onAdd }) {
-  const [v, setV] = useState("");
-  const add = () => {
-    const t = v.trim();
-    if (t) onAdd(t.slice(0, 12));
-    setV("");
-  };
-  return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-      <input
-        value={v}
-        onChange={(e) => setV(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") add();
-        }}
-        placeholder="例：腸腰筋"
-        maxLength={12}
-        style={{ width: 96, padding: "5px 8px", borderRadius: 999, border: "2px dashed #9AD5AE", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
-      />
-      <button onClick={add} style={{ border: "none", borderRadius: 999, padding: "6px 10px", background: "#4FA283", color: "#fff", fontWeight: 800, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
-        ＋ 追加
-      </button>
-    </span>
-  );
-}
-
 // 大人用：種類（筋トレ／ウォーキング／ランニング）ごとの目標入力。
 // ここで入れた値はスタンプを押すとその日の記録に自動で入り、メモで直せる。
-function ExerciseGoalPanel({ subject, set, togglePart }) {
+function ExerciseGoalPanel({ subject, set }) {
   const box = { background: "#F4FAF6", borderRadius: 12, padding: "10px 12px", margin: "8px 0", border: "1.5px solid #CFE6D8" };
-  const labelSt = { width: 92, fontSize: 13.5, fontWeight: 700, color: "#1E4A3B", whiteSpace: "nowrap" };
+  const labelSt = { minWidth: 92, fontSize: 13.5, fontWeight: 700, color: "#1E4A3B", whiteSpace: "nowrap" };
   const inputSt = { ...styles.measureSelect, width: 110, minWidth: 0, boxSizing: "border-box" };
   const num = (key, unit, ph, step = 1, label) => (
     <div key={key} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
-      <span style={labelSt}>{label}</span>
+      {label && <span style={labelSt}>{label}</span>}
       <input
         type="number"
         inputMode={step < 1 ? "decimal" : "numeric"}
@@ -2203,58 +2204,82 @@ function ExerciseGoalPanel({ subject, set, togglePart }) {
   const note = <div style={{ fontSize: 11.5, color: "#5d7d70", marginTop: 8 }}>スタンプを押すと、この値がその日の記録に自動で入ります（「📝 メモ」で直せます）。</div>;
 
   if (subject.exType === "strength") {
-    const parts = subject.exParts || [];
-    const customParts = [...(subject.exCustomParts || []), ...parts.filter((x) => !BODY_PARTS.includes(x) && !(subject.exCustomParts || []).includes(x))];
-    const chip = (p, removable) => {
-      const on = parts.includes(p);
-      return (
-        <span key={p} style={{ display: "inline-flex", alignItems: "center" }}>
-          <button
-            onClick={() => togglePart(p)}
-            style={{ border: "2px solid #4FA283", borderRadius: 999, padding: "4px 10px", fontSize: 13, fontWeight: 800, fontFamily: "inherit", cursor: "pointer", background: on ? "#2C8A5F" : "#fff", color: on ? "#fff" : "#2C6E55" }}
-          >
-            {p}
-          </button>
-          {removable && (
-            <button
-              onClick={() => {
-                const nextParts = parts.filter((x) => x !== p);
-                set({ exCustomParts: (subject.exCustomParts || []).filter((x) => x !== p), exParts: nextParts, customLabel: nextParts.join("・") || "筋トレ" });
-              }}
-              aria-label={`${p}を削除`}
-              style={{ border: "none", background: "none", color: "#9bb0a6", cursor: "pointer", fontSize: 14, padding: "0 2px" }}
-            >
-              ×
-            </button>
-          )}
-        </span>
-      );
-    };
+    const items = strengthItems(subject);
+    const update = (next) => set(strengthDerived(next));
+    const setItem = (id, patch) => update(items.map((x) => (x.id === id ? { ...x, ...patch } : x)));
+    const selSt = { padding: "7px 6px", borderRadius: 10, border: "2px solid #A9DEC4", fontSize: 14, fontFamily: "inherit", background: "#fff", color: "#1E4A3B", boxSizing: "border-box" };
     return (
       <div style={box}>
-        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#2C6E55" }}>💪 鍛える部位（複数選べます）</div>
-        {BODY_PART_GROUPS.map((grp) => (
-          <div key={grp.g} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 5, marginTop: 6 }}>
-            <span style={{ width: "100%", fontSize: 12, fontWeight: 800, color: "#5d7d70", marginBottom: -2 }}>{grp.g}</span>
-            {grp.parts.map((p) => chip(p, false))}
-          </div>
-        ))}
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 5, marginTop: 6 }}>
-          <span style={{ width: "100%", fontSize: 12, fontWeight: 800, color: "#5d7d70", marginBottom: -2 }}>自分で追加</span>
-          {customParts.map((p) => chip(p, true))}
-          <AddPartInput
-            onAdd={(p) => {
-              if (!p || BODY_PARTS.includes(p) || (subject.exCustomParts || []).includes(p)) {
-                if (p && !parts.includes(p)) togglePart(p);
-                return;
-              }
-              const nextParts = [...parts, p];
-              set({ exCustomParts: [...(subject.exCustomParts || []), p], exParts: nextParts, customLabel: nextParts.join("・") });
-            }}
-          />
-        </div>
-        {num("targetCustom", "回", "20", 1, "💪 回数")}
-        {num("perKcal", "kcal", "80", 1, "🔥 カロリー")}
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#2C6E55" }}>💪 鍛える部位と回数（1回あたり）</div>
+        {items.map((it) => {
+          const grp = BODY_PART_GROUPS.find((g) => g.g === it.group);
+          return (
+            <div key={it.id} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, marginTop: 8, paddingBottom: 8, borderBottom: "1px dashed #CFE6D8" }}>
+              <select
+                value={it.group || ""}
+                onChange={(e) => {
+                  const g = BODY_PART_GROUPS.find((x) => x.g === e.target.value);
+                  setItem(it.id, { group: e.target.value, part: g ? g.parts[0] : "" });
+                }}
+                style={{ ...selSt, width: 96 }}
+                aria-label="部位"
+              >
+                {BODY_PART_GROUPS.map((g) => (
+                  <option key={g.g} value={g.g}>
+                    {g.g}
+                  </option>
+                ))}
+                <option value={CUSTOM_GROUP}>{CUSTOM_GROUP}</option>
+              </select>
+              {grp ? (
+                <select value={it.part} onChange={(e) => setItem(it.id, { part: e.target.value })} style={{ ...selSt, flex: "1 1 140px", minWidth: 0 }} aria-label="詳しい部位">
+                  {grp.parts.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  value={it.part || ""}
+                  onChange={(e) => setItem(it.id, { part: e.target.value.slice(0, 12) })}
+                  placeholder="例：腸腰筋"
+                  style={{ ...selSt, flex: "1 1 140px", minWidth: 0 }}
+                />
+              )}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#2C6E55" }}>回数</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  value={it.reps ?? ""}
+                  onChange={(e) => setItem(it.id, { reps: e.target.value === "" ? "" : Number(e.target.value) })}
+                  placeholder="20"
+                  style={{ ...selSt, width: 64, textAlign: "center" }}
+                />
+                <span style={styles.measureUnit}>回</span>
+              </span>
+              {items.length > 1 && (
+                <button
+                  onClick={() => update(items.filter((x) => x.id !== it.id))}
+                  aria-label="この部位を削除"
+                  style={{ border: "none", background: "#E3EEF3", color: "#4a6c85", borderRadius: "50%", width: 26, height: 26, cursor: "pointer", fontWeight: 900 }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        })}
+        <button
+          onClick={() => update([...items, { id: "p" + Date.now(), group: "背中", part: "広背筋", reps: "" }])}
+          style={{ marginTop: 8, border: "2px dashed #4FA283", background: "#fff", color: "#2C6E55", borderRadius: 999, padding: "6px 14px", fontWeight: 800, fontSize: 13.5, cursor: "pointer", fontFamily: "inherit" }}
+        >
+          ＋ 部位を追加
+        </button>
+        <div style={{ marginTop: 10, fontSize: 13.5, fontWeight: 700, color: "#1E4A3B" }}>🔥 筋トレ全体のカロリー</div>
+        {num("perKcal", "kcal", "120", 1, "")}
         {note}
       </div>
     );
@@ -3558,6 +3583,17 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
     setAchv((prev) => ({ ...prev, [subjId]: { ...(prev[subjId] || {}), [field]: value, auto: false } }));
   }
 
+  // 筋トレ：部位ごとの回数。合計は custom に入れる（合計の計算・表示用）
+  function setPartReps(subject, itemId, value) {
+    setAchv((prev) => {
+      const cur = prev[subject.id] || {};
+      const parts = { ...(cur.parts || {}), [itemId]: value };
+      if (value === "") delete parts[itemId];
+      const sum = Object.values(parts).reduce((a, n) => a + (Number(n) || 0), 0);
+      return { ...prev, [subject.id]: { ...cur, parts, custom: Object.keys(parts).length ? sum : "", auto: false } };
+    });
+  }
+
   // 大人用：時間を「分＋秒」で入れる。保存は分（小数）で持つ
   function minSecParts(v) {
     if (v === undefined || v === null || v === "") return ["", ""];
@@ -3758,7 +3794,23 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       kcal
                     </label>
                   )}
-                  {s.measureCustom && (
+                  {s.exType === "strength" && strengthItems(s).length > 0 &&
+                    strengthItems(s).map((it) => (
+                      <label key={it.id} style={styles.achievementField}>
+                        💪{it.part}
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          placeholder={String(it.reps ?? "")}
+                          value={achv[s.id]?.parts?.[it.id] ?? ""}
+                          onChange={(e) => setPartReps(s, it.id, e.target.value)}
+                          style={{ ...styles.achievementInput, width: 56 }}
+                        />
+                        回
+                      </label>
+                    ))}
+                  {s.measureCustom && !(s.exType === "strength" && strengthItems(s).length > 0) && (
                     <label style={styles.achievementField}>
                       {s.exType === "strength" ? "💪" : "🎯"}
                       {(s.customLabel || "").trim()}
