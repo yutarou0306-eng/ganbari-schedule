@@ -548,7 +548,7 @@ const DEFAULT_SUBJECT = (palette) => ({
   measureCustom: false,
   customLabel: "",
   customUnit: "",
-  targetCustom: 10,
+  targetCustom: "",
 });
 
 function freshConfig() {
@@ -4206,6 +4206,22 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
   const item = (icon, label, actual, unit, hasPlan) => {
     if (!hasPlan) {
       return (
+        <div key={label} style={{ gridColumn: "1 / -1", padding: "6px 2px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, fontWeight: 800, color: "#1E4A3B" }}>
+              {icon} {label}
+            </span>
+            <span style={{ fontSize: 13, color: "#5d7d70", whiteSpace: "nowrap" }}>
+              <b style={{ fontSize: 19, color: "#1E4A3B" }}>{fmt(actual, unit)}</b>
+              {unitLabel[unit]} ／ 目標なし
+            </span>
+          </div>
+          <div style={{ height: 12, borderRadius: 999, background: "#EEF2F0", marginTop: 4 }} />
+        </div>
+      );
+    }
+    if (false) {
+      return (
         <div key={label} style={{ minWidth: 0, textAlign: "center" }}>
           <div style={{ fontSize: 12, color: "#5d7d70", fontWeight: 700, whiteSpace: "nowrap" }}>{label}</div>
           <div style={{ fontSize: 24, fontWeight: 900, color: "#1E4A3B", lineHeight: 1.25, whiteSpace: "nowrap" }}>
@@ -4288,6 +4304,11 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
           }}
         >
           {noGoal.map((e) => item(...e))}
+        </div>
+      )}
+      {noGoal.length > 0 && (
+        <div style={{ fontSize: 11.5, color: "#C0603F", textAlign: "center", marginTop: 6, lineHeight: 1.5 }}>
+          「目標なし」の項目は、「✏️ 修正する」でやることの種類（ウォーキングなど）を選び、1回あたりの値を入れると進み具合が出ます
         </div>
       )}
       {kmBreakdown.length > 1 && dailyKm === 0 && (
@@ -4933,6 +4954,12 @@ function GlobalStyle() {
   return (
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yuji+Syuku&family=Kaisei+Decol:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap');
+      /* 入力欄の例示（プレースホルダー）は薄いグレーで、入力した文字と見分けやすく */
+      input::placeholder, textarea::placeholder {
+        color: #cbd5db;
+        font-weight: 400;
+        opacity: 1;
+      }
       .hatchNameInput::placeholder {
         color: #d3dee4;
         font-weight: 400;
