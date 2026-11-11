@@ -403,6 +403,7 @@ const EX_TYPES = [
   { k: "strength", label: "💪 筋トレ", name: "筋トレ" },
   { k: "walk", label: "🚶 ウォーキング", name: "ウォーキング" },
   { k: "run", label: "🏃 ランニング", name: "ランニング" },
+  { k: "other", label: "🏋️ その他トレーニング", name: "トレーニング" },
 ];
 // 筋トレの部位（グループごと）。自分で追加した部位は subject.exCustomParts に入る
 const BODY_PART_GROUPS = [
@@ -1030,6 +1031,7 @@ export default function KidsScheduleApp() {
     if (subject.measureDistance && Number(subject.targetKm) > 0) v.km = Number(subject.targetKm);
     const walkRun = subject.exType === "walk" || subject.exType === "run";
     if ((tr.steps || walkRun) && subject.exType !== "strength" && Number(subject.perSteps) > 0) v.steps = Number(subject.perSteps);
+    if (subject.exType === "other" && Number(subject.targetCustom) > 0) v.custom = Number(subject.targetCustom);
     if (subject.exType === "strength") {
       const items = strengthItems(subject).filter((x) => Number(x.reps) > 0);
       if (items.length) {
@@ -1827,8 +1829,22 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
         measureCustom: false,
         distanceTouched: true,
       });
+    } else if (t.k === "other") {
+      set({
+        exType: "other",
+        name,
+        measureTime: false,
+        measurePages: false,
+        measureProblems: false,
+        measureDistance: false,
+        measureCustom: true,
+        customLabel: subject.exType === "other" ? subject.customLabel : "",
+        customUnit: subject.exType === "other" ? subject.customUnit : "",
+        targetCustom: subject.exType === "other" ? subject.targetCustom : "",
+      });
     } else {
-      set({ exType: "" });
+      // 自由：カロリー・距離は使わない
+      set({ exType: "", measureDistance: false, perKcal: "", perSteps: "" });
     }
   }
   function toggleWeekday(i) {
@@ -1988,31 +2004,7 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
           )}
         </div>
 
-        {isDiet && (
-          <div style={{ background: "#F4FAF6", borderRadius: 12, padding: "8px 10px", margin: "4px 0 8px" }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: "#2C6E55", marginBottom: 6 }}>1回あたり（スタンプを押すと自動で記録・あとで直せます）</div>
-            {[
-              ...(trackStepsOn ? [["👟 歩数", "perSteps", "歩", "4000"]] : []),
-              ["🔥 カロリー", "perKcal", "kcal", "150"],
-            ].map(([label, key, unit, ph]) => (
-              <div key={key} style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
-                <span style={{ width: 92, fontSize: 13.5, fontWeight: 700, color: "#1E4A3B", whiteSpace: "nowrap" }}>{label}</span>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={subject[key] ?? ""}
-                  onChange={(e) => set({ [key]: e.target.value === "" ? "" : Number(e.target.value) })}
-                  placeholder={`例：${ph}`}
-                  style={{ ...styles.measureSelect, width: 120, minWidth: 0, boxSizing: "border-box" }}
-                />
-                <span style={styles.measureUnit}>{unit}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {(showDistance || subject.measureDistance) && (
+        {!isDiet && subject.measureDistance && (
           <div style={styles.measureRow}>
             <button
               onClick={() => set({ measureDistance: !subject.measureDistance, distanceTouched: true })}
@@ -2203,6 +2195,49 @@ function ExerciseGoalPanel({ subject, set }) {
   );
   const note = <div style={{ fontSize: 11.5, color: "#5d7d70", marginTop: 8 }}>スタンプを押すと、この値がその日の記録に自動で入ります（「📝 メモ」で直せます）。</div>;
 
+  if (subject.exType === "other") {
+    return (
+      <div style={box}>
+        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#2C6E55" }}>🏋️ その他トレーニング（自由に決める）</div>
+        <label style={{ display: "flex", flexDirection: "column", gap: 2, marginTop: 8 }}>
+          <span style={styles.customGoalCaption}>何を鍛える？</span>
+          <input
+            value={subject.customLabel || ""}
+            onChange={(e) => set({ customLabel: e.target.value })}
+            placeholder="例：ハッピー"
+            maxLength={12}
+            style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box", textAlign: "left" }}
+          />
+        </label>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 6, marginTop: 6 }}>
+          <label style={{ width: 90, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={styles.customGoalCaption}>目標の数</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="any"
+              value={subject.targetCustom ?? ""}
+              onChange={(e) => set({ targetCustom: e.target.value === "" ? "" : Number(e.target.value) })}
+              placeholder="30"
+              style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box" }}
+            />
+          </label>
+          <label style={{ width: 90, flexShrink: 0, display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={styles.customGoalCaption}>単位</span>
+            <input
+              value={subject.customUnit || ""}
+              onChange={(e) => set({ customUnit: e.target.value })}
+              placeholder="分"
+              maxLength={6}
+              style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box" }}
+            />
+          </label>
+        </div>
+        {note}
+      </div>
+    );
+  }
   if (subject.exType === "strength") {
     const items = strengthItems(subject);
     const update = (next) => set(strengthDerived(next));
@@ -3606,7 +3641,9 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
     setField(subjId, "minutes", Math.round(val * 10000) / 10000);
   }
 
-  const measurableSubjects = (subjects || []).filter((x) => (showWeight ? (x.name || "").trim() : subjectIsMeasurable(x)));
+  const measurableSubjects = (subjects || []).filter(
+    (x) => subjectIsMeasurable(x) || (showWeight && ["strength", "walk", "run"].includes(x.exType) && (x.name || "").trim())
+  );
 
   return (
     <div style={styles.modalOverlay}>
@@ -3764,7 +3801,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       km
                     </label>
                   )}
-                  {showWeight && s.exType !== "strength" && (tr.steps || s.exType === "walk" || s.exType === "run") && (
+                  {showWeight && (s.exType === "walk" || s.exType === "run") && (
                     <label style={styles.achievementField}>
                       👟
                       <input
@@ -3779,7 +3816,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       歩
                     </label>
                   )}
-                  {showWeight && (
+                  {showWeight && ["strength", "walk", "run"].includes(s.exType) && (
                     <label style={styles.achievementField}>
                       🔥
                       <input
