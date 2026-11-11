@@ -400,7 +400,18 @@ const EX_TYPES = [
   { k: "walk", label: "🚶 ウォーキング", name: "ウォーキング" },
   { k: "run", label: "🏃 ランニング", name: "ランニング" },
 ];
-const BODY_PARTS = ["腕", "肩", "胸", "背中", "お腹", "お尻", "脚", "全身"];
+// 筋トレの部位（グループごと）。自分で追加した部位は subject.exCustomParts に入る
+const BODY_PART_GROUPS = [
+  { g: "胸", parts: ["大胸筋（上部）", "大胸筋（中部）", "大胸筋（下部）"] },
+  { g: "背中", parts: ["広背筋", "僧帽筋", "大円筋", "脊柱起立筋"] },
+  { g: "肩", parts: ["三角筋（前部）", "三角筋（中部）", "三角筋（後部）"] },
+  { g: "腕", parts: ["上腕二頭筋", "上腕三頭筋", "前腕"] },
+  { g: "体幹", parts: ["腹直筋", "腹斜筋", "腹横筋"] },
+  { g: "お尻", parts: ["大臀筋", "中臀筋"] },
+  { g: "脚", parts: ["大腿四頭筋", "ハムストリングス", "内転筋", "ふくらはぎ"] },
+  { g: "その他", parts: ["全身", "有酸素（HIIT など）"] },
+];
+const BODY_PARTS = BODY_PART_GROUPS.flatMap((x) => x.parts);
 
 // 分（小数で秒を含む）を「35分30秒」の形に
 function fmtMinSec(min) {
@@ -1759,7 +1770,7 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
       set({
         exType: "strength",
         name,
-        measureTime: Number(subject.targetMinutes) > 0 && subject.exType === "strength" ? subject.measureTime : false,
+        measureTime: false,
         measurePages: false,
         measureProblems: false,
         measureDistance: false,
@@ -1788,7 +1799,8 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
   function togglePart(part) {
     const cur = subject.exParts || [];
     const next = cur.includes(part) ? cur.filter((x) => x !== part) : [...cur, part];
-    const ordered = BODY_PARTS.filter((x) => next.includes(x));
+    const all = [...BODY_PARTS, ...(subject.exCustomParts || [])];
+    const ordered = [...all.filter((x) => next.includes(x)), ...next.filter((x) => !all.includes(x))];
     set({ exParts: ordered, customLabel: ordered.join("・") || "筋トレ" });
   }
   function toggleWeekday(i) {
@@ -2105,6 +2117,33 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
   );
 }
 
+// 筋トレの部位を自分で追加する小さな入力欄
+function AddPartInput({ onAdd }) {
+  const [v, setV] = useState("");
+  const add = () => {
+    const t = v.trim();
+    if (t) onAdd(t.slice(0, 12));
+    setV("");
+  };
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+      <input
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") add();
+        }}
+        placeholder="例：腸腰筋"
+        maxLength={12}
+        style={{ width: 96, padding: "5px 8px", borderRadius: 999, border: "2px dashed #9AD5AE", fontSize: 13, fontFamily: "inherit", boxSizing: "border-box" }}
+      />
+      <button onClick={add} style={{ border: "none", borderRadius: 999, padding: "6px 10px", background: "#4FA283", color: "#fff", fontWeight: 800, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}>
+        ＋ 追加
+      </button>
+    </span>
+  );
+}
+
 // 大人用：種類（筋トレ／ウォーキング／ランニング）ごとの目標入力。
 // ここで入れた値はスタンプを押すとその日の記録に自動で入り、メモで直せる。
 function ExerciseGoalPanel({ subject, set, togglePart }) {
@@ -2165,26 +2204,57 @@ function ExerciseGoalPanel({ subject, set, togglePart }) {
 
   if (subject.exType === "strength") {
     const parts = subject.exParts || [];
+    const customParts = [...(subject.exCustomParts || []), ...parts.filter((x) => !BODY_PARTS.includes(x) && !(subject.exCustomParts || []).includes(x))];
+    const chip = (p, removable) => {
+      const on = parts.includes(p);
+      return (
+        <span key={p} style={{ display: "inline-flex", alignItems: "center" }}>
+          <button
+            onClick={() => togglePart(p)}
+            style={{ border: "2px solid #4FA283", borderRadius: 999, padding: "4px 10px", fontSize: 13, fontWeight: 800, fontFamily: "inherit", cursor: "pointer", background: on ? "#2C8A5F" : "#fff", color: on ? "#fff" : "#2C6E55" }}
+          >
+            {p}
+          </button>
+          {removable && (
+            <button
+              onClick={() => {
+                const nextParts = parts.filter((x) => x !== p);
+                set({ exCustomParts: (subject.exCustomParts || []).filter((x) => x !== p), exParts: nextParts, customLabel: nextParts.join("・") || "筋トレ" });
+              }}
+              aria-label={`${p}を削除`}
+              style={{ border: "none", background: "none", color: "#9bb0a6", cursor: "pointer", fontSize: 14, padding: "0 2px" }}
+            >
+              ×
+            </button>
+          )}
+        </span>
+      );
+    };
     return (
       <div style={box}>
         <div style={{ fontSize: 13.5, fontWeight: 800, color: "#2C6E55" }}>💪 鍛える部位（複数選べます）</div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-          {BODY_PARTS.map((p) => {
-            const on = parts.includes(p);
-            return (
-              <button
-                key={p}
-                onClick={() => togglePart(p)}
-                style={{ border: "2px solid #4FA283", borderRadius: 999, padding: "5px 12px", fontSize: 13.5, fontWeight: 800, fontFamily: "inherit", cursor: "pointer", background: on ? "#2C8A5F" : "#fff", color: on ? "#fff" : "#2C6E55" }}
-              >
-                {p}
-              </button>
-            );
-          })}
+        {BODY_PART_GROUPS.map((grp) => (
+          <div key={grp.g} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 5, marginTop: 6 }}>
+            <span style={{ width: "100%", fontSize: 12, fontWeight: 800, color: "#5d7d70", marginBottom: -2 }}>{grp.g}</span>
+            {grp.parts.map((p) => chip(p, false))}
+          </div>
+        ))}
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 5, marginTop: 6 }}>
+          <span style={{ width: "100%", fontSize: 12, fontWeight: 800, color: "#5d7d70", marginBottom: -2 }}>自分で追加</span>
+          {customParts.map((p) => chip(p, true))}
+          <AddPartInput
+            onAdd={(p) => {
+              if (!p || BODY_PARTS.includes(p) || (subject.exCustomParts || []).includes(p)) {
+                if (p && !parts.includes(p)) togglePart(p);
+                return;
+              }
+              const nextParts = [...parts, p];
+              set({ exCustomParts: [...(subject.exCustomParts || []), p], exParts: nextParts, customLabel: nextParts.join("・") });
+            }}
+          />
         </div>
         {num("targetCustom", "回", "20", 1, "💪 回数")}
         {num("perKcal", "kcal", "80", 1, "🔥 カロリー")}
-        {timeRow("⏱ 時間（任意）", true)}
         {note}
       </div>
     );
@@ -2216,12 +2286,6 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
   const initTrack = trackFlags(initial);
   const [trackSteps, setTrackSteps] = useState(initTrack.steps);
   const [trackDistance, setTrackDistance] = useState(initTrack.distance);
-  // 1日あたりの目標（任意）。入れた項目だけ合計の欄に進み具合バーが出る
-  const initGoals = initial.dailyGoals || {};
-  const [goalSteps, setGoalSteps] = useState(initGoals.steps ? String(initGoals.steps) : "");
-  const [goalKm, setGoalKm] = useState(initGoals.km ? String(initGoals.km) : "");
-  const [goalKcal, setGoalKcal] = useState(initGoals.kcal ? String(initGoals.kcal) : "");
-  const [showGoals, setShowGoals] = useState(!!(initGoals.minutes || initGoals.steps || initGoals.km || initGoals.kcal));
   const initialPalette = getTheme(initial.theme || "girl").palette;
   const [subjects, setSubjects] = useState(
     initial.subjects && initial.subjects.length ? initial.subjects : [DEFAULT_SUBJECT(initialPalette)]
@@ -2339,15 +2403,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       reward: reward.trim(),
       ...(convertingToDiet ? { convertedFrom: initial.theme || "girl" } : initial.convertedFrom ? { convertedFrom: initial.convertedFrom } : {}),
       ...(theme === "diet" ? { trackSteps, trackDistance } : {}),
-      ...(theme === "diet"
-        ? (() => {
-            const g = {};
-            if (trackSteps && parseFloat(goalSteps) > 0) g.steps = Math.round(parseFloat(goalSteps));
-            if (trackDistance && parseFloat(goalKm) > 0) g.km = Math.round(parseFloat(goalKm) * 10) / 10;
-            if (parseFloat(goalKcal) > 0) g.kcal = Math.round(parseFloat(goalKcal));
-            return Object.keys(g).length ? { dailyGoals: g } : { dailyGoals: undefined };
-          })()
-        : {}),
+      ...(theme === "diet" ? { dailyGoals: undefined } : {}),
       ...(theme === "diet" && parseFloat(targetWeight) > 0 ? { targetWeight: Math.round(parseFloat(targetWeight) * 10) / 10 } : {}),
       ...(profileId ? { profileId } : {}),
     };
@@ -2523,63 +2579,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
             </div>
             <div style={{ fontSize: 12, color: "#7c98aa", marginTop: 4 }}>歩数と走行距離は、どちらか1つか両方を選べます（あとから「✏️ 修正する」で変えられます）。</div>
 
-            {!showGoals ? (
-              <button
-                onClick={() => setShowGoals(true)}
-                style={{ marginTop: 10, background: "none", border: "none", padding: 0, color: "#2C8A5F", fontWeight: 800, fontSize: 14, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}
-              >
-                🎯 1日の目標を決める（任意）
-              </button>
-            ) : (
-              <div style={{ marginTop: 10, borderRadius: 14, padding: "10px 12px", background: "#F4FAF6", border: "1.5px solid #CFE6D8" }}>
-                <div style={{ fontSize: 13.5, fontWeight: 800, color: "#1E4A3B", marginBottom: 6 }}>🎯 1日の目標（入れたものだけ進み具合を表示）</div>
-                {(() => {
-                  // スタンプを押す予定の日数（やることの予定から計算）
-                  const sD = new Date(startDate + "T00:00:00");
-                  const eD = new Date(endDate + "T00:00:00");
-                  const named = subjects.filter((x) => (x.name || "").trim());
-                  let days = 0;
-                  for (let d = new Date(sD); d.getTime() <= eD.getTime(); d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
-                    if (named.some((x) => subjectAppliesOnDate(x, d, sD, eD))) days += 1;
-                  }
-                  const row = (icon, label, val, setVal, unit, ph, step) => {
-                    const n = parseFloat(val);
-                    const total = n > 0 ? (step < 1 ? Math.round(n * days * 10) / 10 : Math.round(n * days)) : null;
-                    return (
-                      <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
-                        <span style={{ width: 110, fontSize: 13.5, fontWeight: 700, color: "#1E4A3B" }}>{icon} {label}</span>
-                        <input
-                          type="number"
-                          inputMode="decimal"
-                          min={0}
-                          step={step}
-                          value={val}
-                          onChange={(e) => setVal(e.target.value)}
-                          placeholder={`例：${ph}`}
-                          style={{ ...styles.measureSelect, width: 90, boxSizing: "border-box" }}
-                        />
-                        <span style={{ fontSize: 13, color: "#4a6c85" }}>{unit}／日</span>
-                        {total !== null && (
-                          <span style={{ fontSize: 12, color: "#7c98aa" }}>
-                            → スタンプの日 {days}日で {total.toLocaleString()}
-                            {unit}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  };
-                  return (
-                    <>
-                      <div style={{ fontSize: 12.5, color: "#4a6c85", marginTop: 2 }}>⏱ 運動時間の目標は、やることの予定と目標時間から自動で計算します。</div>
-                      {trackSteps && row("👟", "歩数", goalSteps, setGoalSteps, "歩", "10000", 1)}
-                      {trackDistance && row("🏃", "走行距離", goalKm, setGoalKm, "km", "3", 0.1)}
-                      {row("🔥", "消費カロリー", goalKcal, setGoalKcal, "kcal", "300", 1)}
-                    </>
-                  );
-                })()}
-                <div style={{ fontSize: 11.5, color: "#7c98aa", marginTop: 6 }}>スタンプを押す予定の日だけ数えます（お休みスタンプの日は除きます）。空欄の項目は合計だけを表示します。</div>
-              </div>
-            )}
+
           </>
         )}
 
@@ -2960,7 +2960,7 @@ function MainScreen({
       </div>
 
       {theme.key === "diet" && (
-        <CalorieTotal calories={calories || {}} distances={distances || {}} steps={steps || {}} track={trackFlags(config)} goals={config.dailyGoals || {}} isExcused={isExcused} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
+        <CalorieTotal calories={calories || {}} distances={distances || {}} steps={steps || {}} track={trackFlags(config)} isExcused={isExcused} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
       )}
       {theme.key === "diet" && <WeightChart weights={weights || {}} startDate={startDate} endDate={endDate} target={config.targetWeight} onSaveWeight={onSaveWeight} onSaveTarget={onSaveTargetWeight} />}
 
@@ -4035,7 +4035,7 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
 
 
 // ダイエット用：期間内の消費カロリー合計（スタンプの合計と同じように大きく表示）
-function CalorieTotal({ calories, distances, steps, track, goals, isExcused, achievements, subjects, startDate, endDate }) {
+function CalorieTotal({ calories, distances, steps, track, isExcused, achievements, subjects, startDate, endDate }) {
   const startKey = dateKey(startDate);
   const endKey = dateKey(endDate);
   const inRange = (k) => k >= startKey && k <= endKey;
@@ -4078,23 +4078,25 @@ function CalorieTotal({ calories, distances, steps, track, goals, isExcused, ach
   //  ・歩数／距離／カロリー … 1日の目標 × スタンプを押す予定の日数
   //  お休みスタンプを押したマスは目標から外す。「今日までの目安」は今日までの予定分。
   const todayK = todayStr();
-  let planDays = 0;
-  let planDaysToDate = 0;
-  let planMin = 0;
-  let planMinToDate = 0;
+  // 予定のマスごとに、やることに入れた「1回あたり」の値を足して目標にする
+  const plan = { min: 0, steps: 0, km: 0, kcal: 0 };
+  const planToDate = { min: 0, steps: 0, km: 0, kcal: 0 };
   for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
     const k = dateKey(d);
     const subs = subjects.filter((x) => subjectAppliesOnDate(x, d, startDate, endDate) && !(isExcused && isExcused(k, x.id)));
-    if (subs.length === 0) continue;
-    const mins = subs.filter((x) => x.measureTime !== false).reduce((a, x) => a + (Number(x.targetMinutes) || 0), 0);
-    planDays += 1;
-    planMin += mins;
-    if (k <= todayK) {
-      planDaysToDate += 1;
-      planMinToDate += mins;
-    }
+    subs.forEach((x) => {
+      const add = {
+        min: x.measureTime !== false ? Number(x.targetMinutes) || 0 : 0,
+        steps: x.exType !== "strength" ? Number(x.perSteps) || 0 : 0,
+        km: x.measureDistance ? Number(x.targetKm) || 0 : 0,
+        kcal: Number(x.perKcal) || 0,
+      };
+      Object.keys(add).forEach((key) => {
+        plan[key] += add[key];
+        if (k <= todayK) planToDate[key] += add[key];
+      });
+    });
   }
-  const g = goals || {};
 
   const fmt = (n, unit) => (unit === "min" ? fmtMinSec2(n) : unit === "km" ? `${Math.round(n * 10) / 10}` : Math.round(n).toLocaleString());
   const unitLabel = { min: "", km: "km", steps: "歩", kcal: "kcal" };
@@ -4111,8 +4113,9 @@ function CalorieTotal({ calories, distances, steps, track, goals, isExcused, ach
   }
 
   // 目標なし：合計だけ。目標あり：実績／目標のバー＋今日までの目安
-  const item = (icon, label, actual, unit, daily) => {
-    if (!(daily > 0)) {
+  const planKey = { min: "min", steps: "steps", km: "km", kcal: "kcal" };
+  const item = (icon, label, actual, unit, hasPlan) => {
+    if (!hasPlan) {
       return (
         <div key={label} style={{ minWidth: 0, textAlign: "center" }}>
           <div style={{ fontSize: 12, color: "#5d7d70", fontWeight: 700, whiteSpace: "nowrap" }}>{label}</div>
@@ -4124,9 +4127,10 @@ function CalorieTotal({ calories, distances, steps, track, goals, isExcused, ach
         </div>
       );
     }
-    const goal = unit === "min" ? planMin : daily * planDays;
-    const pace = unit === "min" ? planMinToDate : daily * planDaysToDate;
-    const pct = Math.min(100, Math.round((actual / goal) * 100));
+    const goal = plan[planKey[unit]];
+    const pace = planToDate[planKey[unit]];
+    const pctRaw = Math.round((actual / goal) * 100);
+    const pct = Math.min(100, pctRaw);
     const pacePct = Math.min(100, (pace / goal) * 100);
     const done = actual >= goal;
     const ahead = actual >= pace;
@@ -4139,7 +4143,7 @@ function CalorieTotal({ calories, distances, steps, track, goals, isExcused, ach
           </span>
           <span style={{ fontSize: 13, color: "#5d7d70", whiteSpace: "nowrap" }}>
             <b style={{ fontSize: 19, color: "#1E4A3B" }}>{fmt(actual, unit)}</b> ／ {fmt(goal, unit)}
-            {unitLabel[unit]}（{pct}%）
+            {unitLabel[unit]}（<span style={{ color: pctRaw > 100 ? "#C98A00" : "inherit", fontWeight: pctRaw > 100 ? 900 : 400 }}>{pctRaw}%</span>）
           </span>
         </div>
         <div style={{ position: "relative", height: 12, borderRadius: 999, background: "#E6F1EB", marginTop: 4, overflow: "hidden" }}>
@@ -4150,11 +4154,11 @@ function CalorieTotal({ calories, distances, steps, track, goals, isExcused, ach
         </div>
         <div style={{ fontSize: 11.5, marginTop: 3, color: done ? "#2C8A5F" : ahead ? "#3E9A74" : "#C0603F", fontWeight: 700 }}>
           {done
-            ? "🎉 期間の目標を達成！"
+            ? pctRaw > 100
+              ? `🎉 期間の目標を達成！（目標より ${fmt(actual - goal, unit)}${unitLabel[unit]} 多い）`
+              : "🎉 期間の目標を達成！"
             : pace === 0
-            ? unit === "min"
-              ? "やることの予定から目標を計算しています"
-              : `スタンプの日に 1日 ${fmt(daily, unit)}${unitLabel[unit]} が目標です`
+            ? "スタンプの予定から目標を計算しています"
             : ahead
             ? `今日までの目安 ${fmt(pace, unit)}${unitLabel[unit]} … ペース通り👍`
             : `今日までの目安 ${fmt(pace, unit)}${unitLabel[unit]} → あと ${fmt(pace - actual, unit)}${unitLabel[unit]}`}
@@ -4164,14 +4168,14 @@ function CalorieTotal({ calories, distances, steps, track, goals, isExcused, ach
   };
 
   const entries = [
-    ["⏱", "運動時間", totalMin, "min", planMin > 0 ? 1 : 0],
-    ...(tr.steps ? [["👟", "歩数", totalSteps, "steps", g.steps]] : []),
-    ...(tr.distance ? [["🏃", "走行距離", totalKm, "km", g.km]] : []),
-    ["🔥", "消費カロリー", totalKcal, "kcal", g.kcal],
+    ["⏱", "運動時間", totalMin, "min", plan.min > 0],
+    ...(tr.steps || plan.steps > 0 ? [["👟", "歩数", totalSteps, "steps", plan.steps > 0]] : []),
+    ...(tr.distance || plan.km > 0 ? [["🏃", "走行距離", totalKm, "km", plan.km > 0]] : []),
+    ["🔥", "消費カロリー", totalKcal, "kcal", plan.kcal > 0],
   ];
-  const withGoal = entries.filter((e) => e[4] > 0);
-  const noGoal = entries.filter((e) => !(e[4] > 0));
-  const allDone = withGoal.length > 0 && withGoal.every((e) => e[2] >= (e[3] === "min" ? planMin : e[4] * planDays));
+  const withGoal = entries.filter((e) => e[4]);
+  const noGoal = entries.filter((e) => !e[4]);
+  const allDone = withGoal.length > 0 && withGoal.every((e) => e[2] >= plan[planKey[e[3]]]);
 
   return (
     <div style={{ position: "relative", zIndex: 2, margin: "14px auto 0", width: "calc(100% - 36px)", maxWidth: 640, background: "#fff", borderRadius: 18, padding: "12px 14px", boxShadow: "0 10px 24px rgba(30,74,59,0.25)", boxSizing: "border-box" }}>
@@ -4201,7 +4205,7 @@ function CalorieTotal({ calories, distances, steps, track, goals, isExcused, ach
         <div style={{ fontSize: 11.5, color: "#5d7d70", textAlign: "center", marginTop: 4 }}>（{kmBreakdown.join("・")}）</div>
       )}
       <div style={{ fontSize: 11.5, color: "#8aa69a", textAlign: "center", marginTop: 6 }}>
-        目標は、スタンプを押す予定の日（お休みを除く）から計算しています
+        目標＝やることに入れた「1回あたり」の値 × スタンプの予定（お休みを除く）
       </div>
     </div>
   );
