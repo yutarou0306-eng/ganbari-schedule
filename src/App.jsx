@@ -2044,7 +2044,7 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
                 <input
                   value={subject.customLabel || ""}
                   onChange={(e) => set({ customLabel: e.target.value })}
-                  placeholder="例：なわとび"
+                  placeholder="例：英単語"
                   maxLength={12}
                   style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box", textAlign: "left" }}
                 />
@@ -2059,14 +2059,14 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
                     step="any"
                     value={subject.targetCustom ?? ""}
                     onChange={(e) => set({ targetCustom: e.target.value === "" ? "" : Number(e.target.value) })}
-                    placeholder="50"
+                    placeholder="30"
                     style={{ ...styles.measureSelect, width: "100%", boxSizing: "border-box" }}
                   />
                 </label>
                 <input
                   value={subject.customUnit || ""}
                   onChange={(e) => set({ customUnit: e.target.value })}
-                  placeholder="単位：回、分など"
+                  placeholder="語"
                   maxLength={6}
                   aria-label="単位"
                   style={{ ...styles.measureSelect, flex: 1, minWidth: 0, maxWidth: 170, width: "auto", boxSizing: "border-box" }}
