@@ -1965,6 +1965,13 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
   const initTrack = trackFlags(initial);
   const [trackSteps, setTrackSteps] = useState(initTrack.steps);
   const [trackDistance, setTrackDistance] = useState(initTrack.distance);
+  // 1日あたりの目標（任意）。入れた項目だけ合計の欄に進み具合バーが出る
+  const initGoals = initial.dailyGoals || {};
+  const [goalMin, setGoalMin] = useState(initGoals.minutes ? String(initGoals.minutes) : "");
+  const [goalSteps, setGoalSteps] = useState(initGoals.steps ? String(initGoals.steps) : "");
+  const [goalKm, setGoalKm] = useState(initGoals.km ? String(initGoals.km) : "");
+  const [goalKcal, setGoalKcal] = useState(initGoals.kcal ? String(initGoals.kcal) : "");
+  const [showGoals, setShowGoals] = useState(!!(initGoals.minutes || initGoals.steps || initGoals.km || initGoals.kcal));
   const initialPalette = getTheme(initial.theme || "girl").palette;
   const [subjects, setSubjects] = useState(
     initial.subjects && initial.subjects.length ? initial.subjects : [DEFAULT_SUBJECT(initialPalette)]
@@ -2082,6 +2089,16 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       reward: reward.trim(),
       ...(convertingToDiet ? { convertedFrom: initial.theme || "girl" } : initial.convertedFrom ? { convertedFrom: initial.convertedFrom } : {}),
       ...(theme === "diet" ? { trackSteps, trackDistance } : {}),
+      ...(theme === "diet"
+        ? (() => {
+            const g = {};
+            if (parseFloat(goalMin) > 0) g.minutes = Math.round(parseFloat(goalMin));
+            if (trackSteps && parseFloat(goalSteps) > 0) g.steps = Math.round(parseFloat(goalSteps));
+            if (trackDistance && parseFloat(goalKm) > 0) g.km = Math.round(parseFloat(goalKm) * 10) / 10;
+            if (parseFloat(goalKcal) > 0) g.kcal = Math.round(parseFloat(goalKcal));
+            return Object.keys(g).length ? { dailyGoals: g } : { dailyGoals: undefined };
+          })()
+        : {}),
       ...(theme === "diet" && parseFloat(targetWeight) > 0 ? { targetWeight: Math.round(parseFloat(targetWeight) * 10) / 10 } : {}),
       ...(profileId ? { profileId } : {}),
     };
@@ -2256,6 +2273,57 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
               </button>
             </div>
             <div style={{ fontSize: 12, color: "#7c98aa", marginTop: 4 }}>歩数と走行距離は、どちらか1つか両方を選べます（あとから「✏️ 修正する」で変えられます）。</div>
+
+            {!showGoals ? (
+              <button
+                onClick={() => setShowGoals(true)}
+                style={{ marginTop: 10, background: "none", border: "none", padding: 0, color: "#2C8A5F", fontWeight: 800, fontSize: 14, textDecoration: "underline", cursor: "pointer", fontFamily: "inherit" }}
+              >
+                🎯 1日の目標を決める（任意）
+              </button>
+            ) : (
+              <div style={{ marginTop: 10, borderRadius: 14, padding: "10px 12px", background: "#F4FAF6", border: "1.5px solid #CFE6D8" }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: "#1E4A3B", marginBottom: 6 }}>🎯 1日の目標（入れたものだけ進み具合を表示）</div>
+                {(() => {
+                  const days = Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / 86400000) + 1);
+                  const row = (icon, label, val, setVal, unit, ph, step) => {
+                    const n = parseFloat(val);
+                    const total = n > 0 ? (step < 1 ? Math.round(n * days * 10) / 10 : Math.round(n * days)) : null;
+                    return (
+                      <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 6 }}>
+                        <span style={{ width: 110, fontSize: 13.5, fontWeight: 700, color: "#1E4A3B" }}>{icon} {label}</span>
+                        <input
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          step={step}
+                          value={val}
+                          onChange={(e) => setVal(e.target.value)}
+                          placeholder={`例：${ph}`}
+                          style={{ ...styles.measureSelect, width: 90, boxSizing: "border-box" }}
+                        />
+                        <span style={{ fontSize: 13, color: "#4a6c85" }}>{unit}／日</span>
+                        {total !== null && (
+                          <span style={{ fontSize: 12, color: "#7c98aa" }}>
+                            → {days}日で {total.toLocaleString()}
+                            {unit}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  };
+                  return (
+                    <>
+                      {row("⏱", "運動時間", goalMin, setGoalMin, "分", "30", 1)}
+                      {trackSteps && row("👟", "歩数", goalSteps, setGoalSteps, "歩", "10000", 1)}
+                      {trackDistance && row("🏃", "走行距離", goalKm, setGoalKm, "km", "3", 0.1)}
+                      {row("🔥", "消費カロリー", goalKcal, setGoalKcal, "kcal", "300", 1)}
+                    </>
+                  );
+                })()}
+                <div style={{ fontSize: 11.5, color: "#7c98aa", marginTop: 6 }}>空欄の項目は、今までどおり合計だけを表示します。</div>
+              </div>
+            )}
           </>
         )}
 
@@ -2634,7 +2702,7 @@ function MainScreen({
       </div>
 
       {theme.key === "diet" && (
-        <CalorieTotal calories={calories || {}} distances={distances || {}} steps={steps || {}} track={trackFlags(config)} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
+        <CalorieTotal calories={calories || {}} distances={distances || {}} steps={steps || {}} track={trackFlags(config)} goals={config.dailyGoals || {}} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
       )}
       {theme.key === "diet" && <WeightChart weights={weights || {}} startDate={startDate} endDate={endDate} target={config.targetWeight} onSaveWeight={onSaveWeight} onSaveTarget={onSaveTargetWeight} />}
 
@@ -3633,7 +3701,7 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
 
 
 // ダイエット用：期間内の消費カロリー合計（スタンプの合計と同じように大きく表示）
-function CalorieTotal({ calories, distances, steps, track, achievements, subjects, startDate, endDate }) {
+function CalorieTotal({ calories, distances, steps, track, goals, achievements, subjects, startDate, endDate }) {
   const startKey = dateKey(startDate);
   const endKey = dateKey(endDate);
   const inRange = (k) => k >= startKey && k <= endKey;
@@ -3660,39 +3728,116 @@ function CalorieTotal({ calories, distances, steps, track, achievements, subject
     });
   });
   const totalKm = Math.round((dailyKm + Object.values(kmBySubj).reduce((a, b) => a + b, 0)) * 10) / 10;
-  const h = Math.floor(totalMin / 60);
-  const m = Math.round(totalMin % 60);
-  const timeText = h > 0 ? `${h}時間${m > 0 ? m + "分" : ""}` : `${m}分`;
   const kmBreakdown = Object.entries(kmBySubj).map(([sid, km]) => {
     const subj = subjects.find((x) => x.id === sid);
     return `${(subj && subj.name) || "？"} ${Math.round(km * 10) / 10}km`;
   });
 
-  const stat = (icon, label, value, unit) => (
-    <div style={{ flex: "1 1 0", minWidth: 0, textAlign: "center" }}>
-      <div style={{ fontSize: 12, color: "#5d7d70", fontWeight: 700, whiteSpace: "nowrap" }}>{label}</div>
-      <div style={{ fontSize: 24, fontWeight: 900, color: "#1E4A3B", lineHeight: 1.25, whiteSpace: "nowrap" }}>
-        <span style={{ fontSize: 18 }}>{icon}</span>
-        {value}
-        {unit && <span style={{ fontSize: 13, marginLeft: 2 }}>{unit}</span>}
+  // 期間の日数と、今日までの経過日数（ペース計算用）
+  const DAY = 86400000;
+  const totalDays = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / DAY) + 1);
+  const todayK = todayStr();
+  const elapsed = todayK < startKey ? 0 : todayK > endKey ? totalDays : Math.round((new Date(todayK + "T00:00:00").getTime() - startDate.getTime()) / DAY) + 1;
+  const g = goals || {};
+
+  const fmt = (n, unit) => (unit === "min" ? formatMin(n) : unit === "km" ? `${Math.round(n * 10) / 10}` : Math.round(n).toLocaleString());
+  const unitLabel = { min: "", km: "km", steps: "歩", kcal: "kcal" };
+  function formatMin(n) {
+    const hh = Math.floor(n / 60);
+    const mm = Math.round(n % 60);
+    return hh > 0 ? `${hh}時間${mm > 0 ? mm + "分" : ""}` : `${mm}分`;
+  }
+
+  // 目標なし：合計だけ。目標あり：実績／目標のバー＋今日までの目安
+  const item = (icon, label, actual, unit, daily) => {
+    if (!(daily > 0)) {
+      return (
+        <div key={label} style={{ minWidth: 0, textAlign: "center" }}>
+          <div style={{ fontSize: 12, color: "#5d7d70", fontWeight: 700, whiteSpace: "nowrap" }}>{label}</div>
+          <div style={{ fontSize: 24, fontWeight: 900, color: "#1E4A3B", lineHeight: 1.25, whiteSpace: "nowrap" }}>
+            <span style={{ fontSize: 18 }}>{icon}</span>
+            {fmt(actual, unit)}
+            {unitLabel[unit] && <span style={{ fontSize: 13, marginLeft: 2 }}>{unitLabel[unit]}</span>}
+          </div>
+        </div>
+      );
+    }
+    const goal = daily * totalDays;
+    const pace = daily * elapsed;
+    const pct = Math.min(100, Math.round((actual / goal) * 100));
+    const pacePct = Math.min(100, (pace / goal) * 100);
+    const done = actual >= goal;
+    const ahead = actual >= pace;
+    const color = done ? "#2C8A5F" : ahead ? "#3E9A74" : "#E08A3C";
+    return (
+      <div key={label} style={{ gridColumn: "1 / -1", padding: "6px 2px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 800, color: "#1E4A3B" }}>
+            {icon} {label}
+          </span>
+          <span style={{ fontSize: 13, color: "#5d7d70", whiteSpace: "nowrap" }}>
+            <b style={{ fontSize: 19, color: "#1E4A3B" }}>{fmt(actual, unit)}</b> ／ {fmt(goal, unit)}
+            {unitLabel[unit]}（{pct}%）
+          </span>
+        </div>
+        <div style={{ position: "relative", height: 12, borderRadius: 999, background: "#E6F1EB", marginTop: 4, overflow: "hidden" }}>
+          <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: color, transition: "width .4s" }} />
+          {!done && elapsed > 0 && elapsed < totalDays && (
+            <div title="今日までの目安" style={{ position: "absolute", top: -2, bottom: -2, left: `calc(${pacePct}% - 1px)`, width: 2, background: "#1E4A3B", opacity: 0.55 }} />
+          )}
+        </div>
+        <div style={{ fontSize: 11.5, marginTop: 3, color: done ? "#2C8A5F" : ahead ? "#3E9A74" : "#C0603F", fontWeight: 700 }}>
+          {done
+            ? "🎉 期間の目標を達成！"
+            : elapsed === 0
+            ? `1日 ${fmt(daily, unit)}${unitLabel[unit]} が目標です`
+            : ahead
+            ? `今日までの目安 ${fmt(pace, unit)}${unitLabel[unit]} … ペース通り👍`
+            : `今日までの目安 ${fmt(pace, unit)}${unitLabel[unit]} → あと ${fmt(pace - actual, unit)}${unitLabel[unit]}`}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
+
+  const entries = [
+    ["⏱", "運動時間", totalMin, "min", g.minutes],
+    ...(tr.steps ? [["👟", "歩数", totalSteps, "steps", g.steps]] : []),
+    ...(tr.distance ? [["🏃", "走行距離", totalKm, "km", g.km]] : []),
+    ["🔥", "消費カロリー", totalKcal, "kcal", g.kcal],
+  ];
+  const withGoal = entries.filter((e) => e[4] > 0);
+  const noGoal = entries.filter((e) => !(e[4] > 0));
+  const allDone = withGoal.length > 0 && withGoal.every((e) => e[2] >= e[4] * totalDays);
 
   return (
-    <div style={{ position: "relative", zIndex: 2, margin: "14px 18px 0", background: "#fff", borderRadius: 18, padding: "12px 10px", boxShadow: "0 10px 24px rgba(30,74,59,0.25)" }}>
+    <div style={{ position: "relative", zIndex: 2, margin: "14px auto 0", width: "calc(100% - 36px)", maxWidth: 640, background: "#fff", borderRadius: 18, padding: "12px 14px", boxShadow: "0 10px 24px rgba(30,74,59,0.25)", boxSizing: "border-box" }}>
       <div style={{ fontSize: 13, color: "#1E4A3B", fontWeight: 800, textAlign: "center", marginBottom: 4 }}>このスケジュールの合計</div>
-      <div style={{ display: "grid", gridTemplateColumns: tr.steps && tr.distance ? "1fr 1fr" : "1fr 1fr 1fr", rowGap: 8, columnGap: 6, alignItems: "flex-start" }}>
-        {stat("⏱", "運動時間", timeText, "")}
-        {tr.steps && stat("👟", "歩数", totalSteps.toLocaleString(), "歩")}
-        {tr.distance && stat("🏃", "走行距離", totalKm, "km")}
-        {stat("🔥", "消費カロリー", totalKcal.toLocaleString(), "kcal")}
-      </div>
+      {allDone && (
+        <div style={{ textAlign: "center", margin: "4px 0 8px", padding: "8px 10px", borderRadius: 12, background: "linear-gradient(135deg,#FFF3C4,#DFF3E6)", fontWeight: 900, color: "#1E4A3B" }}>
+          🎉 目標をすべて達成しました！すばらしい！
+        </div>
+      )}
+      {withGoal.map((e) => item(...e))}
+      {noGoal.length > 0 && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `repeat(${noGoal.length === 4 ? 2 : noGoal.length}, 1fr)`,
+            rowGap: 8,
+            columnGap: 6,
+            marginTop: withGoal.length ? 8 : 0,
+            paddingTop: withGoal.length ? 8 : 0,
+            borderTop: withGoal.length ? "1px dashed #E3EEF3" : "none",
+          }}
+        >
+          {noGoal.map((e) => item(...e))}
+        </div>
+      )}
       {kmBreakdown.length > 1 && dailyKm === 0 && (
         <div style={{ fontSize: 11.5, color: "#5d7d70", textAlign: "center", marginTop: 4 }}>（{kmBreakdown.join("・")}）</div>
       )}
-      <div style={{ fontSize: 11.5, color: "#8aa69a", textAlign: "center", marginTop: 4 }}>
-        「📝 メモ」で記録した内容が合計されます
+      <div style={{ fontSize: 11.5, color: "#8aa69a", textAlign: "center", marginTop: 6 }}>
+        「📝 メモ」で記録した内容が合計されます{withGoal.length === 0 ? "（「✏️ 修正する」で1日の目標も決められます）" : ""}
       </div>
     </div>
   );
