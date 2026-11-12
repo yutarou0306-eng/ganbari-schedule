@@ -244,12 +244,6 @@ const THEME_NAMES = { girl: "女の子", boy: "男の子", diet: "ダイエッ�
 // どの種類のスタンプ帳にもつなげられる（ためたスター・ファミリアをそのまま使えるように）。
 // 大人用スタンプ帳には女の子／男の子デザインのスケジュールもつなげられる。
 // 子ども用スタンプ帳には同じ種類（と大人用）だけ。
-// 大人用：歩数・走行距離のどちらを記録するか（両方も可）。古いスケジュールは走行距離だけ。
-function trackFlags(config) {
-  const steps = !!(config && config.trackSteps);
-  const distance = config && config.trackDistance !== undefined ? !!config.trackDistance : !steps;
-  return { steps, distance };
-}
 
 function canLinkTheme(bookGender, scheduleTheme) {
   if (!bookGender) return true;
@@ -348,11 +342,6 @@ function todayStr() {
   return dateKey(new Date());
 }
 
-function clampDuration(v) {
-  let n = Math.round(Number(v) / 10) * 10;
-  if (!Number.isFinite(n) || n <= 0) n = 10;
-  return Math.max(10, Math.min(100, n));
-}
 
 function describeFrequency(subject) {
   if (subject.freqType === "weekday") {
@@ -380,7 +369,7 @@ function describeTargets(subject) {
       .filter((x) => (x.part || "").trim())
       .forEach((x) => parts.push(`💪${x.part}${x.reps ? " " + x.reps + "回" : ""}`));
   } else if (subject.measureCustom) parts.push(`${subject.exType === "strength" ? "💪" : "🎯"}${customGoalText(subject, subject.targetCustom)}`);
-  if (Number(subject.perSteps) > 0 && subject.exType !== "strength") parts.push(`👟${Number(subject.perSteps).toLocaleString()}歩`);
+  if (Number(subject.perSteps) > 0 && subject.exType === "other") parts.push(`👟${Number(subject.perSteps).toLocaleString()}歩`);
   if (Number(subject.perKcal) > 0) parts.push(`🔥${Number(subject.perKcal).toLocaleString()}kcal`);
   return parts;
 }
@@ -405,7 +394,7 @@ const EX_TYPES = [
   { k: "run", label: "🏃 ランニング", name: "ランニング" },
   { k: "other", label: "🏋️ その他トレーニング", name: "トレーニング" },
 ];
-// 筋トレの部位（グループごと）。自分で追加した部位は subject.exCustomParts に入る
+// 筋トレの部位（グループごと）。リストにない部位は「自由入力」で入れる
 const BODY_PART_GROUPS = [
   { g: "胸", parts: ["大胸筋（上部）", "大胸筋（中部）", "大胸筋（下部）"] },
   { g: "背中", parts: ["広背筋", "僧帽筋", "大円筋", "脊柱起立筋"] },
@@ -416,7 +405,6 @@ const BODY_PART_GROUPS = [
   { g: "脚", parts: ["大腿四頭筋", "ハムストリングス", "内転筋", "ふくらはぎ"] },
   { g: "その他", parts: ["全身", "有酸素（HIIT など）"] },
 ];
-const BODY_PARTS = BODY_PART_GROUPS.flatMap((x) => x.parts);
 const CUSTOM_GROUP = "自由入力";
 
 // 筋トレ：部位ごとの行（{ id, group, part, reps }）。古い形（exParts だけ）からも作る
@@ -610,7 +598,6 @@ export default function KidsScheduleApp() {
   const [achievements, setAchievements] = useState({});
   const [weights, setWeights] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 体重kg }
   const [calories, setCalories] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 消費カロリーkcal }
-  const [distances, setDistances] = useState({}); // ダイエット用：{ "YYYY-MM-DD": その日の走行距離km }
   const [steps, setSteps] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 歩数 }
   const [noteModalDate, setNoteModalDate] = useState(null);
   const [linkedProfile, setLinkedProfile] = useState(null); // { name, totalStamps } | null
@@ -653,7 +640,6 @@ export default function KidsScheduleApp() {
             setAchievements(data.achievements || {});
             setWeights(data.weights || {});
             setCalories(data.calories || {});
-            setDistances(data.distances || {});
             setSteps(data.steps || {});
             // Another schedule on this device may have just been unlocked
             // with the same PIN — if so, start unlocked here too instead of
@@ -730,13 +716,13 @@ export default function KidsScheduleApp() {
       try {
         await window.storage.set(
           STORAGE_KEY,
-          JSON.stringify({ config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, distances, steps }),
+          JSON.stringify({ config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, steps }),
           false
         );
       } catch (e) {}
     }, 350);
     return () => clearTimeout(t);
-  }, [config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, distances, steps, loaded]);
+  }, [config, completions, recoveries, funStamps, excused, notes, parentComments, achievements, weights, calories, steps, loaded]);
 
   // iOS home-screen apps often get suspended instead of fully closed, and
   // reopening them can show whatever was last in memory instead of fetching
@@ -772,7 +758,6 @@ export default function KidsScheduleApp() {
             setAchievements(data.achievements || {});
             setWeights(data.weights || {});
             setCalories(data.calories || {});
-            setDistances(data.distances || {});
             setSteps(data.steps || {});
           }
         } catch (e) {}
@@ -1025,11 +1010,9 @@ export default function KidsScheduleApp() {
   // （メモで直すと auto が外れ、そのあとスタンプを取り消しても記録は消えない）
   function autoFillOnStamp(dKey, subject) {
     if (config.theme !== "diet" || !subject) return;
-    const tr = trackFlags(config);
     const v = { auto: true };
     if (subject.measureTime !== false && Number(subject.targetMinutes) > 0) v.minutes = Number(subject.targetMinutes);
     if (subject.measureDistance && Number(subject.targetKm) > 0) v.km = Number(subject.targetKm);
-    const walkRun = subject.exType === "walk" || subject.exType === "run";
     if (subject.exType === "other" && Number(subject.perSteps) > 0) v.steps = Number(subject.perSteps);
     if (subject.exType === "other" && Number(subject.targetCustom) > 0) v.custom = Number(subject.targetCustom);
     if (subject.exType === "strength") {
@@ -1298,7 +1281,7 @@ export default function KidsScheduleApp() {
       const comments = parentComments[dKey] || [];
       const achv = achievements[dKey];
       const hasAchv = achv && Object.keys(achv).length > 0;
-      entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null, weight: weights[dKey] || null, kcal: calories[dKey] || null, dist: distances[dKey] || null, steps: steps[dKey] || null });
+      entries.push({ date: new Date(d), dKey, note, comments, achv: hasAchv ? achv : null, weight: weights[dKey] || null, kcal: calories[dKey] || null, steps: steps[dKey] || null });
     }
     entries.sort((a, b) => b.date.getTime() - a.date.getTime());
     return entries;
@@ -1370,7 +1353,8 @@ export default function KidsScheduleApp() {
     });
   }
 
-  function handleSaveNote(text, achv, weight, kcal, distKm, stepCount) {
+  // メモの保存：感想・やることごとの記録と、大人用は健康アプリの1日の合計（カロリー・歩数）
+  function handleSaveNote(text, achv, kcal, stepCount) {
     if (noteModalDate && stepCount !== undefined) {
       const sKey = dateKey(noteModalDate);
       const n = Math.round(parseFloat(stepCount));
@@ -1383,29 +1367,11 @@ export default function KidsScheduleApp() {
     }
     if (!noteModalDate) return;
     const dKey = dateKey(noteModalDate);
-    if (distKm !== undefined) {
-      const n = Math.round(parseFloat(distKm) * 100) / 100;
-      setDistances((prev) => {
-        const next = { ...prev };
-        if (n > 0) next[dKey] = n;
-        else delete next[dKey];
-        return next;
-      });
-    }
     if (kcal !== undefined) {
       const c = Math.round(parseFloat(kcal));
       setCalories((prev) => {
         const next = { ...prev };
         if (c > 0) next[dKey] = c;
-        else delete next[dKey];
-        return next;
-      });
-    }
-    if (weight !== undefined) {
-      const w = parseFloat(weight);
-      setWeights((prev) => {
-        const next = { ...prev };
-        if (w > 0) next[dKey] = Math.round(w * 10) / 10;
         else delete next[dKey];
         return next;
       });
@@ -1593,7 +1559,6 @@ export default function KidsScheduleApp() {
           achievements={achievements}
           weights={weights}
           calories={calories}
-          distances={distances}
           steps={steps}
           onSaveWeight={handleSaveWeight}
           onSaveTargetWeight={handleSaveTargetWeight}
@@ -1694,12 +1659,10 @@ export default function KidsScheduleApp() {
           comments={parentComments[dateKey(noteModalDate)] || []}
           subjects={config.subjects}
           isMapTheme={getTheme(config.theme).isMapTheme}
-          showWeight={config.theme === "diet"}
-          initialWeight={weights[dateKey(noteModalDate)]}
+          isDiet={config.theme === "diet"}
+          trackSteps={!!config.trackSteps}
           initialCalories={calories[dateKey(noteModalDate)]}
-          initialDistance={distances[dateKey(noteModalDate)]}
           initialSteps={steps[dateKey(noteModalDate)]}
-          track={trackFlags(config)}
           onSave={handleSaveNote}
           onClose={handleCloseNote}
         />
@@ -1793,7 +1756,7 @@ export default function KidsScheduleApp() {
 
 /* ---------------- Setup Screen ---------------- */
 
-function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapTheme, isFocused, showDistance, isDiet, trackStepsOn }) {
+function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapTheme, isFocused, isDiet }) {
   function set(patch) {
     onChange({ ...subject, ...patch });
   }
@@ -1827,7 +1790,6 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
         measureDistance: true,
         targetKm: subject.targetKm || (t.k === "run" ? 5 : 3),
         measureCustom: false,
-        distanceTouched: true,
       });
     } else if (t.k === "other") {
       set({
@@ -1843,8 +1805,20 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
         targetCustom: subject.exType === "other" ? subject.targetCustom : "",
       });
     } else {
-      // 自由：カロリー・距離は使わない
-      set({ exType: "", measureDistance: false, perKcal: "", perSteps: "" });
+      // 自由：ほかの種類で入れた目標は消して、時間だけの状態から始める
+      set({
+        exType: "",
+        measureTime: true,
+        measureDistance: false,
+        measureCustom: false,
+        customLabel: "",
+        customUnit: "",
+        targetCustom: "",
+        exItems: undefined,
+        exParts: undefined,
+        perKcal: "",
+        perSteps: "",
+      });
     }
   }
   function toggleWeekday(i) {
@@ -1891,14 +1865,8 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
       <div style={styles.subjCardTop}>
         <input
           value={subject.name}
-          onChange={(e) => {
-            const name = e.target.value;
-            // ダイエット用：ランニング・ウォーキングなどは距離の目標を自動でオンにする（あとから外せる）
-            const autoDist =
-              showDistance && !subject.measureDistance && !subject.distanceTouched && /ランニング|ウォーキング|ジョギング|ラン|ウォーク|走|歩/.test(name);
-            set({ name, ...(autoDist ? { measureDistance: true } : {}) });
-          }}
-          placeholder={isDiet ? "② 名前をつける（例：胸の日）" : showDistance ? "何を頑張る？（例：ウォーキング）" : "何を頑張る？（例：ピアノ）"}
+          onChange={(e) => set({ name: e.target.value })}
+          placeholder={isDiet ? "② 名前をつける（例：胸の日）" : "何を頑張る？（例：ピアノ）"}
           style={styles.subjNameInput}
         />
         {canRemove && (
@@ -2003,32 +1971,6 @@ function SubjectCard({ subject, onChange, onRemove, canRemove, palette, isMapThe
             </>
           )}
         </div>
-
-        {!isDiet && subject.measureDistance && (
-          <div style={styles.measureRow}>
-            <button
-              onClick={() => set({ measureDistance: !subject.measureDistance, distanceTouched: true })}
-              style={{ ...styles.measureToggle, ...(subject.measureDistance ? styles.measureToggleOn : {}) }}
-            >
-              🏃 距離
-            </button>
-            {subject.measureDistance && (
-              <>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.1"
-                  value={subject.targetKm ?? ""}
-                  onChange={(e) => set({ targetKm: e.target.value === "" ? "" : Number(e.target.value) })}
-                  placeholder="3"
-                  style={{ ...styles.measureSelect, boxSizing: "border-box" }}
-                />
-                <span style={styles.measureUnit}>km</span>
-              </>
-            )}
-          </div>
-        )}
 
         <div style={{ ...styles.measureRow, flexWrap: "wrap" }}>
           <button
@@ -2162,21 +2104,22 @@ function ExerciseGoalPanel({ subject, set }) {
   const totalSec = Math.round((Number(subject.targetMinutes) || 0) * 60);
   const mm = subject.targetMinutes === "" || subject.targetMinutes === undefined ? "" : String(Math.floor(totalSec / 60));
   const ss = subject.targetMinutes === "" || subject.targetMinutes === undefined ? "" : String(totalSec % 60);
-  function setTime(m, sec, extra = {}) {
-    if (m === "" && sec === "") return set({ targetMinutes: "", ...extra });
+  function setTime(m, sec) {
+    if (m === "" && sec === "") return set({ targetMinutes: "" });
     const v = (parseFloat(m) || 0) + Math.min(59, parseFloat(sec) || 0) / 60;
-    set({ targetMinutes: Math.round(v * 10000) / 10000, ...extra });
+    set({ targetMinutes: Math.round(v * 10000) / 10000 });
   }
-  const timeRow = (label, optional) => (
+  // ウォーキング・ランニングの時間（分＋秒）
+  const timeRow = (label) => (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
       <span style={labelSt}>{label}</span>
       <input
         type="number"
         inputMode="numeric"
         min={0}
-        value={optional && subject.measureTime === false ? "" : mm}
+        value={mm}
         onChange={(e) => {
-          setTime(e.target.value, ss, optional ? { measureTime: e.target.value !== "" || ss !== "" } : {});
+          setTime(e.target.value, ss);
           // 分を2桁入れたら秒の欄へ移る
           if (e.target.value.length >= 2) {
             const sec = e.target.parentElement && e.target.parentElement.querySelector("input[data-sec]");
@@ -2193,8 +2136,8 @@ function ExerciseGoalPanel({ subject, set }) {
         min={0}
         max={59}
         data-sec="1"
-        value={optional && subject.measureTime === false ? "" : ss}
-        onChange={(e) => setTime(mm, e.target.value, optional ? { measureTime: mm !== "" || e.target.value !== "" } : {})}
+        value={ss}
+        onChange={(e) => setTime(mm, e.target.value)}
         placeholder="0"
         style={{ ...inputSt, width: 60 }}
       />
@@ -2352,9 +2295,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
   const [pin, setPin] = useState(initial.pin || "");
   const [reward, setReward] = useState(initial.reward || "");
   const [targetWeight, setTargetWeight] = useState(initial.targetWeight ? String(initial.targetWeight) : "");
-  const initTrack = trackFlags(initial);
-  const [trackSteps, setTrackSteps] = useState(initTrack.steps);
-  const [trackDistance, setTrackDistance] = useState(initTrack.distance);
+  const [trackSteps, setTrackSteps] = useState(!!initial.trackSteps);
   const initialPalette = getTheme(initial.theme || "girl").palette;
   const [subjects, setSubjects] = useState(
     initial.subjects && initial.subjects.length ? initial.subjects : [DEFAULT_SUBJECT(initialPalette)]
@@ -2471,8 +2412,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       pin: pin.trim(),
       reward: reward.trim(),
       ...(convertingToDiet ? { convertedFrom: initial.theme || "girl" } : initial.convertedFrom ? { convertedFrom: initial.convertedFrom } : {}),
-      ...(theme === "diet" ? { trackSteps, trackDistance: false } : {}),
-      ...(theme === "diet" ? { dailyGoals: undefined } : {}),
+      ...(theme === "diet" ? { trackSteps } : {}),
       ...(theme === "diet" && parseFloat(targetWeight) > 0 ? { targetWeight: Math.round(parseFloat(targetWeight) * 10) / 10 } : {}),
       ...(profileId ? { profileId } : {}),
     };
@@ -2656,9 +2596,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
               canRemove={subjects.length > 1}
               palette={palette}
               isMapTheme={themeObj.isMapTheme}
-              showDistance={theme === "diet" && trackDistance}
               isDiet={theme === "diet"}
-              trackStepsOn={trackSteps}
               isFocused={s.id === focusSubjectId}
             />
           ))}
@@ -2774,7 +2712,6 @@ function MainScreen({
   achievements,
   weights,
   calories,
-  distances,
   steps,
   onSaveWeight,
   onSaveTargetWeight,
@@ -3022,7 +2959,7 @@ function MainScreen({
       </div>
 
       {theme.key === "diet" && (
-        <CalorieTotal calories={calories || {}} distances={distances || {}} steps={steps || {}} track={trackFlags(config)} isExcused={isExcused} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
+        <CalorieTotal calories={calories || {}} steps={steps || {}} trackSteps={!!config.trackSteps} isExcused={isExcused} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
       )}
       {theme.key !== "diet" && (
         <ProgressCard isExcused={isExcused} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
@@ -3107,7 +3044,7 @@ function MainScreen({
                             border: notes[dKey] || achievements[dKey] ? "1px solid #8B5E34" : "1px dashed #C4A876",
                             color: notes[dKey] || achievements[dKey] ? "#5C3A21" : "#8B6B47",
                           }
-                        : notes[dKey] || (weights && weights[dKey]) || (calories && calories[dKey]) || (distances && distances[dKey]) || (steps && steps[dKey])
+                        : notes[dKey] || (weights && weights[dKey]) || (calories && calories[dKey]) || (steps && steps[dKey])
                         ? styles.memoBtnFilled
                         : {}),
                     }}
@@ -3608,14 +3545,11 @@ function PinModal({ correctPin, onSuccess, onFail, onCancel }) {
   );
 }
 
-function NoteModal({ date, initialText, initialAchievements, comments, subjects, isMapTheme, showWeight, initialWeight, initialCalories, initialDistance, initialSteps, track, onSave, onClose }) {
-  const tr = track || { steps: false, distance: true };
+function NoteModal({ date, initialText, initialAchievements, comments, subjects, isMapTheme, isDiet, trackSteps, initialCalories, initialSteps, onSave, onClose }) {
   const [text, setText] = useState(initialText || "");
   const [achv, setAchv] = useState(initialAchievements || {});
-  const [weight, setWeight] = useState(initialWeight !== undefined && initialWeight !== null ? String(initialWeight) : "");
-  const [kcal, setKcal] = useState(initialCalories !== undefined && initialCalories !== null ? String(initialCalories) : "");
-  const [distKm, setDistKm] = useState(initialDistance !== undefined && initialDistance !== null ? String(initialDistance) : "");
-  const [stepCount, setStepCount] = useState(initialSteps !== undefined && initialSteps !== null ? String(initialSteps) : "");
+  const [kcal, setKcal] = useState(initialCalories != null ? String(initialCalories) : "");
+  const [stepCount, setStepCount] = useState(initialSteps != null ? String(initialSteps) : "");
   const dLabel = `${date.getMonth() + 1}月${date.getDate()}日`;
 
   // 手で直した記録は auto を外す（スタンプを取り消しても消えないように）
@@ -3647,7 +3581,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
   }
 
   const measurableSubjects = (subjects || []).filter(
-    (x) => subjectIsMeasurable(x) || (showWeight && ["strength", "walk", "run"].includes(x.exType) && (x.name || "").trim())
+    (x) => subjectIsMeasurable(x) || (isDiet && x.exType && (x.name || "").trim())
   );
 
   return (
@@ -3656,7 +3590,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
       <div style={styles.noteModalScrollBody}>
         <h3 style={styles.modalTitle}>📝 {dLabel} の記録</h3>
 
-        {showWeight && (
+        {isDiet && (
           <div style={{ ...styles.achievementSection, background: "#EEF8F2", borderColor: "#BFE6C9", display: "flex", flexDirection: "column", gap: 10 }}>
             <p style={{ ...styles.achievementSectionLabel, color: "#2C6E55", margin: 0 }}>📱 健康アプリの1日の合計（トレーニング込み・任意）</p>
 
@@ -3674,7 +3608,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
               />
               kcal
             </label>
-            {tr.steps && (
+            {trackSteps && (
               <label style={{ ...styles.achievementField, fontSize: 15, color: "#1E4A3B" }}>
                 👟 歩数
                 <input
@@ -3723,7 +3657,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
               <div key={s.id} style={styles.achievementSubjectRow}>
                 <div style={{ ...styles.achievementSubjectName, color: s.color }}>{s.name}</div>
                 <div style={styles.achievementFieldsRow}>
-                  {s.measureTime && !showWeight && (
+                  {s.measureTime && !isDiet && (
                     <label style={styles.achievementField}>
                       ⏱
                       <input
@@ -3737,7 +3671,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       分
                     </label>
                   )}
-                  {s.measureTime !== false && showWeight && (() => {
+                  {s.measureTime !== false && isDiet && (() => {
                     const [mm, ss] = minSecParts(achv[s.id]?.minutes);
                     return (
                       <label style={styles.achievementField}>
@@ -3818,7 +3752,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       km
                     </label>
                   )}
-                  {showWeight && s.exType === "other" && (
+                  {isDiet && s.exType === "other" && (
                     <label style={styles.achievementField}>
                       👟
                       <input
@@ -3833,7 +3767,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       歩
                     </label>
                   )}
-                  {showWeight && ["strength", "walk", "run", "other"].includes(s.exType) && (
+                  {isDiet && ["strength", "walk", "run", "other"].includes(s.exType) && (
                     <label style={styles.achievementField}>
                       🔥
                       <input
@@ -3914,7 +3848,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
           <button style={styles.modalCancel} onClick={onClose}>
             とじる
           </button>
-          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, undefined, showWeight ? kcal : undefined, undefined, showWeight && tr.steps ? stepCount : undefined)}>
+          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, isDiet ? kcal : undefined, isDiet && trackSteps ? stepCount : undefined)}>
             保存する
           </button>
         </div>
@@ -4035,7 +3969,6 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
       </div>
       {e.weight && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>⚖️ 体重：{Number(e.weight).toFixed(1)}kg</div>}
       {e.steps && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>📱 1日の歩数：{Number(e.steps).toLocaleString()}歩</div>}
-      {e.dist && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>📱 1日の距離：{e.dist}km</div>}
       {e.kcal && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>📱 1日の消費カロリー：{Number(e.kcal).toLocaleString()}kcal</div>}
       {achvParts.map((a) => (
         <div key={a.name} style={{ ...styles.recordEntryAchv, color: a.color }}>
@@ -4140,55 +4073,174 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
 }
 
 
-// ダイエット用：期間内の消費カロリー合計（スタンプの合計と同じように大きく表示）
-function CalorieTotal({ calories, distances, steps, track, isExcused, achievements, subjects, startDate, endDate }) {
+// ===== 進み具合の表示（大人用の合計カード・子ども用の進捗表で共通） =====
+
+// 期間内の日付を1日ずつ回す
+function forEachDay(startDate, endDate, fn) {
+  for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) fn(d, dateKey(d));
+}
+
+// 予定のマス（やること×日、お休みは除く）ごとに fn(subject, 日付キー) を呼ぶ
+function forEachPlannedCell(subjects, startDate, endDate, isExcused, fn) {
+  forEachDay(startDate, endDate, (d, k) => {
+    subjects.forEach((x) => {
+      if ((x.name || "").trim() && subjectAppliesOnDate(x, d, startDate, endDate) && !(isExcused && isExcused(k, x.id))) fn(x, k);
+    });
+  });
+}
+
+// 数値の表示：unit が "min" なら時間、それ以外は桁区切り
+function formatAmount(n, unit) {
+  if (unit === "min") {
+    const total = Math.round(n * 60);
+    if (total < 3600) return fmtMinSec(n);
+    const m = Math.round(n);
+    return `${Math.floor(m / 60)}時間${m % 60 ? (m % 60) + "分" : ""}`;
+  }
+  if (unit === "km") return `${Math.round(n * 10) / 10}`;
+  return (Math.round(n * 10) / 10).toLocaleString();
+}
+
+const mdLabel = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+
+// 1項目分のバー：実績／目標（%）、開始日・今日・最終日、予定との差
+function ProgressRow({ icon, label, actual, goal, pace, unit, unitText, startDate, endDate, ink, track }) {
+  const u = unitText || "";
+  const head = (right) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+      <span style={{ fontSize: 13, fontWeight: 800, color: ink }}>
+        {icon} {label}
+      </span>
+      <span style={{ fontSize: 13, color: "#6b8590", whiteSpace: "nowrap" }}>{right}</span>
+    </div>
+  );
+  // 目標がない項目は合計だけ
+  if (!(goal > 0)) {
+    return (
+      <div style={{ padding: "6px 2px" }}>
+        {head(
+          <>
+            <b style={{ fontSize: 19, color: ink }}>{formatAmount(actual, unit)}</b>
+            {u} ／ 目標なし
+          </>
+        )}
+        <div style={{ height: 12, borderRadius: 999, background: track, marginTop: 4, opacity: 0.6 }} />
+      </div>
+    );
+  }
+  const pctRaw = Math.round((actual / goal) * 100);
+  const pacePct = Math.min(100, (pace / goal) * 100);
+  const showToday = pace > 0 && pace < goal;
+  const done = actual >= goal;
+  const ahead = actual >= pace;
+  const good = done || ahead;
+  const todayK = todayStr();
+  return (
+    <div style={{ padding: "6px 2px" }}>
+      {head(
+        <>
+          <b style={{ fontSize: 19, color: ink }}>{formatAmount(actual, unit)}</b> ／ {formatAmount(goal, unit)}
+          {u}（<span style={{ color: pctRaw > 100 ? "#C98A00" : "inherit", fontWeight: pctRaw > 100 ? 900 : 400 }}>{pctRaw}%</span>）
+        </>
+      )}
+      <div style={{ position: "relative", height: 12, borderRadius: 999, background: track, marginTop: 4, overflow: "hidden" }}>
+        <div style={{ width: `${Math.min(100, pctRaw)}%`, height: "100%", borderRadius: 999, background: good ? "#3E9A74" : "#E08A3C", transition: "width .4s" }} />
+        {showToday && <div style={{ position: "absolute", top: -2, bottom: -2, left: `calc(${pacePct}% - 1px)`, width: 2, background: ink, opacity: 0.55 }} />}
+      </div>
+      {/* 開始日（左）・今日（縦線の位置）・最終日（右） */}
+      <div style={{ position: "relative", height: 14, marginTop: 2, fontSize: 10.5, color: "#7a958a", fontWeight: 700 }}>
+        {!(showToday && pacePct < 16) && <span style={{ position: "absolute", left: 0 }}>{mdLabel(startDate)}</span>}
+        {showToday && (
+          <span style={{ position: "absolute", left: `${Math.min(88, Math.max(6, pacePct))}%`, transform: "translateX(-50%)", color: ink, whiteSpace: "nowrap" }}>
+            今日 {mdLabel(new Date(todayK + "T00:00:00"))}
+          </span>
+        )}
+        {!(showToday && pacePct > 84) && <span style={{ position: "absolute", right: 0 }}>{mdLabel(endDate)}</span>}
+      </div>
+      <div style={{ fontSize: 11.5, marginTop: 3, color: good ? "#2C8A5F" : "#C0603F", fontWeight: 700 }}>
+        {done
+          ? actual > goal
+            ? `🎉 期間の目標を達成！（目標より ${formatAmount(actual - goal, unit)}${u} 多い）`
+            : "🎉 期間の目標を達成！"
+          : pace === 0
+          ? "スタンプの予定から目標を計算しています"
+          : actual > pace
+          ? `予定より ${formatAmount(actual - pace, unit)}${u} 進んでいます👍`
+          : actual === pace
+          ? "予定どおり👍"
+          : `予定より ${formatAmount(pace - actual, unit)}${u} 遅れています`}
+      </div>
+    </div>
+  );
+}
+
+const progressCardStyle = (shadow) => ({
+  position: "relative",
+  zIndex: 2,
+  margin: "14px auto 0",
+  width: "calc(100% - 36px)",
+  maxWidth: 640,
+  background: "#fff",
+  borderRadius: 18,
+  padding: "12px 14px",
+  boxShadow: `0 10px 24px ${shadow}`,
+  boxSizing: "border-box",
+});
+
+// 大人用：トレーニングの合計（バー）と日常生活（健康アプリの1日の合計 − トレーニング分）
+function CalorieTotal({ calories, steps, trackSteps, isExcused, achievements, subjects, startDate, endDate }) {
   const startKey = dateKey(startDate);
   const endKey = dateKey(endDate);
+  const todayK = todayStr();
   const inRange = (k) => k >= startKey && k <= endKey;
-  // バーはトレーニング（やることの記録）だけで集計する。
-  // メモの「健康アプリの1日の合計」から、その日のトレーニング分を引いたものを「日常生活」とする。
-  let totalKcal = 0;
-  // メモで入れたその日の走行距離（km）
-  const tr0 = track || { steps: false, distance: true };
-  const tr = {
-    steps: tr0.steps || subjects.some((x) => x.exType === "walk" || x.exType === "run" || (x.exType === "other" && Number(x.perSteps) > 0)),
-    distance: tr0.distance || subjects.some((x) => x.measureDistance),
-  };
-  let totalSteps = 0;
-  const dayTrain = {}; // { 日付: { steps, kcal, km } } その日のトレーニング分
+  const isKmUnit = (x) => x && /^(km|キロ|ｋｍ)$/i.test((x.customUnit || "").trim());
 
-  // 運動時間・距離は、各やることの「実際にどれだけできた？」の記録から合計する。
-  // 距離は「🏃距離」の記録に加えて、自由目標の単位が km のものも数える。
-  let totalMin = 0;
+  // 実績：やることごとの記録（スタンプの自動入力＋メモで直した分）
+  // 歩数はその他トレーニングだけ。距離は「🏃距離」と単位が km の自由目標。
+  const actual = { min: 0, steps: 0, km: 0, kcal: 0 };
+  const dayTrain = {}; // 日付ごとのトレーニング分（日常生活の計算用）
   const kmBySubj = {};
   Object.entries(achievements).forEach(([k, day]) => {
     if (!inRange(k)) return;
     Object.entries(day || {}).forEach(([sid, v]) => {
       if (!v) return;
       const subj = subjects.find((x) => x.id === sid);
-      // 歩数はその他トレーニングだけ（ウォーキング等に前に自動入力された歩数は数えない）
-      const stepsV = subj && subj.exType === "other" ? Number(v.steps) || 0 : 0;
-      totalMin += Number(v.minutes) || 0;
-      totalSteps += stepsV;
-      totalKcal += Number(v.kcal) || 0;
-      let km = Number(v.km) || 0;
-      if (subj && /^(km|キロ|ｋｍ)$/i.test((subj.customUnit || "").trim())) km += Number(v.custom) || 0;
+      const st = subj && subj.exType === "other" ? Number(v.steps) || 0 : 0;
+      const km = (Number(v.km) || 0) + (isKmUnit(subj) ? Number(v.custom) || 0 : 0);
+      const kc = Number(v.kcal) || 0;
+      actual.min += Number(v.minutes) || 0;
+      actual.steps += st;
+      actual.km += km;
+      actual.kcal += kc;
       if (km > 0) kmBySubj[sid] = (kmBySubj[sid] || 0) + km;
-      const t = dayTrain[k] || (dayTrain[k] = { steps: 0, kcal: 0, km: 0 });
-      t.steps += stepsV;
-      t.kcal += Number(v.kcal) || 0;
-      t.km += km;
+      const t = dayTrain[k] || (dayTrain[k] = { steps: 0, kcal: 0 });
+      t.steps += st;
+      t.kcal += kc;
     });
   });
-  const totalKm = Math.round(Object.values(kmBySubj).reduce((a, b) => a + b, 0) * 10) / 10;
 
-  // 日常生活＝健康アプリの1日の合計 − その日のトレーニング分（マイナスにはしない）
-  const life = { steps: 0, kcal: 0, km: 0 };
-  const lifeDays = { steps: 0, kcal: 0, km: 0 };
+  // 目標：予定のマスごとに、やることの「1回あたり」の値を足す
+  const plan = { min: 0, steps: 0, km: 0, kcal: 0 };
+  const pace = { min: 0, steps: 0, km: 0, kcal: 0 };
+  forEachPlannedCell(subjects, startDate, endDate, isExcused, (x, k) => {
+    const add = {
+      min: x.measureTime !== false ? Number(x.targetMinutes) || 0 : 0,
+      steps: x.exType === "other" ? Number(x.perSteps) || 0 : 0,
+      km: x.measureDistance ? Number(x.targetKm) || 0 : 0,
+      kcal: Number(x.perKcal) || 0,
+    };
+    Object.keys(add).forEach((key) => {
+      plan[key] += add[key];
+      if (k <= todayK) pace[key] += add[key];
+    });
+  });
+
+  // 日常生活：健康アプリの1日の合計 − その日のトレーニング分（マイナスにはしない）
+  const life = { steps: 0, kcal: 0 };
+  const lifeDays = { steps: 0, kcal: 0 };
   [
     ["steps", steps],
     ["kcal", calories],
-    ["km", distances],
   ].forEach(([key, src]) => {
     Object.entries(src || {}).forEach(([k, n]) => {
       if (!inRange(k) || !(Number(n) > 0)) return;
@@ -4196,205 +4248,56 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
       lifeDays[key] += 1;
     });
   });
-  life.km = Math.round(life.km * 10) / 10;
-  const kmBreakdown = Object.entries(kmBySubj).map(([sid, km]) => {
-    const subj = subjects.find((x) => x.id === sid);
-    return `${(subj && subj.name) || "？"} ${Math.round(km * 10) / 10}km`;
-  });
 
-  // 目標はスタンプに連動させる：
-  //  ・運動時間 … 予定のマス（やること×日）ごとの目標時間を足したもの（入力不要）
-  //  ・歩数／距離／カロリー … 1日の目標 × スタンプを押す予定の日数
-  //  お休みスタンプを押したマスは目標から外す。「今日までの目安」は今日までの予定分。
-  const todayK = todayStr();
-  // 予定のマスごとに、やることに入れた「1回あたり」の値を足して目標にする
-  const plan = { min: 0, steps: 0, km: 0, kcal: 0 };
-  const planToDate = { min: 0, steps: 0, km: 0, kcal: 0 };
-  for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
-    const k = dateKey(d);
-    const subs = subjects.filter((x) => subjectAppliesOnDate(x, d, startDate, endDate) && !(isExcused && isExcused(k, x.id)));
-    subs.forEach((x) => {
-      const add = {
-        min: x.measureTime !== false ? Number(x.targetMinutes) || 0 : 0,
-        steps: x.exType === "other" ? Number(x.perSteps) || 0 : 0,
-        km: x.measureDistance ? Number(x.targetKm) || 0 : 0,
-        kcal: Number(x.perKcal) || 0,
-      };
-      Object.keys(add).forEach((key) => {
-        plan[key] += add[key];
-        if (k <= todayK) planToDate[key] += add[key];
-      });
-    });
-  }
-
-  const fmt = (n, unit) => (unit === "min" ? fmtMinSec2(n) : unit === "km" ? `${Math.round(n * 10) / 10}` : Math.round(n).toLocaleString());
-  const unitLabel = { min: "", km: "km", steps: "歩", kcal: "kcal" };
-  // 時間・分・秒の表示（1時間以上は秒を省く）
-  function fmtMinSec2(n) {
-    const total = Math.round(n * 60);
-    if (total >= 3600) return formatMin(Math.round(total / 60));
-    return fmtMinSec(n);
-  }
-  function formatMin(n) {
-    const hh = Math.floor(n / 60);
-    const mm = Math.round(n % 60);
-    return hh > 0 ? `${hh}時間${mm > 0 ? mm + "分" : ""}` : `${mm}分`;
-  }
-
-  // 目標なし：合計だけ。目標あり：実績／目標のバー＋今日までの目安
-  const planKey = { min: "min", steps: "steps", km: "km", kcal: "kcal" };
-  const md = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
-  const item = (icon, label, actual, unit, hasPlan) => {
-    if (!hasPlan) {
-      return (
-        <div key={label} style={{ gridColumn: "1 / -1", padding: "6px 2px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 13, fontWeight: 800, color: "#1E4A3B" }}>
-              {icon} {label}
-            </span>
-            <span style={{ fontSize: 13, color: "#5d7d70", whiteSpace: "nowrap" }}>
-              <b style={{ fontSize: 19, color: "#1E4A3B" }}>{fmt(actual, unit)}</b>
-              {unitLabel[unit]} ／ 目標なし
-            </span>
-          </div>
-          <div style={{ height: 12, borderRadius: 999, background: "#EEF2F0", marginTop: 4 }} />
-        </div>
-      );
-    }
-    if (false) {
-      return (
-        <div key={label} style={{ minWidth: 0, textAlign: "center" }}>
-          <div style={{ fontSize: 12, color: "#5d7d70", fontWeight: 700, whiteSpace: "nowrap" }}>{label}</div>
-          <div style={{ fontSize: 24, fontWeight: 900, color: "#1E4A3B", lineHeight: 1.25, whiteSpace: "nowrap" }}>
-            <span style={{ fontSize: 18 }}>{icon}</span>
-            {fmt(actual, unit)}
-            {unitLabel[unit] && <span style={{ fontSize: 13, marginLeft: 2 }}>{unitLabel[unit]}</span>}
-          </div>
-        </div>
-      );
-    }
-    const goal = plan[planKey[unit]];
-    const pace = planToDate[planKey[unit]];
-    const pctRaw = Math.round((actual / goal) * 100);
-    const pct = Math.min(100, pctRaw);
-    const pacePct = Math.min(100, (pace / goal) * 100);
-    const showToday = pace > 0 && pace < goal;
-    const done = actual >= goal;
-    const ahead = actual >= pace;
-    const color = done ? "#2C8A5F" : ahead ? "#3E9A74" : "#E08A3C";
-    return (
-      <div key={label} style={{ gridColumn: "1 / -1", padding: "6px 2px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 13, fontWeight: 800, color: "#1E4A3B" }}>
-            {icon} {label}
-          </span>
-          <span style={{ fontSize: 13, color: "#5d7d70", whiteSpace: "nowrap" }}>
-            <b style={{ fontSize: 19, color: "#1E4A3B" }}>{fmt(actual, unit)}</b> ／ {fmt(goal, unit)}
-            {unitLabel[unit]}（<span style={{ color: pctRaw > 100 ? "#C98A00" : "inherit", fontWeight: pctRaw > 100 ? 900 : 400 }}>{pctRaw}%</span>）
-          </span>
-        </div>
-        <div style={{ position: "relative", height: 12, borderRadius: 999, background: "#E6F1EB", marginTop: 4, overflow: "hidden" }}>
-          <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: color, transition: "width .4s" }} />
-          {showToday && (
-            <div title="今日までの予定" style={{ position: "absolute", top: -2, bottom: -2, left: `calc(${pacePct}% - 1px)`, width: 2, background: "#1E4A3B", opacity: 0.55 }} />
-          )}
-        </div>
-        {/* バーの下：開始日（左）・今日（縦線の位置）・最終日（右） */}
-        <div style={{ position: "relative", height: 14, marginTop: 2, fontSize: 10.5, color: "#7a958a", fontWeight: 700 }}>
-          {!(showToday && pacePct < 16) && <span style={{ position: "absolute", left: 0 }}>{md(startDate)}</span>}
-          {showToday && (
-            <span style={{ position: "absolute", left: `${Math.min(88, Math.max(6, pacePct))}%`, transform: "translateX(-50%)", color: "#1E4A3B", whiteSpace: "nowrap" }}>
-              今日 {md(new Date(todayK + "T00:00:00"))}
-            </span>
-          )}
-          {!(showToday && pacePct > 84) && <span style={{ position: "absolute", right: 0 }}>{md(endDate)}</span>}
-        </div>
-        <div style={{ fontSize: 11.5, marginTop: 3, color: done ? "#2C8A5F" : ahead ? "#3E9A74" : "#C0603F", fontWeight: 700 }}>
-          {done
-            ? pctRaw > 100
-              ? `🎉 期間の目標を達成！（目標より ${fmt(actual - goal, unit)}${unitLabel[unit]} 多い）`
-              : "🎉 期間の目標を達成！"
-            : pace === 0
-            ? "スタンプの予定から目標を計算しています"
-            : ahead
-            ? actual - pace > 0
-              ? `予定より ${fmt(actual - pace, unit)}${unitLabel[unit]} 進んでいます👍`
-              : "予定どおり👍"
-            : `予定より ${fmt(pace - actual, unit)}${unitLabel[unit]} 遅れています`}
-        </div>
-      </div>
-    );
-  };
-
-  const entries = [
-    ["⏱", "運動時間", totalMin, "min", plan.min > 0],
-    ...(plan.steps > 0 || totalSteps > 0 ? [["👟", "歩数", totalSteps, "steps", plan.steps > 0]] : []),
-    ...(plan.km > 0 || totalKm > 0 ? [["🏃", "走行距離", totalKm, "km", plan.km > 0]] : []),
-    ["🔥", "消費カロリー", totalKcal, "kcal", plan.kcal > 0],
-  ];
-  const withGoal = entries.filter((e) => e[4]);
-  const noGoal = entries.filter((e) => !e[4]);
-  const allDone = withGoal.length > 0 && withGoal.every((e) => e[2] >= plan[planKey[e[3]]]);
+  const rows = [
+    { key: "min", icon: "⏱", label: "運動時間", unit: "min", unitText: "" },
+    { key: "steps", icon: "👟", label: "歩数", unit: "steps", unitText: "歩", hideIfEmpty: true },
+    { key: "km", icon: "🏃", label: "走行距離", unit: "km", unitText: "km", hideIfEmpty: true },
+    { key: "kcal", icon: "🔥", label: "消費カロリー", unit: "kcal", unitText: "kcal" },
+  ].filter((r) => !r.hideIfEmpty || plan[r.key] > 0 || actual[r.key] > 0);
+  const withGoal = rows.filter((r) => plan[r.key] > 0);
+  const allDone = withGoal.length > 0 && withGoal.every((r) => actual[r.key] >= plan[r.key]);
+  const hasNoGoal = rows.length > withGoal.length;
+  const kmBreakdown = Object.entries(kmBySubj).map(([sid, km]) => `${(subjects.find((x) => x.id === sid) || {}).name || "？"} ${Math.round(km * 10) / 10}km`);
+  const showLifeSteps = trackSteps || lifeDays.steps > 0;
+  const ink = "#1E4A3B";
 
   return (
-    <div style={{ position: "relative", zIndex: 2, margin: "14px auto 0", width: "calc(100% - 36px)", maxWidth: 640, background: "#fff", borderRadius: 18, padding: "12px 14px", boxShadow: "0 10px 24px rgba(30,74,59,0.25)", boxSizing: "border-box" }}>
-      <div style={{ fontSize: 13, color: "#1E4A3B", fontWeight: 800, textAlign: "center", marginBottom: 4 }}>💪 トレーニングの合計</div>
+    <div style={progressCardStyle("rgba(30,74,59,0.25)")}>
+      <div style={{ fontSize: 13, color: ink, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>💪 トレーニングの合計</div>
       {allDone && (
-        <div style={{ textAlign: "center", margin: "4px 0 8px", padding: "8px 10px", borderRadius: 12, background: "linear-gradient(135deg,#FFF3C4,#DFF3E6)", fontWeight: 900, color: "#1E4A3B" }}>
+        <div style={{ textAlign: "center", margin: "4px 0 8px", padding: "8px 10px", borderRadius: 12, background: "linear-gradient(135deg,#FFF3C4,#DFF3E6)", fontWeight: 900, color: ink }}>
           🎉 目標をすべて達成しました！すばらしい！
         </div>
       )}
-      {withGoal.map((e) => item(...e))}
-      {noGoal.length > 0 && (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: `repeat(${noGoal.length === 4 ? 2 : noGoal.length}, 1fr)`,
-            rowGap: 8,
-            columnGap: 6,
-            marginTop: withGoal.length ? 8 : 0,
-            paddingTop: withGoal.length ? 8 : 0,
-            borderTop: withGoal.length ? "1px dashed #E3EEF3" : "none",
-          }}
-        >
-          {noGoal.map((e) => item(...e))}
-        </div>
-      )}
-      {noGoal.length > 0 && (
+      {[...withGoal, ...rows.filter((r) => !(plan[r.key] > 0))].map((r) => (
+        <ProgressRow key={r.key} {...r} actual={actual[r.key]} goal={plan[r.key]} pace={pace[r.key]} startDate={startDate} endDate={endDate} ink={ink} track="#E6F1EB" />
+      ))}
+      {hasNoGoal && (
         <div style={{ fontSize: 11.5, color: "#C0603F", textAlign: "center", marginTop: 6, lineHeight: 1.5 }}>
           「目標なし」の項目は、「✏️ 修正する」でやることの種類（ウォーキングなど）を選び、1回あたりの値を入れると進み具合が出ます
         </div>
       )}
-      {kmBreakdown.length > 1 && (
-        <div style={{ fontSize: 11.5, color: "#5d7d70", textAlign: "center", marginTop: 4 }}>（{kmBreakdown.join("・")}）</div>
-      )}
-      <div style={{ fontSize: 11.5, color: "#8aa69a", textAlign: "center", marginTop: 6 }}>
-        目標＝やることに入れた「1回あたり」の値 × スタンプの予定（お休みを除く）／バーの縦線は今日までの予定の位置
-      </div>
+      {kmBreakdown.length > 1 && <div style={{ fontSize: 11.5, color: "#5d7d70", textAlign: "center", marginTop: 4 }}>（{kmBreakdown.join("・")}）</div>}
 
       {/* 日常生活（トレーニング以外） */}
       <div style={{ marginTop: 12, paddingTop: 10, borderTop: "2px solid #E3EEF3" }}>
-        <div style={{ fontSize: 13, color: "#1E4A3B", fontWeight: 800, textAlign: "center", marginBottom: 6 }}>🏠 日常生活（トレーニング以外）</div>
+        <div style={{ fontSize: 13, color: ink, fontWeight: 800, textAlign: "center", marginBottom: 6 }}>🏠 日常生活（トレーニング以外）</div>
         {lifeDays.steps + lifeDays.kcal === 0 ? (
           <div style={{ fontSize: 12, color: "#8aa69a", textAlign: "center", lineHeight: 1.5 }}>
             「📝 メモ」に健康アプリの1日の合計を入れると、トレーニング分を引いた日常生活の分がここに出ます
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${tr0.steps || lifeDays.steps ? 2 : 1}, 1fr)`, columnGap: 6 }}>
-            {[
-              ...(tr0.steps || lifeDays.steps ? [["👟", "歩数", life.steps, "steps"]] : []),
-              ["🔥", "消費カロリー", life.kcal, "kcal"],
-            ].map(([icon, label, val, unit]) => (
-              <div key={label} style={{ textAlign: "center", minWidth: 0 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${showLifeSteps ? 2 : 1}, 1fr)`, columnGap: 6 }}>
+            {[...(showLifeSteps ? [["👟", "歩数", "steps", "歩"]] : []), ["🔥", "消費カロリー", "kcal", "kcal"]].map(([icon, label, key, u]) => (
+              <div key={key} style={{ textAlign: "center", minWidth: 0 }}>
                 <div style={{ fontSize: 12, color: "#5d7d70", fontWeight: 700 }}>{label}</div>
-                <div style={{ fontSize: 20, fontWeight: 900, color: "#1E4A3B", whiteSpace: "nowrap" }}>
+                <div style={{ fontSize: 20, fontWeight: 900, color: ink, whiteSpace: "nowrap" }}>
                   <span style={{ fontSize: 15 }}>{icon}</span>
-                  {fmt(val, unit)}
-                  <span style={{ fontSize: 11.5, marginLeft: 2 }}>{unitLabel[unit]}</span>
+                  {formatAmount(life[key], key)}
+                  <span style={{ fontSize: 11.5, marginLeft: 2 }}>{u}</span>
                 </div>
-                <div style={{ fontSize: 11, color: "#8aa69a" }}>
-                  {lifeDays[unit] > 0 ? `1日平均 ${fmt(val / lifeDays[unit], unit)}${unitLabel[unit]}` : "記録なし"}
-                </div>
+                <div style={{ fontSize: 11, color: "#8aa69a" }}>{lifeDays[key] > 0 ? `1日平均 ${formatAmount(Math.round(life[key] / lifeDays[key]), key)}${u}` : "記録なし"}</div>
               </div>
             ))}
           </div>
@@ -4410,109 +4313,47 @@ function ProgressCard({ isExcused, achievements, subjects, startDate, endDate })
   const startKey = dateKey(startDate);
   const endKey = dateKey(endDate);
   const todayK = todayStr();
-  // 集計する項目（自由目標は「名前＋単位」ごと）
-  const metrics = {};
-  const addMetric = (key, icon, label, unit) => {
-    if (!metrics[key]) metrics[key] = { key, icon, label, unit, plan: 0, planToDate: 0, actual: 0 };
-    return metrics[key];
-  };
-  const keysFor = (x) => {
+  // やることが持っている目標の一覧（[集計キー, 表示情報, 1回あたりの目標, 記録のフィールド名]）
+  const goalsOf = (x) => {
     const out = [];
-    if (x.measureTime !== false && Number(x.targetMinutes || x.durationMinutes || 30) > 0)
-      out.push([addMetric("min", "⏱", "取り組んだ時間", "min"), Number(x.targetMinutes || x.durationMinutes || 30), "minutes"]);
-    if (x.measurePages) out.push([addMetric("pages", "📖", "ページ数", "ページ"), Number(x.targetPages || 5), "pages"]);
-    if (x.measureProblems) out.push([addMetric("problems", "✏️", "問題数", "問"), Number(x.targetProblems || 10), "problems"]);
+    const mins = Number(x.targetMinutes || x.durationMinutes || 30);
+    if (x.measureTime !== false && mins > 0) out.push(["min", { icon: "⏱", label: "取り組んだ時間", unit: "min", unitText: "" }, mins, "minutes"]);
+    if (x.measurePages) out.push(["pages", { icon: "📖", label: "ページ数", unit: "pages", unitText: "ページ" }, Number(x.targetPages || 5), "pages"]);
+    if (x.measureProblems) out.push(["problems", { icon: "✏️", label: "問題数", unit: "problems", unitText: "問" }, Number(x.targetProblems || 10), "problems"]);
     if (x.measureCustom && Number(x.targetCustom) > 0) {
       const label = (x.customLabel || "").trim() || x.name;
-      const unit = (x.customUnit || "").trim();
-      out.push([addMetric(`c:${label}|${unit}`, "🎯", label, unit), Number(x.targetCustom), "custom"]);
+      const unitText = (x.customUnit || "").trim();
+      out.push([`c:${label}|${unitText}`, { icon: "🎯", label, unit: "custom", unitText }, Number(x.targetCustom), "custom"]);
     }
     return out;
   };
-  for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
-    const k = dateKey(d);
-    subjects
-      .filter((x) => (x.name || "").trim() && subjectAppliesOnDate(x, d, startDate, endDate) && !(isExcused && isExcused(k, x.id)))
-      .forEach((x) =>
-        keysFor(x).forEach(([m, target]) => {
-          m.plan += target;
-          if (k <= todayK) m.planToDate += target;
-        })
-      );
-  }
+  const metrics = {};
+  const metric = (key, info) => metrics[key] || (metrics[key] = { key, ...info, plan: 0, pace: 0, actual: 0 });
+  forEachPlannedCell(subjects, startDate, endDate, isExcused, (x, k) => {
+    goalsOf(x).forEach(([key, info, target]) => {
+      const m = metric(key, info);
+      m.plan += target;
+      if (k <= todayK) m.pace += target;
+    });
+  });
   Object.entries(achievements).forEach(([k, day]) => {
     if (k < startKey || k > endKey) return;
     Object.entries(day || {}).forEach(([sid, v]) => {
       const x = subjects.find((y) => y.id === sid);
-      if (!x || !v) return;
-      keysFor(x).forEach(([m, , field]) => {
-        m.actual += Number(v[field]) || 0;
-      });
+      if (x && v) goalsOf(x).forEach(([key, info, , field]) => (metric(key, info).actual += Number(v[field]) || 0));
     });
   });
   const list = Object.values(metrics).filter((m) => m.plan > 0);
   if (list.length === 0) return null;
-
-  const fmt = (n, unit) => (unit === "min" ? formatMinShort(n) : `${Math.round(n * 10) / 10}`.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
-  function formatMinShort(n) {
-    const t = Math.round(n);
-    return t >= 60 ? `${Math.floor(t / 60)}時間${t % 60 ? (t % 60) + "分" : ""}` : `${t}分`;
-  }
-  const u = (unit) => (unit === "min" ? "" : unit);
-  const md = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+  const ink = "#0B3D62";
 
   return (
-    <div style={{ position: "relative", zIndex: 2, margin: "14px auto 0", width: "calc(100% - 36px)", maxWidth: 640, background: "#fff", borderRadius: 18, padding: "12px 14px", boxShadow: "0 10px 24px rgba(11,61,98,0.22)", boxSizing: "border-box" }}>
-      <div style={{ fontSize: 13, color: "#0B3D62", fontWeight: 800, textAlign: "center", marginBottom: 4 }}>📊 がんばりの合計</div>
-      {list.map((m) => {
-        const pctRaw = Math.round((m.actual / m.plan) * 100);
-        const pct = Math.min(100, pctRaw);
-        const pacePct = Math.min(100, (m.planToDate / m.plan) * 100);
-        const done = m.actual >= m.plan;
-        const ahead = m.actual >= m.planToDate;
-        const color = done || ahead ? "#3E9A74" : "#E08A3C";
-        const showToday = m.planToDate > 0 && m.planToDate < m.plan;
-        return (
-          <div key={m.key} style={{ padding: "6px 2px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-              <span style={{ fontSize: 13, fontWeight: 800, color: "#0B3D62" }}>
-                {m.icon} {m.label}
-              </span>
-              <span style={{ fontSize: 13, color: "#5d7a8c", whiteSpace: "nowrap" }}>
-                <b style={{ fontSize: 19, color: "#0B3D62" }}>{fmt(m.actual, m.unit)}</b> ／ {fmt(m.plan, m.unit)}
-                {u(m.unit)}（<span style={{ color: pctRaw > 100 ? "#C98A00" : "inherit", fontWeight: pctRaw > 100 ? 900 : 400 }}>{pctRaw}%</span>）
-              </span>
-            </div>
-            <div style={{ position: "relative", height: 12, borderRadius: 999, background: "#E6EEF3", marginTop: 4, overflow: "hidden" }}>
-              <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: color, transition: "width .4s" }} />
-              {showToday && <div style={{ position: "absolute", top: -2, bottom: -2, left: `calc(${pacePct}% - 1px)`, width: 2, background: "#0B3D62", opacity: 0.5 }} />}
-            </div>
-            <div style={{ position: "relative", height: 14, marginTop: 2, fontSize: 10.5, color: "#7c98aa", fontWeight: 700 }}>
-              {!(showToday && pacePct < 16) && <span style={{ position: "absolute", left: 0 }}>{md(startDate)}</span>}
-              {showToday && (
-                <span style={{ position: "absolute", left: `${Math.min(88, Math.max(6, pacePct))}%`, transform: "translateX(-50%)", color: "#0B3D62", whiteSpace: "nowrap" }}>
-                  今日 {md(new Date(todayK + "T00:00:00"))}
-                </span>
-              )}
-              {!(showToday && pacePct > 84) && <span style={{ position: "absolute", right: 0 }}>{md(endDate)}</span>}
-            </div>
-            <div style={{ fontSize: 11.5, marginTop: 3, color: done || ahead ? "#2C8A5F" : "#C0603F", fontWeight: 700 }}>
-              {done
-                ? "🎉 目標を達成！"
-                : m.planToDate === 0
-                ? "スタンプの予定から目標を計算しています"
-                : ahead
-                ? m.actual > m.planToDate
-                  ? `予定より ${fmt(m.actual - m.planToDate, m.unit)}${u(m.unit)} 進んでいます👍`
-                  : "予定どおり👍"
-                : `予定より ${fmt(m.planToDate - m.actual, m.unit)}${u(m.unit)} 遅れています`}
-            </div>
-          </div>
-        );
-      })}
-      <div style={{ fontSize: 11.5, color: "#8aa1b0", textAlign: "center", marginTop: 6, lineHeight: 1.5 }}>
-        「📝 メモ」の「実際にどれだけできた？」に入れた分が合計されます。目標＝やることの目標 × スタンプの予定（お休みを除く）
-      </div>
+    <div style={progressCardStyle("rgba(11,61,98,0.22)")}>
+      <div style={{ fontSize: 13, color: ink, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>📊 がんばりの合計</div>
+      {list.map((m) => (
+        <ProgressRow key={m.key} {...m} goal={m.plan} startDate={startDate} endDate={endDate} ink={ink} track="#E6EEF3" />
+      ))}
+      <div style={{ fontSize: 11.5, color: "#8aa1b0", textAlign: "center", marginTop: 6, lineHeight: 1.5 }}>「📝 メモ」の「実際にどれだけできた？」に入れた分が合計されます</div>
     </div>
   );
 }
@@ -5342,14 +5183,15 @@ const styles = {
   pearlCount: { color: "#fff", fontWeight: 700, fontSize: 12.5, opacity: 0.9, marginTop: 1 },
   rewardPreview: { marginTop: 8, background: "rgba(255,255,255,0.18)", borderRadius: 12, padding: "8px 14px", color: "#fff", fontSize: 16, fontWeight: 700, backdropFilter: "blur(4px)", textAlign: "center" },
 
-  subjectSummaryRow: { position: "relative", zIndex: 2, display: "flex", flexWrap: "wrap", gap: 10, padding: "0 18px", marginTop: 8, justifyContent: "center" },
-  subjectSpotlight: { display: "flex", alignItems: "center", gap: 14, borderRadius: 20, padding: "14px 22px", boxShadow: "0 10px 22px rgba(11,61,98,0.3)", justifyContent: "center", flexWrap: "wrap" },
-  subjectSpotlightIcon: { width: 56, height: 56, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 10px rgba(0,0,0,0.2)" },
+  subjectSummaryRow: { position: "relative", zIndex: 2, display: "flex", flexWrap: "wrap", gap: 6, padding: "0 18px", marginTop: 8, justifyContent: "center" },
+  // やることのカード：控えめなサイズ（カレンダーや進捗表より目立ちすぎないように）
+  subjectSpotlight: { display: "flex", alignItems: "center", gap: 8, borderRadius: 14, padding: "7px 12px", boxShadow: "0 4px 10px rgba(11,61,98,0.18)", justifyContent: "center", flexWrap: "wrap" },
+  subjectSpotlightIcon: { width: 32, height: 32, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 10px rgba(0,0,0,0.2)" },
   subjectSpotlightTextWrap: { display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" },
-  subjectSpotlightName: { fontFamily: "'Kaisei Decol', serif", fontSize: 26, fontWeight: 700, color: "#0B3D62", lineHeight: 1.2 },
-  subjectSpotlightDuration: { fontSize: 16, fontWeight: 900, color: "#0B3D62", marginTop: 2 },
-  subjectSpotlightFreq: { fontSize: 13.5, fontWeight: 700, color: "#3d6a86", marginTop: 2 },
-  backlogBadgeBig: { fontSize: 13.5, color: "#B5651D", background: "#FFE9B3", borderRadius: 999, padding: "5px 12px", fontWeight: 800, boxShadow: "0 2px 6px rgba(0,0,0,0.15)" },
+  subjectSpotlightName: { fontFamily: "'Kaisei Decol', serif", fontSize: 16, fontWeight: 700, color: "#0B3D62", lineHeight: 1.2 },
+  subjectSpotlightDuration: { fontSize: 12, fontWeight: 700, color: "#0B3D62", marginTop: 1 },
+  subjectSpotlightFreq: { fontSize: 11, fontWeight: 700, color: "#3d6a86", marginTop: 1 },
+  backlogBadgeBig: { fontSize: 11.5, color: "#B5651D", background: "#FFE9B3", borderRadius: 999, padding: "3px 8px", fontWeight: 800, boxShadow: "0 1px 3px rgba(0,0,0,0.12)" },
 
   calendarLegendRow: { position: "relative", zIndex: 2, display: "flex", gap: 14, padding: "10px 18px 0", flexWrap: "wrap", justifyContent: "center" },
   calendarLegendItem: { display: "inline-flex", alignItems: "center", gap: 6, color: "#EAF7FB", fontSize: 13, fontWeight: 700 },
