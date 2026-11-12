@@ -4205,6 +4205,7 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
 
   // 目標なし：合計だけ。目標あり：実績／目標のバー＋今日までの目安
   const planKey = { min: "min", steps: "steps", km: "km", kcal: "kcal" };
+  const md = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
   const item = (icon, label, actual, unit, hasPlan) => {
     if (!hasPlan) {
       return (
@@ -4239,6 +4240,7 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
     const pctRaw = Math.round((actual / goal) * 100);
     const pct = Math.min(100, pctRaw);
     const pacePct = Math.min(100, (pace / goal) * 100);
+    const showToday = pace > 0 && pace < goal;
     const done = actual >= goal;
     const ahead = actual >= pace;
     const color = done ? "#2C8A5F" : ahead ? "#3E9A74" : "#E08A3C";
@@ -4255,9 +4257,19 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
         </div>
         <div style={{ position: "relative", height: 12, borderRadius: 999, background: "#E6F1EB", marginTop: 4, overflow: "hidden" }}>
           <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: color, transition: "width .4s" }} />
-          {!done && pace > 0 && pace < goal && (
-            <div title="今日までの目安" style={{ position: "absolute", top: -2, bottom: -2, left: `calc(${pacePct}% - 1px)`, width: 2, background: "#1E4A3B", opacity: 0.55 }} />
+          {showToday && (
+            <div title="今日までの予定" style={{ position: "absolute", top: -2, bottom: -2, left: `calc(${pacePct}% - 1px)`, width: 2, background: "#1E4A3B", opacity: 0.55 }} />
           )}
+        </div>
+        {/* バーの下：開始日（左）・今日（縦線の位置）・最終日（右） */}
+        <div style={{ position: "relative", height: 14, marginTop: 2, fontSize: 10.5, color: "#7a958a", fontWeight: 700 }}>
+          {!(showToday && pacePct < 16) && <span style={{ position: "absolute", left: 0 }}>{md(startDate)}</span>}
+          {showToday && (
+            <span style={{ position: "absolute", left: `${Math.min(88, Math.max(6, pacePct))}%`, transform: "translateX(-50%)", color: "#1E4A3B", whiteSpace: "nowrap" }}>
+              今日 {md(new Date(todayK + "T00:00:00"))}
+            </span>
+          )}
+          {!(showToday && pacePct > 84) && <span style={{ position: "absolute", right: 0 }}>{md(endDate)}</span>}
         </div>
         <div style={{ fontSize: 11.5, marginTop: 3, color: done ? "#2C8A5F" : ahead ? "#3E9A74" : "#C0603F", fontWeight: 700 }}>
           {done
@@ -4267,8 +4279,10 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
             : pace === 0
             ? "スタンプの予定から目標を計算しています"
             : ahead
-            ? `今日までの目安 ${fmt(pace, unit)}${unitLabel[unit]} … ペース通り👍`
-            : `今日までの目安 ${fmt(pace, unit)}${unitLabel[unit]} → あと ${fmt(pace - actual, unit)}${unitLabel[unit]}`}
+            ? actual - pace > 0
+              ? `予定より ${fmt(actual - pace, unit)}${unitLabel[unit]} 進んでいます👍`
+              : "予定どおり👍"
+            : `予定より ${fmt(pace - actual, unit)}${unitLabel[unit]} 遅れています`}
         </div>
       </div>
     );
@@ -4317,7 +4331,7 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
         <div style={{ fontSize: 11.5, color: "#5d7d70", textAlign: "center", marginTop: 4 }}>（{kmBreakdown.join("・")}）</div>
       )}
       <div style={{ fontSize: 11.5, color: "#8aa69a", textAlign: "center", marginTop: 6 }}>
-        目標＝やることに入れた「1回あたり」の値 × スタンプの予定（お休みを除く）
+        目標＝やることに入れた「1回あたり」の値 × スタンプの予定（お休みを除く）／バーの縦線は今日までの予定の位置
       </div>
     </div>
   );
