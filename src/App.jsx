@@ -3039,6 +3039,7 @@ function MainScreen({
                 {inRange && (
                   <button
                     onClick={() => onOpenNote(d)}
+                    className="memoBtn"
                     style={{
                       ...styles.memoBtn,
                       ...(theme.isMapTheme
@@ -3053,14 +3054,8 @@ function MainScreen({
                     }}
                     aria-label={`${d.getMonth() + 1}月${d.getDate()}日 の メモ`}
                   >
-                    {theme.key === "diet" && weights && weights[dKey] ? (
-                      <span style={{ display: "flex", flexDirection: "column", alignItems: "center", lineHeight: 1.15 }}>
-                        <span>⚖️</span>
-                        <span>{Number(weights[dKey]).toFixed(1)}</span>
-                      </span>
-                    ) : (
-                      "📝 メモ"
-                    )}
+                    <span>📝</span>
+                    <span>メモ</span>
                   </button>
                 )}
 
@@ -4114,13 +4109,14 @@ function ProgressRow({ icon, label, actual, goal, pace, unit, unitText, startDat
   // タップで開く「内訳」（記録のあった日とその値）
   const breakdown = hasDetails && open && (
     <div style={{ marginTop: 6, padding: "8px 10px", background: "#F5F9FB", borderRadius: 10, fontSize: 12.5, color: "#3f5a66" }}>
-      <div style={{ fontWeight: 800, color: ink, marginBottom: 4 }}>内訳（{details.length}回）</div>
+      <div style={{ fontWeight: 800, color: ink, marginBottom: 4 }}>{/^\d{4}-/.test(details[0][0]) ? `内訳（${details.length}回）` : "部位ごとの内訳"}</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px" }}>
         {details.map(([k, v]) => {
-          const [, mm, dd] = k.split("-").map(Number);
+          const isDate = /^\d{4}-\d{2}-\d{2}$/.test(k);
+          const [, mm, dd] = isDate ? k.split("-").map(Number) : [];
           return (
             <span key={k} style={{ whiteSpace: "nowrap" }}>
-              <span style={{ color: "#7a958a" }}>{mm}/{dd}</span> <b>{formatAmount(v, unit)}</b>{u}
+              <span style={{ color: "#7a958a" }}>{isDate ? `${mm}/${dd}` : k}</span> <b>{formatAmount(v, unit)}</b>{u}
             </span>
           );
         })}
@@ -4220,9 +4216,10 @@ function CalorieTotal({ calories, steps, trackSteps, isExcused, achievements, su
 
   // 実績：やることごとの記録（スタンプの自動入力＋メモで直した分）
   // 歩数はその他トレーニングだけ。距離は「🏃距離」と単位が km の自由目標。
-  const actual = { min: 0, steps: 0, km: 0, kcal: 0 };
+  const actual = { min: 0, steps: 0, km: 0, kcal: 0, reps: 0 };
   const dayTrain = {}; // 日付ごとのトレーニング分（日常生活の計算用）
   const kmBySubj = {};
+  const repsByPart = {}; // 筋トレの部位ごとの回数（内訳用）
   Object.entries(achievements).forEach(([k, day]) => {
     if (!inRange(k)) return;
     Object.entries(day || {}).forEach(([sid, v]) => {
@@ -4236,6 +4233,24 @@ function CalorieTotal({ calories, steps, trackSteps, isExcused, achievements, su
       actual.km += km;
       actual.kcal += kc;
       if (km > 0) kmBySubj[sid] = (kmBySubj[sid] || 0) + km;
+      if (subj && subj.exType === "strength") {
+        const items = strengthItems(subj);
+        const parts = v.parts || {};
+        const hasParts = Object.values(parts).some((n) => Number(n) > 0);
+        if (hasParts) {
+          Object.entries(parts).forEach(([id, n]) => {
+            const r = Number(n) || 0;
+            if (r <= 0) return;
+            const it = items.find((x) => x.id === id);
+            const name = (it && (it.part || "").trim()) || subj.name;
+            repsByPart[name] = (repsByPart[name] || 0) + r;
+            actual.reps += r;
+          });
+        } else if (Number(v.custom) > 0) {
+          repsByPart[subj.name] = (repsByPart[subj.name] || 0) + Number(v.custom);
+          actual.reps += Number(v.custom);
+        }
+      }
       const t = dayTrain[k] || (dayTrain[k] = { steps: 0, kcal: 0 });
       t.steps += st;
       t.kcal += kc;
@@ -4243,14 +4258,15 @@ function CalorieTotal({ calories, steps, trackSteps, isExcused, achievements, su
   });
 
   // 目標：予定のマスごとに、やることの「1回あたり」の値を足す
-  const plan = { min: 0, steps: 0, km: 0, kcal: 0 };
-  const pace = { min: 0, steps: 0, km: 0, kcal: 0 };
+  const plan = { min: 0, steps: 0, km: 0, kcal: 0, reps: 0 };
+  const pace = { min: 0, steps: 0, km: 0, kcal: 0, reps: 0 };
   forEachPlannedCell(subjects, startDate, endDate, isExcused, (x, k) => {
     const add = {
       min: x.measureTime !== false ? Number(x.targetMinutes) || 0 : 0,
       steps: x.exType === "other" ? Number(x.perSteps) || 0 : 0,
       km: x.measureDistance ? Number(x.targetKm) || 0 : 0,
       kcal: Number(x.perKcal) || 0,
+      reps: x.exType === "strength" ? strengthItems(x).reduce((a, it) => a + ((it.part || "").trim() ? Number(it.reps) || 0 : 0), 0) : 0,
     };
     Object.keys(add).forEach((key) => {
       plan[key] += add[key];
@@ -4276,6 +4292,7 @@ function CalorieTotal({ calories, steps, trackSteps, isExcused, achievements, su
     { key: "min", icon: "⏱", label: "運動時間", unit: "min", unitText: "" },
     { key: "steps", icon: "👟", label: "歩数", unit: "steps", unitText: "歩", hideIfEmpty: true },
     { key: "km", icon: "🏃", label: "走行距離", unit: "km", unitText: "km", hideIfEmpty: true },
+    { key: "reps", icon: "💪", label: "筋トレの回数", unit: "reps", unitText: "回", hideIfEmpty: true, details: Object.entries(repsByPart).sort((a, b) => b[1] - a[1]) },
     { key: "kcal", icon: "🔥", label: "消費カロリー", unit: "kcal", unitText: "kcal" },
   ].filter((r) => !r.hideIfEmpty || plan[r.key] > 0 || actual[r.key] > 0);
   const withGoal = rows.filter((r) => plan[r.key] > 0);
@@ -5061,6 +5078,10 @@ function GlobalStyle() {
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Yuji+Syuku&family=Kaisei+Decol:wght@400;700&family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap');
       /* 入力欄の例示（プレースホルダー）は薄いグレーで、入力した文字と見分けやすく */
+      /* メモボタン：狭いマスでは「📝」と「メモ」を上下2段にして収める */
+      @media (max-width: 600px) {
+        .memoBtn { flex-direction: column; gap: 0 !important; line-height: 1.1; font-size: 10px !important; padding: 3px 0 !important; }
+      }
       input::placeholder, textarea::placeholder {
         color: #cbd5db;
         font-weight: 400;
@@ -5285,7 +5306,7 @@ const styles = {
   dayCellComplete: { boxShadow: "inset 0 0 0 2px #F4C95D", background: "#FFF7DA" },
   dayCellTopRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 3, width: "100%", flexWrap: "wrap" },
   dayNum: { fontSize: 13, fontWeight: 800, color: "#7c98aa" },
-  memoBtn: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3, background: "#EAF7FB", border: "1px dashed #BFE3F0", color: "#7c98aa", borderRadius: 999, padding: "4px 8px", width: "86%", maxWidth: 150, minHeight: 26, boxSizing: "border-box", fontSize: 11.5, fontWeight: 700, cursor: "pointer", marginTop: 2 },
+  memoBtn: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3, background: "#EAF7FB", border: "1px dashed #BFE3F0", color: "#7c98aa", borderRadius: 999, padding: "4px 2px", width: "86%", maxWidth: 150, minHeight: 26, boxSizing: "border-box", whiteSpace: "nowrap", overflow: "hidden", fontSize: 11.5, fontWeight: 700, cursor: "pointer", marginTop: 2 },
   memoBtnFilled: { background: "#FFF3B0", border: "1px solid #E0C24A", color: "#8a6d00" },
   dayHeadTodayTag: { fontSize: 9, color: "#fff", background: "#14588C", borderRadius: 999, padding: "1px 5px", fontWeight: 900 },
   dayHeadTrophy: { fontSize: 12 },
