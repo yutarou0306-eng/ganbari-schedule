@@ -4328,11 +4328,19 @@ function ProgressCard({ isExcused, achievements, subjects, startDate, endDate })
     }
     return out;
   };
+  // やること（スタンプのカード）ごとに別々のバーで集計する
   const metrics = {};
-  const metric = (key, info) => metrics[key] || (metrics[key] = { key, ...info, plan: 0, pace: 0, actual: 0 });
+  const labelOf = (x, info, n) => {
+    const dot = <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 999, background: x.color || "#9bb", marginRight: 2, verticalAlign: "middle" }} />;
+    return { icon: dot, label: `${x.name}　${info.icon}${n > 1 ? (info.unit === "min" ? "時間" : info.label) : ""}` };
+  };
+  const metric = (x, key, info) => {
+    const id = `${x.id}:${key}`;
+    return metrics[id] || (metrics[id] = { key: id, ...info, ...labelOf(x, info, goalsOf(x).length), plan: 0, pace: 0, actual: 0 });
+  };
   forEachPlannedCell(subjects, startDate, endDate, isExcused, (x, k) => {
     goalsOf(x).forEach(([key, info, target]) => {
-      const m = metric(key, info);
+      const m = metric(x, key, info);
       m.plan += target;
       if (k <= todayK) m.pace += target;
     });
@@ -4341,7 +4349,7 @@ function ProgressCard({ isExcused, achievements, subjects, startDate, endDate })
     if (k < startKey || k > endKey) return;
     Object.entries(day || {}).forEach(([sid, v]) => {
       const x = subjects.find((y) => y.id === sid);
-      if (x && v) goalsOf(x).forEach(([key, info, , field]) => (metric(key, info).actual += Number(v[field]) || 0));
+      if (x && v) goalsOf(x).forEach(([key, info, , field]) => (metric(x, key, info).actual += Number(v[field]) || 0));
     });
   });
   const list = Object.values(metrics).filter((m) => m.plan > 0);
