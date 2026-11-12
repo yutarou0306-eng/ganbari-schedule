@@ -1006,15 +1006,18 @@ export default function KidsScheduleApp() {
     return Math.max(0, missed - (recoveries[subject.id] || 0));
   }
 
-  // 大人用：スタンプを押したら、やることに登録した「1回あたり」の値を記録に自動で入れる。
-  // （メモで直すと auto が外れ、そのあとスタンプを取り消しても記録は消えない）
+  // スタンプを押したら、やることの目標の値を「実際にどれだけできた？」に自動で入れる（全テーマ共通）。
+  // 本人はメモで調整するだけ。メモで直すと auto が外れ、スタンプを取り消しても記録は消えない。
   function autoFillOnStamp(dKey, subject) {
-    if (config.theme !== "diet" || !subject) return;
+    if (!subject) return;
     const v = { auto: true };
-    if (subject.measureTime !== false && Number(subject.targetMinutes) > 0) v.minutes = Number(subject.targetMinutes);
+    if (subject.measureTime !== false) v.minutes = Number(subject.targetMinutes || subject.durationMinutes || 30);
+    if (subject.measurePages) v.pages = Number(subject.targetPages || 5);
+    if (subject.measureProblems) v.problems = Number(subject.targetProblems || 10);
+    if (subject.measureCustom && subject.exType !== "strength" && Number(subject.targetCustom) > 0) v.custom = Number(subject.targetCustom);
+    // ここから下は大人用（ダイエット）の項目
     if (subject.measureDistance && Number(subject.targetKm) > 0) v.km = Number(subject.targetKm);
     if (subject.exType === "other" && Number(subject.perSteps) > 0) v.steps = Number(subject.perSteps);
-    if (subject.exType === "other" && Number(subject.targetCustom) > 0) v.custom = Number(subject.targetCustom);
     if (subject.exType === "strength") {
       const items = strengthItems(subject).filter((x) => Number(x.reps) > 0);
       if (items.length) {
@@ -4177,9 +4180,7 @@ function ProgressRow({ icon, label, actual, goal, pace, unit, unitText, startDat
 const progressCardStyle = (shadow) => ({
   position: "relative",
   zIndex: 2,
-  margin: "14px auto 0",
-  width: "calc(100% - 36px)",
-  maxWidth: 640,
+  margin: "14px 18px 0",
   background: "#fff",
   borderRadius: 18,
   padding: "12px 14px",
@@ -4353,7 +4354,7 @@ function ProgressCard({ isExcused, achievements, subjects, startDate, endDate })
       {list.map((m) => (
         <ProgressRow key={m.key} {...m} goal={m.plan} startDate={startDate} endDate={endDate} ink={ink} track="#E6EEF3" />
       ))}
-      <div style={{ fontSize: 11.5, color: "#8aa1b0", textAlign: "center", marginTop: 6, lineHeight: 1.5 }}>「📝 メモ」の「実際にどれだけできた？」に入れた分が合計されます</div>
+      <div style={{ fontSize: 11.5, color: "#8aa1b0", textAlign: "center", marginTop: 6, lineHeight: 1.5 }}>スタンプを押すと目標の値が記録され、「📝 メモ」で調整できます</div>
     </div>
   );
 }
@@ -4371,6 +4372,22 @@ function WeightChart({ weights, startDate, endDate, target, onSaveWeight, onSave
   const [goalVal, setGoalVal] = useState(goal ? String(goal) : "");
   const [editGoal, setEditGoal] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
+  // カードの横幅に合わせてグラフを描く
+  const cardRef = useRef(null);
+  const [cw, setCw] = useState(320);
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const measure = () => setCw(Math.max(240, Math.round(el.clientWidth - 28)));
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", measure);
+      return () => window.removeEventListener("resize", measure);
+    }
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   function pickDay(k) {
     setDay(k);
     setVal(weights[k] ? String(weights[k]) : "");
@@ -4445,10 +4462,11 @@ function WeightChart({ weights, startDate, endDate, target, onSaveWeight, onSave
     borderRadius: 18,
     padding: "12px 14px",
     boxShadow: "0 10px 24px rgba(30,74,59,0.25)",
+    boxSizing: "border-box",
   };
   if (points.length === 0) {
     return (
-      <div style={card}>
+      <div style={card} ref={cardRef}>
         <div style={{ fontWeight: 800, color: "#1E4A3B", fontSize: 15 }}>⚖️ 体重の記録</div>
         {goal && <div style={{ fontSize: 13, fontWeight: 800, color: "#E07A4F", marginTop: 4 }}>目標 {goal.toFixed(1)}kg</div>}
         <div style={{ fontSize: 12.5, color: "#5d7d70", marginTop: 4 }}>下の欄に体重を入れると、ここにグラフが出ます。</div>
@@ -4464,20 +4482,33 @@ function WeightChart({ weights, startDate, endDate, target, onSaveWeight, onSave
   let lo = Math.floor(Math.min(...vals) - 0.5);
   let hi = Math.ceil(Math.max(...vals) + 0.5);
   if ((hi - lo) % 2 === 1) hi += 1;
-  const W = 320, H = 140, L = 34, R = 10, T = 10, B = 22;
-  const span = Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / 86400000));
-  const xOf = (k) => {
+  const W = cw, H = 180, L = 34, R = 16, T = 12, B = 24;
+  // 横軸は「最初の記録日〜最後の記録日」。記録が1つだけなら真ん中に置く
+  const dayNum = (k) => {
     const [y, m, d] = k.split("-").map(Number);
-    const t = new Date(y, m - 1, d).getTime();
-    const day = Math.round((t - startDate.getTime()) / 86400000);
-    return L + ((W - L - R) * Math.min(span, Math.max(0, day))) / span;
+    return Math.round(new Date(y, m - 1, d).getTime() / 86400000);
   };
+  const d0 = dayNum(points[0][0]);
+  const span = dayNum(points[points.length - 1][0]) - d0;
+  const xOf = (k) => (span <= 0 ? (L + W - R) / 2 : L + ((W - L - R) * (dayNum(k) - d0)) / span);
+  // 記録のあった日付を表示（重なる分は間引く。最後の日は必ず出す）
+  const labelKeys = [];
+  for (let i = 0; i < points.length; i++) {
+    const k = points[i][0];
+    const x = xOf(k);
+    if (i === points.length - 1) {
+      while (labelKeys.length && x - xOf(labelKeys[labelKeys.length - 1]) < 34) labelKeys.pop();
+      labelKeys.push(k);
+    } else if (!labelKeys.length || x - xOf(labelKeys[labelKeys.length - 1]) >= 34) {
+      labelKeys.push(k);
+    }
+  }
+  const mdKey = (k) => { const [, m, d] = k.split("-").map(Number); return `${m}/${d}`; };
   const yOf = (w) => T + ((H - T - B) * (hi - w)) / (hi - lo);
   const path = points.map(([k, w], i) => `${i === 0 ? "M" : "L"}${xOf(k).toFixed(1)} ${yOf(w).toFixed(1)}`).join(" ");
   const ticks = [hi, (hi + lo) / 2, lo];
-  const md = (dt) => `${dt.getMonth() + 1}/${dt.getDate()}`;
   return (
-    <div style={card}>
+    <div style={card} ref={cardRef}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
         <div style={{ fontWeight: 800, color: "#1E4A3B", fontSize: 15 }}>⚖️ 体重の記録</div>
         <div style={{ fontSize: 13, fontWeight: 800, color: "#1E4A3B" }}>
@@ -4495,19 +4526,20 @@ function WeightChart({ weights, startDate, endDate, target, onSaveWeight, onSave
           {last <= goal ? "🎉 目標達成！" : `🎯 目標まで あと ${(Math.round((last - goal) * 10) / 10).toFixed(1)}kg`}
         </div>
       )}
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", maxWidth: 560, height: "auto", display: "block", margin: "6px auto 0" }}>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: H, display: "block", margin: "6px 0 0" }}>
         {ticks.map((v, i) => (
           <g key={i}>
             <line x1={L} x2={W - R} y1={yOf(v)} y2={yOf(v)} stroke="#E3EFE8" strokeWidth="1" />
-            <text x={L - 4} y={yOf(v) + 3.5} fontSize="9.5" textAnchor="end" fill="#7a958a">{v}</text>
+            <text x={L - 4} y={yOf(v) + 3.5} fontSize="10.5" textAnchor="end" fill="#7a958a">{v}</text>
           </g>
         ))}
-        <text x={L} y={H - 6} fontSize="9.5" fill="#7a958a">{md(startDate)}</text>
-        <text x={W - R} y={H - 6} fontSize="9.5" textAnchor="end" fill="#7a958a">{md(endDate)}</text>
+        {labelKeys.map((k) => (
+          <text key={k} x={xOf(k)} y={H - 6} fontSize="10.5" textAnchor="middle" fill="#7a958a">{mdKey(k)}</text>
+        ))}
         {goal && (
           <g>
             <line x1={L} x2={W - R} y1={yOf(goal)} y2={yOf(goal)} stroke="#E07A4F" strokeWidth="1.5" strokeDasharray="5 4" />
-            <text x={W - R} y={yOf(goal) - 4} fontSize="9.5" textAnchor="end" fill="#E07A4F" fontWeight="700">目標 {goal}kg</text>
+            <text x={W - R} y={yOf(goal) - 4} fontSize="10.5" textAnchor="end" fill="#E07A4F" fontWeight="700">目標 {goal}kg</text>
           </g>
         )}
         <path d={path} fill="none" stroke="#3E9A74" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />
