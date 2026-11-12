@@ -1035,15 +1035,14 @@ export default function ProfileRoot() {
                   <div style={{ display: "flex", justifyContent: "flex-end", flexWrap: "wrap", gap: "2px 14px", marginTop: 6, paddingTop: 6, borderTop: "1px dashed #E3EEF3", fontSize: 13, fontWeight: 800, color: "#2C6E55" }}>
                     <span style={{ width: "100%", fontSize: 12, color: "#5d7d70" }}>💪 トレーニング</span>
                     <span>⏱ {formatMinutes(s.achvTotals && s.achvTotals.minutes)}</span>
-                    {(s.trackSteps || s.dailySteps > 0) && <span>👟 {(s.dailySteps || 0).toLocaleString()}歩</span>}
-                    {(s.trackDistance || (s.achvTotals && s.achvTotals.km > 0)) && <span>🏃 {Math.round(((s.achvTotals && s.achvTotals.km) || 0) * 10) / 10}km</span>}
+                    {s.dailySteps > 0 && <span>👟 {(s.dailySteps || 0).toLocaleString()}歩</span>}
+                    {s.achvTotals && s.achvTotals.km > 0 && <span>🏃 {Math.round(((s.achvTotals && s.achvTotals.km) || 0) * 10) / 10}km</span>}
                     <span>🔥 {(s.calories || 0).toLocaleString()}kcal</span>
                   </div>
                   {s.life && s.life.any && (
                     <div style={{ display: "flex", justifyContent: "flex-end", flexWrap: "wrap", gap: "2px 14px", marginTop: 4, fontSize: 13, fontWeight: 800, color: "#4a6c85" }}>
                       <span style={{ width: "100%", fontSize: 12, color: "#7c98aa" }}>🏠 日常生活</span>
                       {s.life.steps > 0 && <span>👟 {s.life.steps.toLocaleString()}歩</span>}
-                      {s.life.km > 0 && <span>🏃 {s.life.km}km</span>}
                       <span>🔥 {s.life.kcal.toLocaleString()}kcal</span>
                     </div>
                   )}

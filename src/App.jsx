@@ -1030,7 +1030,7 @@ export default function KidsScheduleApp() {
     if (subject.measureTime !== false && Number(subject.targetMinutes) > 0) v.minutes = Number(subject.targetMinutes);
     if (subject.measureDistance && Number(subject.targetKm) > 0) v.km = Number(subject.targetKm);
     const walkRun = subject.exType === "walk" || subject.exType === "run";
-    if ((tr.steps || walkRun || subject.exType === "other") && subject.exType !== "strength" && Number(subject.perSteps) > 0) v.steps = Number(subject.perSteps);
+    if (subject.exType === "other" && Number(subject.perSteps) > 0) v.steps = Number(subject.perSteps);
     if (subject.exType === "other" && Number(subject.targetCustom) > 0) v.custom = Number(subject.targetCustom);
     if (subject.exType === "strength") {
       const items = strengthItems(subject).filter((x) => Number(x.reps) > 0);
@@ -2175,7 +2175,14 @@ function ExerciseGoalPanel({ subject, set }) {
         inputMode="numeric"
         min={0}
         value={optional && subject.measureTime === false ? "" : mm}
-        onChange={(e) => setTime(e.target.value, ss, optional ? { measureTime: e.target.value !== "" || ss !== "" } : {})}
+        onChange={(e) => {
+          setTime(e.target.value, ss, optional ? { measureTime: e.target.value !== "" || ss !== "" } : {});
+          // 分を2桁入れたら秒の欄へ移る
+          if (e.target.value.length >= 2) {
+            const sec = e.target.parentElement && e.target.parentElement.querySelector("input[data-sec]");
+            if (sec) sec.focus();
+          }
+        }}
         placeholder="30"
         style={{ ...inputSt, width: 70 }}
       />
@@ -2185,6 +2192,7 @@ function ExerciseGoalPanel({ subject, set }) {
         inputMode="numeric"
         min={0}
         max={59}
+        data-sec="1"
         value={optional && subject.measureTime === false ? "" : ss}
         onChange={(e) => setTime(mm, e.target.value, optional ? { measureTime: mm !== "" || e.target.value !== "" } : {})}
         placeholder="0"
@@ -2326,7 +2334,6 @@ function ExerciseGoalPanel({ subject, set }) {
       <div style={{ fontSize: 13.5, fontWeight: 800, color: "#2C6E55" }}>{subject.exType === "run" ? "🏃 ランニング" : "🚶 ウォーキング"}の目標（1回あたり）</div>
       {timeRow("⏱ 時間")}
       {num("targetKm", "km", subject.exType === "run" ? "5" : "3", 0.1, "🏃 距離")}
-      {num("perSteps", "歩", subject.exType === "run" ? "6000" : "4000", 1, "👟 歩数")}
       {num("perKcal", "kcal", subject.exType === "run" ? "300" : "150", 1, "🔥 カロリー")}
       {note}
     </div>
@@ -2464,7 +2471,7 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
       pin: pin.trim(),
       reward: reward.trim(),
       ...(convertingToDiet ? { convertedFrom: initial.theme || "girl" } : initial.convertedFrom ? { convertedFrom: initial.convertedFrom } : {}),
-      ...(theme === "diet" ? { trackSteps, trackDistance } : {}),
+      ...(theme === "diet" ? { trackSteps, trackDistance: false } : {}),
       ...(theme === "diet" ? { dailyGoals: undefined } : {}),
       ...(theme === "diet" && parseFloat(targetWeight) > 0 ? { targetWeight: Math.round(parseFloat(targetWeight) * 10) / 10 } : {}),
       ...(profileId ? { profileId } : {}),
@@ -2623,23 +2630,16 @@ function SetupScreen({ initial, onSave, onCancel, hasExisting, onRequestDelete, 
               <span style={{ fontWeight: 700, color: "#4a6c85" }}>kg</span>
             </div>
 
-            <label style={{ ...styles.label, marginTop: 14 }}>📝 毎日記録するもの</label>
+            <label style={{ ...styles.label, marginTop: 14 }}>📱 毎日の記録（健康アプリの1日の合計）</label>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: "#4a6c85", width: "100%" }}>⏱ 運動時間・🔥 消費カロリーはいつも記録します。</span>
+              <span style={{ fontSize: 13.5, fontWeight: 700, color: "#4a6c85" }}>🔥 消費カロリーは毎日記録します。</span>
               <button
-                onClick={() => setTrackSteps((v) => (v && !trackDistance ? v : !v))}
+                onClick={() => setTrackSteps((v) => !v)}
                 style={{ ...styles.measureToggle, ...(trackSteps ? styles.measureToggleOn : {}) }}
               >
-                👟 歩数
-              </button>
-              <button
-                onClick={() => setTrackDistance((v) => (v && !trackSteps ? v : !v))}
-                style={{ ...styles.measureToggle, ...(trackDistance ? styles.measureToggleOn : {}) }}
-              >
-                🏃 走行距離
+                👟 歩数も記録する
               </button>
             </div>
-            <div style={{ fontSize: 12, color: "#7c98aa", marginTop: 4 }}>歩数と走行距離は、どちらか1つか両方を選べます（あとから「✏️ 修正する」で変えられます）。</div>
 
 
           </>
@@ -3687,22 +3687,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                 歩
               </label>
             )}
-            {tr.distance && (
-            <label style={{ ...styles.achievementField, fontSize: 15, color: "#1E4A3B" }}>
-              🏃 走行距離
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.1"
-                placeholder="例：5.2"
-                value={distKm}
-                onChange={(e) => setDistKm(e.target.value)}
-                style={{ ...styles.achievementInput, width: 84, borderColor: "#A9DEC4", fontSize: 16 }}
-              />
-              km
-            </label>
-            )}
+
             <div style={{ fontSize: 11.5, color: "#5d7d70", lineHeight: 1.5 }}>
               健康アプリに出ている1日の合計をそのまま入れてください（カロリーは「アクティブカロリー」）。下の「実際にどれだけできた？」のトレーニング分を引いた残りが、日常生活の分になります。
             </div>
@@ -3718,7 +3703,6 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
               const parts = [];
               if (parseFloat(stepCount) > 0) parts.push(`👟 ${Math.max(0, Math.round(parseFloat(stepCount) - train.steps)).toLocaleString()}歩`);
               if (parseFloat(kcal) > 0) parts.push(`🔥 ${Math.max(0, Math.round(parseFloat(kcal) - train.kcal)).toLocaleString()}kcal`);
-              if (parseFloat(distKm) > 0) parts.push(`🏃 ${Math.max(0, Math.round((parseFloat(distKm) - train.km) * 10) / 10)}km`);
               return parts.length ? (
                 <div style={{ fontSize: 13, fontWeight: 800, color: "#1E4A3B", background: "#fff", borderRadius: 10, padding: "6px 10px" }}>
                   🏠 日常生活の分：{parts.join("　")}
@@ -3760,7 +3744,14 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                           min={0}
                           placeholder={minSecParts(s.targetMinutes || 30)[0]}
                           value={mm}
-                          onChange={(e) => setMinSec(s.id, e.target.value, ss)}
+                          onChange={(e) => {
+                            setMinSec(s.id, e.target.value, ss);
+                            // 分を2桁入れたら秒の欄へ移る
+                            if (e.target.value.length >= 2) {
+                              const sec = e.target.parentElement && e.target.parentElement.querySelector("input[data-sec]");
+                              if (sec) sec.focus();
+                            }
+                          }}
                           style={{ ...styles.achievementInput, width: 56 }}
                         />
                         分
@@ -3769,6 +3760,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                           inputMode="numeric"
                           min={0}
                           max={59}
+                          data-sec="1"
                           placeholder={minSecParts(s.targetMinutes || 30)[1]}
                           value={ss}
                           onChange={(e) => setMinSec(s.id, mm, String(Math.min(59, Math.max(0, parseInt(e.target.value || "0", 10) || 0))))}
@@ -3822,7 +3814,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                       km
                     </label>
                   )}
-                  {showWeight && ["walk", "run", "other"].includes(s.exType) && (
+                  {showWeight && s.exType === "other" && (
                     <label style={styles.achievementField}>
                       👟
                       <input
@@ -3918,7 +3910,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
           <button style={styles.modalCancel} onClick={onClose}>
             とじる
           </button>
-          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, undefined, showWeight ? kcal : undefined, showWeight && tr.distance ? distKm : undefined, showWeight && tr.steps ? stepCount : undefined)}>
+          <button style={styles.modalConfirm} onClick={() => onSave(text, achv, undefined, showWeight ? kcal : undefined, undefined, showWeight && tr.steps ? stepCount : undefined)}>
             保存する
           </button>
         </div>
@@ -4218,7 +4210,7 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
     subs.forEach((x) => {
       const add = {
         min: x.measureTime !== false ? Number(x.targetMinutes) || 0 : 0,
-        steps: x.exType !== "strength" ? Number(x.perSteps) || 0 : 0,
+        steps: x.exType === "other" ? Number(x.perSteps) || 0 : 0,
         km: x.measureDistance ? Number(x.targetKm) || 0 : 0,
         kcal: Number(x.perKcal) || 0,
       };
@@ -4330,8 +4322,8 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
 
   const entries = [
     ["⏱", "運動時間", totalMin, "min", plan.min > 0],
-    ...(tr.steps || plan.steps > 0 ? [["👟", "歩数", totalSteps, "steps", plan.steps > 0]] : []),
-    ...(tr.distance || plan.km > 0 ? [["🏃", "走行距離", totalKm, "km", plan.km > 0]] : []),
+    ...(plan.steps > 0 || totalSteps > 0 ? [["👟", "歩数", totalSteps, "steps", plan.steps > 0]] : []),
+    ...(plan.km > 0 || totalKm > 0 ? [["🏃", "走行距離", totalKm, "km", plan.km > 0]] : []),
     ["🔥", "消費カロリー", totalKcal, "kcal", plan.kcal > 0],
   ];
   const withGoal = entries.filter((e) => e[4]);
@@ -4377,16 +4369,15 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
       {/* 日常生活（トレーニング以外） */}
       <div style={{ marginTop: 12, paddingTop: 10, borderTop: "2px solid #E3EEF3" }}>
         <div style={{ fontSize: 13, color: "#1E4A3B", fontWeight: 800, textAlign: "center", marginBottom: 6 }}>🏠 日常生活（トレーニング以外）</div>
-        {lifeDays.steps + lifeDays.kcal + lifeDays.km === 0 ? (
+        {lifeDays.steps + lifeDays.kcal === 0 ? (
           <div style={{ fontSize: 12, color: "#8aa69a", textAlign: "center", lineHeight: 1.5 }}>
             「📝 メモ」に健康アプリの1日の合計を入れると、トレーニング分を引いた日常生活の分がここに出ます
           </div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[tr.steps || lifeDays.steps, true, tr.distance || lifeDays.km].filter(Boolean).length}, 1fr)`, columnGap: 6 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${tr0.steps || lifeDays.steps ? 2 : 1}, 1fr)`, columnGap: 6 }}>
             {[
-              ...(tr.steps || lifeDays.steps ? [["👟", "歩数", life.steps, "steps"]] : []),
+              ...(tr0.steps || lifeDays.steps ? [["👟", "歩数", life.steps, "steps"]] : []),
               ["🔥", "消費カロリー", life.kcal, "kcal"],
-              ...(tr.distance || lifeDays.km ? [["🏃", "距離", life.km, "km"]] : []),
             ].map(([icon, label, val, unit]) => (
               <div key={label} style={{ textAlign: "center", minWidth: 0 }}>
                 <div style={{ fontSize: 12, color: "#5d7d70", fontWeight: 700 }}>{label}</div>
