@@ -95,6 +95,39 @@ function countCaloriesInBlob(blob) {
   return Object.values(cal).reduce((sum, c) => sum + (Number(c) || 0), 0) + totalAchievementsInBlob(blob).kcal;
 }
 
+// 大人用：日常生活の分＝健康アプリの1日の合計 − その日のトレーニング分（日ごとに計算）
+function dailyLifeInBlob(blob) {
+  const ach = (blob && blob.achievements) || {};
+  const subjects = (blob && blob.config && blob.config.subjects) || [];
+  const train = {};
+  Object.entries(ach).forEach(([k, day]) => {
+    Object.entries(day || {}).forEach(([sid, v]) => {
+      if (!v) return;
+      const subj = subjects.find((x) => x.id === sid) || {};
+      let km = Number(v.km) || 0;
+      if (/^(km|キロ|ｋｍ)$/i.test((subj.customUnit || "").trim())) km += Number(v.custom) || 0;
+      const t = train[k] || (train[k] = { steps: 0, kcal: 0, km: 0 });
+      t.steps += Number(v.steps) || 0;
+      t.kcal += Number(v.kcal) || 0;
+      t.km += km;
+    });
+  });
+  const life = { steps: 0, kcal: 0, km: 0, any: false };
+  [
+    ["steps", blob && blob.steps],
+    ["kcal", blob && blob.calories],
+    ["km", blob && blob.distances],
+  ].forEach(([key, src]) => {
+    Object.entries(src || {}).forEach(([k, n]) => {
+      if (!(Number(n) > 0)) return;
+      life.any = true;
+      life[key] += Math.max(0, Number(n) - ((train[k] && train[k][key]) || 0));
+    });
+  });
+  life.km = Math.round(life.km * 10) / 10;
+  return life;
+}
+
 function countStampsInBlob(blob) {
   const completions = (blob && blob.completions) || {};
   const excused = (blob && blob.excused) || {};
@@ -298,11 +331,12 @@ export default function ProfileRoot() {
             startDate: row.blob.config.startDate || "",
             endDate: row.blob.config.endDate || "",
             stamps: countStampsInBlob(row.blob),
-            calories: countCaloriesInBlob(row.blob),
-            dailySteps: Object.values((row.blob && row.blob.steps) || {}).reduce((a, n) => a + (Number(n) || 0), 0) + totalAchievementsInBlob(row.blob).steps,
+            calories: totalAchievementsInBlob(row.blob).kcal, // トレーニング分
+            life: dailyLifeInBlob(row.blob), // 日常生活の分
+            dailySteps: totalAchievementsInBlob(row.blob).steps, // トレーニング分
             trackSteps: !!row.blob.config.trackSteps,
             trackDistance: row.blob.config.trackDistance !== undefined ? !!row.blob.config.trackDistance : !row.blob.config.trackSteps,
-            dailyKm: Object.values((row.blob && row.blob.distances) || {}).reduce((a, n) => a + (Number(n) || 0), 0),
+            dailyKm: 0,
             awardedCard: row.blob.config.awardedCard || null,
             // ファミリアが登場する条件：30日以上 かつ やること2つ以上
             cardEligible: (() => {
@@ -997,12 +1031,23 @@ export default function ProfileRoot() {
                 </div>
                 {s.theme === "diet" && (
                   // 大人用（ダイエット）は運動時間・走行距離・消費カロリーの合計をスケジュールごとに表示
+                  <>
                   <div style={{ display: "flex", justifyContent: "flex-end", flexWrap: "wrap", gap: "2px 14px", marginTop: 6, paddingTop: 6, borderTop: "1px dashed #E3EEF3", fontSize: 13, fontWeight: 800, color: "#2C6E55" }}>
+                    <span style={{ width: "100%", fontSize: 12, color: "#5d7d70" }}>💪 トレーニング</span>
                     <span>⏱ {formatMinutes(s.achvTotals && s.achvTotals.minutes)}</span>
                     {(s.trackSteps || s.dailySteps > 0) && <span>👟 {(s.dailySteps || 0).toLocaleString()}歩</span>}
-                    {(s.trackDistance || s.dailyKm > 0) && <span>🏃 {Math.round((((s.achvTotals && s.achvTotals.km) || 0) + (s.dailyKm || 0)) * 10) / 10}km</span>}
+                    {(s.trackDistance || (s.achvTotals && s.achvTotals.km > 0)) && <span>🏃 {Math.round(((s.achvTotals && s.achvTotals.km) || 0) * 10) / 10}km</span>}
                     <span>🔥 {(s.calories || 0).toLocaleString()}kcal</span>
                   </div>
+                  {s.life && s.life.any && (
+                    <div style={{ display: "flex", justifyContent: "flex-end", flexWrap: "wrap", gap: "2px 14px", marginTop: 4, fontSize: 13, fontWeight: 800, color: "#4a6c85" }}>
+                      <span style={{ width: "100%", fontSize: 12, color: "#7c98aa" }}>🏠 日常生活</span>
+                      {s.life.steps > 0 && <span>👟 {s.life.steps.toLocaleString()}歩</span>}
+                      {s.life.km > 0 && <span>🏃 {s.life.km}km</span>}
+                      <span>🔥 {s.life.kcal.toLocaleString()}kcal</span>
+                    </div>
+                  )}
+                  </>
                 )}
                 </div>
               ))}
@@ -1184,8 +1229,11 @@ export default function ProfileRoot() {
                 if (t.km > 0) achvParts.push(`🏃${Math.round(t.km * 10) / 10}km`);
                 achvParts.push(...customTotalsText(t));
                 if (s.dailySteps > 0) achvParts.push(`👟${s.dailySteps.toLocaleString()}歩`);
-                if (s.dailyKm > 0) achvParts.push(`🏃${Math.round(s.dailyKm * 10) / 10}km`);
                 if (s.calories > 0) achvParts.push(`🔥${s.calories.toLocaleString()}kcal`);
+                if (s.life && s.life.any)
+                  achvParts.push(
+                    `🏠日常 ${[s.life.steps > 0 ? s.life.steps.toLocaleString() + "歩" : "", s.life.kcal > 0 ? s.life.kcal.toLocaleString() + "kcal" : ""].filter(Boolean).join(" ")}`
+                  );
                 return (
                   <div
                     key={s.id}

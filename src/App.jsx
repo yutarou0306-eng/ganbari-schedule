@@ -3655,7 +3655,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
 
         {showWeight && (
           <div style={{ ...styles.achievementSection, background: "#EEF8F2", borderColor: "#BFE6C9", display: "flex", flexDirection: "column", gap: 10 }}>
-            <p style={{ ...styles.achievementSectionLabel, color: "#2C6E55", margin: 0 }}>やること以外の分（通勤・家事など・任意）</p>
+            <p style={{ ...styles.achievementSectionLabel, color: "#2C6E55", margin: 0 }}>📱 健康アプリの1日の合計（トレーニング込み・任意）</p>
 
             <label style={{ ...styles.achievementField, fontSize: 15, color: "#1E4A3B" }}>
               🔥 消費カロリー
@@ -3664,7 +3664,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                 inputMode="numeric"
                 min={0}
                 step="1"
-                placeholder="例：250"
+                placeholder="例：450"
                 value={kcal}
                 onChange={(e) => setKcal(e.target.value)}
                 style={{ ...styles.achievementInput, width: 84, borderColor: "#A9DEC4", fontSize: 16 }}
@@ -3679,7 +3679,7 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
                   inputMode="numeric"
                   min={0}
                   step="1"
-                  placeholder="例：8000"
+                  placeholder="例：12000"
                   value={stepCount}
                   onChange={(e) => setStepCount(e.target.value)}
                   style={{ ...styles.achievementInput, width: 96, borderColor: "#A9DEC4", fontSize: 16 }}
@@ -3704,8 +3704,27 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
             </label>
             )}
             <div style={{ fontSize: 11.5, color: "#5d7d70", lineHeight: 1.5 }}>
-              消費カロリーは、健康アプリの「アクティブカロリー」（運動で消費した分）を入れてください。
+              健康アプリに出ている1日の合計をそのまま入れてください（カロリーは「アクティブカロリー」）。下の「実際にどれだけできた？」のトレーニング分を引いた残りが、日常生活の分になります。
             </div>
+            {(() => {
+              // 日常生活の分を、その場で計算して見せる
+              const train = { steps: 0, kcal: 0, km: 0 };
+              Object.entries(achv || {}).forEach(([sid, v]) => {
+                if (!v) return;
+                train.steps += Number(v.steps) || 0;
+                train.kcal += Number(v.kcal) || 0;
+                train.km += Number(v.km) || 0;
+              });
+              const parts = [];
+              if (parseFloat(stepCount) > 0) parts.push(`👟 ${Math.max(0, Math.round(parseFloat(stepCount) - train.steps)).toLocaleString()}歩`);
+              if (parseFloat(kcal) > 0) parts.push(`🔥 ${Math.max(0, Math.round(parseFloat(kcal) - train.kcal)).toLocaleString()}kcal`);
+              if (parseFloat(distKm) > 0) parts.push(`🏃 ${Math.max(0, Math.round((parseFloat(distKm) - train.km) * 10) / 10)}km`);
+              return parts.length ? (
+                <div style={{ fontSize: 13, fontWeight: 800, color: "#1E4A3B", background: "#fff", borderRadius: 10, padding: "6px 10px" }}>
+                  🏠 日常生活の分：{parts.join("　")}
+                </div>
+              ) : null;
+            })()}
           </div>
         )}
 
@@ -4019,9 +4038,9 @@ function RecordEntryCard({ entry: e, subjects, commenterName, onCommenterNameCha
         {e.date.getMonth() + 1}月{e.date.getDate()}日
       </div>
       {e.weight && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>⚖️ 体重：{Number(e.weight).toFixed(1)}kg</div>}
-      {e.steps && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>👟 歩数：{Number(e.steps).toLocaleString()}歩</div>}
-      {e.dist && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>🏃 走行距離：{e.dist}km</div>}
-      {e.kcal && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>🔥 消費カロリー：{Number(e.kcal).toLocaleString()}kcal</div>}
+      {e.steps && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>📱 1日の歩数：{Number(e.steps).toLocaleString()}歩</div>}
+      {e.dist && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>📱 1日の距離：{e.dist}km</div>}
+      {e.kcal && <div style={{ ...styles.recordEntryAchv, color: "#1E4A3B" }}>📱 1日の消費カロリー：{Number(e.kcal).toLocaleString()}kcal</div>}
       {achvParts.map((a) => (
         <div key={a.name} style={{ ...styles.recordEntryAchv, color: a.color }}>
           {a.name}：{a.text}
@@ -4130,16 +4149,17 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
   const startKey = dateKey(startDate);
   const endKey = dateKey(endDate);
   const inRange = (k) => k >= startKey && k <= endKey;
-  const calEntries = Object.entries(calories).filter(([k, c]) => inRange(k) && c > 0);
-  let totalKcal = calEntries.reduce((sum, [, c]) => sum + Number(c), 0);
+  // バーはトレーニング（やることの記録）だけで集計する。
+  // メモの「健康アプリの1日の合計」から、その日のトレーニング分を引いたものを「日常生活」とする。
+  let totalKcal = 0;
   // メモで入れたその日の走行距離（km）
   const tr0 = track || { steps: false, distance: true };
   const tr = {
     steps: tr0.steps || subjects.some((x) => x.exType === "walk" || x.exType === "run" || (x.exType === "other" && Number(x.perSteps) > 0)),
     distance: tr0.distance || subjects.some((x) => x.measureDistance),
   };
-  let totalSteps = Object.entries(steps || {}).filter(([k, n]) => inRange(k) && n > 0).reduce((sum, [, n]) => sum + Number(n), 0);
-  const dailyKm = Object.entries(distances || {}).filter(([k, n]) => inRange(k) && n > 0).reduce((sum, [, n]) => sum + Number(n), 0);
+  let totalSteps = 0;
+  const dayTrain = {}; // { 日付: { steps, kcal, km } } その日のトレーニング分
 
   // 運動時間・距離は、各やることの「実際にどれだけできた？」の記録から合計する。
   // 距離は「🏃距離」の記録に加えて、自由目標の単位が km のものも数える。
@@ -4156,9 +4176,29 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
       let km = Number(v.km) || 0;
       if (subj && /^(km|キロ|ｋｍ)$/i.test((subj.customUnit || "").trim())) km += Number(v.custom) || 0;
       if (km > 0) kmBySubj[sid] = (kmBySubj[sid] || 0) + km;
+      const t = dayTrain[k] || (dayTrain[k] = { steps: 0, kcal: 0, km: 0 });
+      t.steps += Number(v.steps) || 0;
+      t.kcal += Number(v.kcal) || 0;
+      t.km += km;
     });
   });
-  const totalKm = Math.round((dailyKm + Object.values(kmBySubj).reduce((a, b) => a + b, 0)) * 10) / 10;
+  const totalKm = Math.round(Object.values(kmBySubj).reduce((a, b) => a + b, 0) * 10) / 10;
+
+  // 日常生活＝健康アプリの1日の合計 − その日のトレーニング分（マイナスにはしない）
+  const life = { steps: 0, kcal: 0, km: 0 };
+  const lifeDays = { steps: 0, kcal: 0, km: 0 };
+  [
+    ["steps", steps],
+    ["kcal", calories],
+    ["km", distances],
+  ].forEach(([key, src]) => {
+    Object.entries(src || {}).forEach(([k, n]) => {
+      if (!inRange(k) || !(Number(n) > 0)) return;
+      life[key] += Math.max(0, Number(n) - ((dayTrain[k] && dayTrain[k][key]) || 0));
+      lifeDays[key] += 1;
+    });
+  });
+  life.km = Math.round(life.km * 10) / 10;
   const kmBreakdown = Object.entries(kmBySubj).map(([sid, km]) => {
     const subj = subjects.find((x) => x.id === sid);
     return `${(subj && subj.name) || "？"} ${Math.round(km * 10) / 10}km`;
@@ -4300,7 +4340,7 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
 
   return (
     <div style={{ position: "relative", zIndex: 2, margin: "14px auto 0", width: "calc(100% - 36px)", maxWidth: 640, background: "#fff", borderRadius: 18, padding: "12px 14px", boxShadow: "0 10px 24px rgba(30,74,59,0.25)", boxSizing: "border-box" }}>
-      <div style={{ fontSize: 13, color: "#1E4A3B", fontWeight: 800, textAlign: "center", marginBottom: 4 }}>このスケジュールの合計</div>
+      <div style={{ fontSize: 13, color: "#1E4A3B", fontWeight: 800, textAlign: "center", marginBottom: 4 }}>💪 トレーニングの合計</div>
       {allDone && (
         <div style={{ textAlign: "center", margin: "4px 0 8px", padding: "8px 10px", borderRadius: 12, background: "linear-gradient(135deg,#FFF3C4,#DFF3E6)", fontWeight: 900, color: "#1E4A3B" }}>
           🎉 目標をすべて達成しました！すばらしい！
@@ -4327,11 +4367,41 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
           「目標なし」の項目は、「✏️ 修正する」でやることの種類（ウォーキングなど）を選び、1回あたりの値を入れると進み具合が出ます
         </div>
       )}
-      {kmBreakdown.length > 1 && dailyKm === 0 && (
+      {kmBreakdown.length > 1 && (
         <div style={{ fontSize: 11.5, color: "#5d7d70", textAlign: "center", marginTop: 4 }}>（{kmBreakdown.join("・")}）</div>
       )}
       <div style={{ fontSize: 11.5, color: "#8aa69a", textAlign: "center", marginTop: 6 }}>
         目標＝やることに入れた「1回あたり」の値 × スタンプの予定（お休みを除く）／バーの縦線は今日までの予定の位置
+      </div>
+
+      {/* 日常生活（トレーニング以外） */}
+      <div style={{ marginTop: 12, paddingTop: 10, borderTop: "2px solid #E3EEF3" }}>
+        <div style={{ fontSize: 13, color: "#1E4A3B", fontWeight: 800, textAlign: "center", marginBottom: 6 }}>🏠 日常生活（トレーニング以外）</div>
+        {lifeDays.steps + lifeDays.kcal + lifeDays.km === 0 ? (
+          <div style={{ fontSize: 12, color: "#8aa69a", textAlign: "center", lineHeight: 1.5 }}>
+            「📝 メモ」に健康アプリの1日の合計を入れると、トレーニング分を引いた日常生活の分がここに出ます
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${[tr.steps || lifeDays.steps, true, tr.distance || lifeDays.km].filter(Boolean).length}, 1fr)`, columnGap: 6 }}>
+            {[
+              ...(tr.steps || lifeDays.steps ? [["👟", "歩数", life.steps, "steps"]] : []),
+              ["🔥", "消費カロリー", life.kcal, "kcal"],
+              ...(tr.distance || lifeDays.km ? [["🏃", "距離", life.km, "km"]] : []),
+            ].map(([icon, label, val, unit]) => (
+              <div key={label} style={{ textAlign: "center", minWidth: 0 }}>
+                <div style={{ fontSize: 12, color: "#5d7d70", fontWeight: 700 }}>{label}</div>
+                <div style={{ fontSize: 20, fontWeight: 900, color: "#1E4A3B", whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: 15 }}>{icon}</span>
+                  {fmt(val, unit)}
+                  <span style={{ fontSize: 11.5, marginLeft: 2 }}>{unitLabel[unit]}</span>
+                </div>
+                <div style={{ fontSize: 11, color: "#8aa69a" }}>
+                  {lifeDays[unit] > 0 ? `1日平均 ${fmt(val / lifeDays[unit], unit)}${unitLabel[unit]}` : "記録なし"}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
