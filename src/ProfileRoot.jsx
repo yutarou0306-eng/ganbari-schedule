@@ -107,7 +107,7 @@ function dailyLifeInBlob(blob) {
       let km = Number(v.km) || 0;
       if (/^(km|キロ|ｋｍ)$/i.test((subj.customUnit || "").trim())) km += Number(v.custom) || 0;
       const t = train[k] || (train[k] = { steps: 0, kcal: 0, km: 0 });
-      t.steps += Number(v.steps) || 0;
+      if (subj.exType === "other") t.steps += Number(v.steps) || 0; // 歩数はその他トレーニングだけ
       t.kcal += Number(v.kcal) || 0;
       t.km += km;
     });
@@ -167,7 +167,9 @@ function totalAchievementsInBlob(blob) {
       totals.pages += Number(vals.pages) || 0;
       totals.problems += Number(vals.problems) || 0;
       totals.km += Number(vals.km) || 0;
-      totals.steps += Number(vals.steps) || 0;
+      // 歩数はその他トレーニングだけ数える（ウォーキング等に前に自動入力された分は除く）
+      const sSubj = subjects.find((x) => x.id === subjId);
+      if (sSubj && sSubj.exType === "other") totals.steps += Number(vals.steps) || 0;
       totals.kcal += Number(vals.kcal) || 0;
       const n = Number(vals.custom) || 0;
       if (n > 0) {

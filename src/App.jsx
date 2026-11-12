@@ -3699,7 +3699,8 @@ function NoteModal({ date, initialText, initialAchievements, comments, subjects,
               const train = { steps: 0, kcal: 0, km: 0 };
               Object.entries(achv || {}).forEach(([sid, v]) => {
                 if (!v) return;
-                train.steps += Number(v.steps) || 0;
+                const sj = (subjects || []).find((x) => x.id === sid);
+                if (sj && sj.exType === "other") train.steps += Number(v.steps) || 0;
                 train.kcal += Number(v.kcal) || 0;
                 train.km += Number(v.km) || 0;
               });
@@ -4164,15 +4165,17 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
     if (!inRange(k)) return;
     Object.entries(day || {}).forEach(([sid, v]) => {
       if (!v) return;
-      totalMin += Number(v.minutes) || 0;
-      totalSteps += Number(v.steps) || 0;
-      totalKcal += Number(v.kcal) || 0;
       const subj = subjects.find((x) => x.id === sid);
+      // 歩数はその他トレーニングだけ（ウォーキング等に前に自動入力された歩数は数えない）
+      const stepsV = subj && subj.exType === "other" ? Number(v.steps) || 0 : 0;
+      totalMin += Number(v.minutes) || 0;
+      totalSteps += stepsV;
+      totalKcal += Number(v.kcal) || 0;
       let km = Number(v.km) || 0;
       if (subj && /^(km|キロ|ｋｍ)$/i.test((subj.customUnit || "").trim())) km += Number(v.custom) || 0;
       if (km > 0) kmBySubj[sid] = (kmBySubj[sid] || 0) + km;
       const t = dayTrain[k] || (dayTrain[k] = { steps: 0, kcal: 0, km: 0 });
-      t.steps += Number(v.steps) || 0;
+      t.steps += stepsV;
       t.kcal += Number(v.kcal) || 0;
       t.km += km;
     });
