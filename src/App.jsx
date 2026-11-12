@@ -4107,20 +4107,40 @@ function formatAmount(n, unit) {
 const mdLabel = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
 
 // 1項目分のバー：実績／目標（%）、開始日・今日・最終日、予定との差
-function ProgressRow({ icon, label, actual, goal, pace, unit, unitText, startDate, endDate, ink, track }) {
+function ProgressRow({ icon, label, actual, goal, pace, unit, unitText, startDate, endDate, ink, track, details, bigLabel }) {
   const u = unitText || "";
+  const [open, setOpen] = useState(false);
+  const hasDetails = Array.isArray(details) && details.length > 0;
+  // タップで開く「内訳」（記録のあった日とその値）
+  const breakdown = hasDetails && open && (
+    <div style={{ marginTop: 6, padding: "8px 10px", background: "#F5F9FB", borderRadius: 10, fontSize: 12.5, color: "#3f5a66" }}>
+      <div style={{ fontWeight: 800, color: ink, marginBottom: 4 }}>内訳（{details.length}回）</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 14px" }}>
+        {details.map(([k, v]) => {
+          const [, mm, dd] = k.split("-").map(Number);
+          return (
+            <span key={k} style={{ whiteSpace: "nowrap" }}>
+              <span style={{ color: "#7a958a" }}>{mm}/{dd}</span> <b>{formatAmount(v, unit)}</b>{u}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
   const head = (right) => (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
-      <span style={{ fontSize: 13, fontWeight: 800, color: ink }}>
+      <span style={{ fontSize: bigLabel ? 15.5 : 13, fontWeight: 800, color: ink }}>
         {icon} {label}
+        {hasDetails && <span style={{ fontSize: 11, fontWeight: 700, color: "#8aa1b0", marginLeft: 6, whiteSpace: "nowrap", display: "inline-block" }}>{open ? "▾ 内訳をとじる" : "▸ タップで内訳"}</span>}
       </span>
       <span style={{ fontSize: 13, color: "#6b8590", whiteSpace: "nowrap" }}>{right}</span>
     </div>
   );
   // 目標がない項目は合計だけ
+  const rowProps = hasDetails ? { onClick: () => setOpen((o) => !o), role: "button", style: { padding: "6px 2px", cursor: "pointer" } } : { style: { padding: "6px 2px" } };
   if (!(goal > 0)) {
     return (
-      <div style={{ padding: "6px 2px" }}>
+      <div {...rowProps}>
         {head(
           <>
             <b style={{ fontSize: 19, color: ink }}>{formatAmount(actual, unit)}</b>
@@ -4128,6 +4148,7 @@ function ProgressRow({ icon, label, actual, goal, pace, unit, unitText, startDat
           </>
         )}
         <div style={{ height: 12, borderRadius: 999, background: track, marginTop: 4, opacity: 0.6 }} />
+        {breakdown}
       </div>
     );
   }
@@ -4139,7 +4160,7 @@ function ProgressRow({ icon, label, actual, goal, pace, unit, unitText, startDat
   const good = done || ahead;
   const todayK = todayStr();
   return (
-    <div style={{ padding: "6px 2px" }}>
+    <div {...rowProps}>
       {head(
         <>
           <b style={{ fontSize: 19, color: ink }}>{formatAmount(actual, unit)}</b> ／ {formatAmount(goal, unit)}
@@ -4173,6 +4194,7 @@ function ProgressRow({ icon, label, actual, goal, pace, unit, unitText, startDat
           ? "予定どおり👍"
           : `予定より ${formatAmount(pace - actual, unit)}${u} 遅れています`}
       </div>
+      {breakdown}
     </div>
   );
 }
@@ -4331,12 +4353,12 @@ function ProgressCard({ isExcused, achievements, subjects, startDate, endDate })
   // やること（スタンプのカード）ごとに別々のバーで集計する
   const metrics = {};
   const labelOf = (x, info, n) => {
-    const dot = <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: 999, background: x.color || "#9bb", marginRight: 2, verticalAlign: "middle" }} />;
+    const dot = <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 999, background: x.color || "#9bb", marginRight: 2, verticalAlign: "middle" }} />;
     return { icon: dot, label: `${x.name}　${info.icon}${n > 1 ? (info.unit === "min" ? "時間" : info.label) : ""}` };
   };
   const metric = (x, key, info) => {
     const id = `${x.id}:${key}`;
-    return metrics[id] || (metrics[id] = { key: id, ...info, ...labelOf(x, info, goalsOf(x).length), plan: 0, pace: 0, actual: 0 });
+    return metrics[id] || (metrics[id] = { key: id, ...info, ...labelOf(x, info, goalsOf(x).length), plan: 0, pace: 0, actual: 0, details: [] });
   };
   forEachPlannedCell(subjects, startDate, endDate, isExcused, (x, k) => {
     goalsOf(x).forEach(([key, info, target]) => {
@@ -4349,18 +4371,25 @@ function ProgressCard({ isExcused, achievements, subjects, startDate, endDate })
     if (k < startKey || k > endKey) return;
     Object.entries(day || {}).forEach(([sid, v]) => {
       const x = subjects.find((y) => y.id === sid);
-      if (x && v) goalsOf(x).forEach(([key, info, , field]) => (metric(x, key, info).actual += Number(v[field]) || 0));
+      if (x && v) goalsOf(x).forEach(([key, info, , field]) => {
+          const n = Number(v[field]) || 0;
+          if (n <= 0) return;
+          const m = metric(x, key, info);
+          m.actual += n;
+          m.details.push([k, n]);
+        });
     });
   });
   const list = Object.values(metrics).filter((m) => m.plan > 0);
   if (list.length === 0) return null;
+  list.forEach((m) => m.details.sort(([a], [b]) => (a < b ? -1 : 1)));
   const ink = "#0B3D62";
 
   return (
     <div style={progressCardStyle("rgba(11,61,98,0.22)")}>
       <div style={{ fontSize: 13, color: ink, fontWeight: 800, textAlign: "center", marginBottom: 4 }}>📊 がんばりの合計</div>
       {list.map((m) => (
-        <ProgressRow key={m.key} {...m} goal={m.plan} startDate={startDate} endDate={endDate} ink={ink} track="#E6EEF3" />
+        <ProgressRow key={m.key} {...m} bigLabel goal={m.plan} startDate={startDate} endDate={endDate} ink={ink} track="#E6EEF3" />
       ))}
       <div style={{ fontSize: 11.5, color: "#8aa1b0", textAlign: "center", marginTop: 6, lineHeight: 1.5 }}>スタンプを押すと目標の値が記録され、「📝 メモ」で調整できます</div>
     </div>
@@ -5256,7 +5285,7 @@ const styles = {
   dayCellComplete: { boxShadow: "inset 0 0 0 2px #F4C95D", background: "#FFF7DA" },
   dayCellTopRow: { display: "flex", alignItems: "center", justifyContent: "center", gap: 3, width: "100%", flexWrap: "wrap" },
   dayNum: { fontSize: 13, fontWeight: 800, color: "#7c98aa" },
-  memoBtn: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3, background: "#EAF7FB", border: "1px dashed #BFE3F0", color: "#7c98aa", borderRadius: 999, padding: "2px 8px", fontSize: 10.5, fontWeight: 700, cursor: "pointer", marginTop: 2 },
+  memoBtn: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 3, background: "#EAF7FB", border: "1px dashed #BFE3F0", color: "#7c98aa", borderRadius: 999, padding: "4px 8px", width: "86%", maxWidth: 150, minHeight: 26, boxSizing: "border-box", fontSize: 11.5, fontWeight: 700, cursor: "pointer", marginTop: 2 },
   memoBtnFilled: { background: "#FFF3B0", border: "1px solid #E0C24A", color: "#8a6d00" },
   dayHeadTodayTag: { fontSize: 9, color: "#fff", background: "#14588C", borderRadius: 999, padding: "1px 5px", fontWeight: 900 },
   dayHeadTrophy: { fontSize: 12 },
