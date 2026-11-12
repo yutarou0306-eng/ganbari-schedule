@@ -3024,6 +3024,9 @@ function MainScreen({
       {theme.key === "diet" && (
         <CalorieTotal calories={calories || {}} distances={distances || {}} steps={steps || {}} track={trackFlags(config)} isExcused={isExcused} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
       )}
+      {theme.key !== "diet" && (
+        <ProgressCard isExcused={isExcused} achievements={achievements || {}} subjects={subjects} startDate={startDate} endDate={endDate} />
+      )}
       {theme.key === "diet" && <WeightChart weights={weights || {}} startDate={startDate} endDate={endDate} target={config.targetWeight} onSaveWeight={onSaveWeight} onSaveTarget={onSaveTargetWeight} />}
 
       {/* ロックの案内はカレンダーのすぐ上（スタンプの説明と一緒）に表示 */}
@@ -4393,6 +4396,119 @@ function CalorieTotal({ calories, distances, steps, track, isExcused, achievemen
             ))}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// 女の子用・男の子用：がんばりの進み具合（時間・ページ数・問題数・自由目標）
+// 目標＝やることの目標 × スタンプの予定（お休みを除く）、実績＝「実際にどれだけできた？」の記録
+function ProgressCard({ isExcused, achievements, subjects, startDate, endDate }) {
+  const startKey = dateKey(startDate);
+  const endKey = dateKey(endDate);
+  const todayK = todayStr();
+  // 集計する項目（自由目標は「名前＋単位」ごと）
+  const metrics = {};
+  const addMetric = (key, icon, label, unit) => {
+    if (!metrics[key]) metrics[key] = { key, icon, label, unit, plan: 0, planToDate: 0, actual: 0 };
+    return metrics[key];
+  };
+  const keysFor = (x) => {
+    const out = [];
+    if (x.measureTime !== false && Number(x.targetMinutes || x.durationMinutes || 30) > 0)
+      out.push([addMetric("min", "⏱", "取り組んだ時間", "min"), Number(x.targetMinutes || x.durationMinutes || 30), "minutes"]);
+    if (x.measurePages) out.push([addMetric("pages", "📖", "ページ数", "ページ"), Number(x.targetPages || 5), "pages"]);
+    if (x.measureProblems) out.push([addMetric("problems", "✏️", "問題数", "問"), Number(x.targetProblems || 10), "problems"]);
+    if (x.measureCustom && Number(x.targetCustom) > 0) {
+      const label = (x.customLabel || "").trim() || x.name;
+      const unit = (x.customUnit || "").trim();
+      out.push([addMetric(`c:${label}|${unit}`, "🎯", label, unit), Number(x.targetCustom), "custom"]);
+    }
+    return out;
+  };
+  for (let d = new Date(startDate); d.getTime() <= endDate.getTime(); d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+    const k = dateKey(d);
+    subjects
+      .filter((x) => (x.name || "").trim() && subjectAppliesOnDate(x, d, startDate, endDate) && !(isExcused && isExcused(k, x.id)))
+      .forEach((x) =>
+        keysFor(x).forEach(([m, target]) => {
+          m.plan += target;
+          if (k <= todayK) m.planToDate += target;
+        })
+      );
+  }
+  Object.entries(achievements).forEach(([k, day]) => {
+    if (k < startKey || k > endKey) return;
+    Object.entries(day || {}).forEach(([sid, v]) => {
+      const x = subjects.find((y) => y.id === sid);
+      if (!x || !v) return;
+      keysFor(x).forEach(([m, , field]) => {
+        m.actual += Number(v[field]) || 0;
+      });
+    });
+  });
+  const list = Object.values(metrics).filter((m) => m.plan > 0);
+  if (list.length === 0) return null;
+
+  const fmt = (n, unit) => (unit === "min" ? formatMinShort(n) : `${Math.round(n * 10) / 10}`.replace(/\B(?=(\d{3})+(?!\d))/g, ","));
+  function formatMinShort(n) {
+    const t = Math.round(n);
+    return t >= 60 ? `${Math.floor(t / 60)}時間${t % 60 ? (t % 60) + "分" : ""}` : `${t}分`;
+  }
+  const u = (unit) => (unit === "min" ? "" : unit);
+  const md = (d) => `${d.getMonth() + 1}/${d.getDate()}`;
+
+  return (
+    <div style={{ position: "relative", zIndex: 2, margin: "14px auto 0", width: "calc(100% - 36px)", maxWidth: 640, background: "#fff", borderRadius: 18, padding: "12px 14px", boxShadow: "0 10px 24px rgba(11,61,98,0.22)", boxSizing: "border-box" }}>
+      <div style={{ fontSize: 13, color: "#0B3D62", fontWeight: 800, textAlign: "center", marginBottom: 4 }}>📊 がんばりの合計</div>
+      {list.map((m) => {
+        const pctRaw = Math.round((m.actual / m.plan) * 100);
+        const pct = Math.min(100, pctRaw);
+        const pacePct = Math.min(100, (m.planToDate / m.plan) * 100);
+        const done = m.actual >= m.plan;
+        const ahead = m.actual >= m.planToDate;
+        const color = done || ahead ? "#3E9A74" : "#E08A3C";
+        const showToday = m.planToDate > 0 && m.planToDate < m.plan;
+        return (
+          <div key={m.key} style={{ padding: "6px 2px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13, fontWeight: 800, color: "#0B3D62" }}>
+                {m.icon} {m.label}
+              </span>
+              <span style={{ fontSize: 13, color: "#5d7a8c", whiteSpace: "nowrap" }}>
+                <b style={{ fontSize: 19, color: "#0B3D62" }}>{fmt(m.actual, m.unit)}</b> ／ {fmt(m.plan, m.unit)}
+                {u(m.unit)}（<span style={{ color: pctRaw > 100 ? "#C98A00" : "inherit", fontWeight: pctRaw > 100 ? 900 : 400 }}>{pctRaw}%</span>）
+              </span>
+            </div>
+            <div style={{ position: "relative", height: 12, borderRadius: 999, background: "#E6EEF3", marginTop: 4, overflow: "hidden" }}>
+              <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: color, transition: "width .4s" }} />
+              {showToday && <div style={{ position: "absolute", top: -2, bottom: -2, left: `calc(${pacePct}% - 1px)`, width: 2, background: "#0B3D62", opacity: 0.5 }} />}
+            </div>
+            <div style={{ position: "relative", height: 14, marginTop: 2, fontSize: 10.5, color: "#7c98aa", fontWeight: 700 }}>
+              {!(showToday && pacePct < 16) && <span style={{ position: "absolute", left: 0 }}>{md(startDate)}</span>}
+              {showToday && (
+                <span style={{ position: "absolute", left: `${Math.min(88, Math.max(6, pacePct))}%`, transform: "translateX(-50%)", color: "#0B3D62", whiteSpace: "nowrap" }}>
+                  今日 {md(new Date(todayK + "T00:00:00"))}
+                </span>
+              )}
+              {!(showToday && pacePct > 84) && <span style={{ position: "absolute", right: 0 }}>{md(endDate)}</span>}
+            </div>
+            <div style={{ fontSize: 11.5, marginTop: 3, color: done || ahead ? "#2C8A5F" : "#C0603F", fontWeight: 700 }}>
+              {done
+                ? "🎉 目標を達成！"
+                : m.planToDate === 0
+                ? "スタンプの予定から目標を計算しています"
+                : ahead
+                ? m.actual > m.planToDate
+                  ? `予定より ${fmt(m.actual - m.planToDate, m.unit)}${u(m.unit)} 進んでいます👍`
+                  : "予定どおり👍"
+                : `予定より ${fmt(m.planToDate - m.actual, m.unit)}${u(m.unit)} 遅れています`}
+            </div>
+          </div>
+        );
+      })}
+      <div style={{ fontSize: 11.5, color: "#8aa1b0", textAlign: "center", marginTop: 6, lineHeight: 1.5 }}>
+        「📝 メモ」の「実際にどれだけできた？」に入れた分が合計されます。目標＝やることの目標 × スタンプの予定（お休みを除く）
       </div>
     </div>
   );
