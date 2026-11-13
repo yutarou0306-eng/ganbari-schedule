@@ -676,9 +676,29 @@ function ScheduleTabs({ tabs, currentId, profileId, profileName }) {
         {tabs.map((t) => {
           const active = t.id === currentId;
           return (
-            <a key={t.id} ref={active ? activeRef : null} href={active ? undefined : `${base}?id=${t.id}`} style={tabStyle(active)} aria-current={active ? "page" : undefined}>
-              {icon(t.theme)} {t.title}
-            </a>
+            // タブ＝スケジュール名（タップで移動）＋「📋 記録」ボタン（タップで記録一覧を開く）
+            <div key={t.id} ref={active ? activeRef : null} style={{ ...tabStyle(active), display: "flex", alignItems: "center", gap: 6, maxWidth: 230, padding: "6px 6px 6px 12px" }} aria-current={active ? "page" : undefined}>
+              <a href={active ? undefined : `${base}?id=${t.id}`} style={{ color: "inherit", textDecoration: "none", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {icon(t.theme)} {t.title}
+              </a>
+              <a
+                href={`${base}?id=${t.id}&records=1`}
+                aria-label={`${t.title}の記録`}
+                style={{
+                  flexShrink: 0,
+                  textDecoration: "none",
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  borderRadius: 8,
+                  padding: "4px 7px",
+                  background: active ? "#EAF4F9" : "rgba(255,255,255,0.22)",
+                  color: active ? "#14588C" : "#fff",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                📋 記録
+              </a>
+            </div>
           );
         })}
       </div>
