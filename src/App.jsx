@@ -4,6 +4,7 @@ import { computeOverallStats } from "./progress.js";
 import { Lock, Unlock, Settings, Plus, X, ArrowLeft } from "lucide-react";
 import { supabase } from "./db.js";
 import ShareBar from "./ShareBar.jsx";
+import { getScheduleIdFromUrl } from "./scheduleId.js";
 
 const STORAGE_KEY = "pearl-sea-schedule-v2";
 // Backup PIN — always accepted alongside whatever PIN the parent set, in case
@@ -578,6 +579,55 @@ function writeSharedUnlock(pin, expiresAt) {
   } catch (e) {}
 }
 
+// エクセルのシートのような、画面下のスケジュール切り替えタブ
+// 同じスタンプ帳の進行中スケジュールを並べ、タップでそのスケジュールに移動する
+function ScheduleTabs({ tabs, currentId, profileId, profileName }) {
+  const activeRef = useRef(null);
+  const rowRef = useRef(null);
+  useEffect(() => {
+    // 今のタブが見えるように横スクロール（ページ自体は動かさない）
+    const row = rowRef.current, el = activeRef.current;
+    if (row && el) row.scrollLeft = Math.max(0, el.offsetLeft - (row.clientWidth - el.offsetWidth) / 2);
+  }, [currentId, tabs.length]);
+  const base = window.location.pathname;
+  const tabStyle = (active) => ({
+    flexShrink: 0,
+    maxWidth: 180,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    padding: "9px 14px",
+    borderRadius: "0 0 12px 12px",
+    fontSize: 13,
+    fontWeight: 800,
+    textDecoration: "none",
+    background: active ? "#fff" : "rgba(255,255,255,0.18)",
+    color: active ? "#0B3D62" : "#fff",
+    borderTop: active ? "3px solid #F4C95D" : "3px solid transparent",
+    boxShadow: active ? "0 4px 10px rgba(0,0,0,0.25)" : "none",
+  });
+  const icon = (t) => (t === "boy" ? "🐉" : t === "diet" ? "🌿" : "🎀");
+  return (
+    <div style={styles.tabBar}>
+      <div ref={rowRef} className="noScrollbar" style={{ position: "relative", display: "flex", gap: 4, overflowX: "auto", padding: "0 8px", alignItems: "flex-start", WebkitOverflowScrolling: "touch" }}>
+        {profileId && (
+          <a href={`${base}?profile=${profileId}`} style={{ ...tabStyle(false), background: "rgba(197,144,29,0.9)" }}>
+            🌟 {profileName || "スタンプ帳"}
+          </a>
+        )}
+        {tabs.map((t) => {
+          const active = t.id === currentId;
+          return (
+            <a key={t.id} ref={active ? activeRef : null} href={active ? undefined : `${base}?id=${t.id}`} style={tabStyle(active)} aria-current={active ? "page" : undefined}>
+              {icon(t.theme)} {t.title}
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function KidsScheduleApp() {
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState("loading");
@@ -601,6 +651,8 @@ export default function KidsScheduleApp() {
   const [steps, setSteps] = useState({}); // ダイエット用：{ "YYYY-MM-DD": 歩数 }
   const [noteModalDate, setNoteModalDate] = useState(null);
   const [linkedProfile, setLinkedProfile] = useState(null); // { name, totalStamps } | null
+  // 同じスタンプ帳につながっている進行中のスケジュール（下のタブで切り替える用）
+  const [siblingSchedules, setSiblingSchedules] = useState([]); // [{ id, title, theme }]
   // スタンプ帳（プロフィール）に設定された保護者用暗証番号。スケジュール自身の
   // 暗証番号欄は廃止されたので、新しいスケジュールは config.pin が空になる。
   // 空のときはこちらを使う（空のままだと「はい」だけで解除できてしまうため）。
@@ -857,8 +909,22 @@ export default function KidsScheduleApp() {
       try {
         const [{ data: profData }, { data: schedData }] = await Promise.all([
           supabase.from("profiles").select("blob").eq("id", config.profileId).maybeSingle(),
-          supabase.from("schedules").select("blob").eq("blob->config->>profileId", config.profileId),
+          supabase.from("schedules").select("id, blob").eq("blob->config->>profileId", config.profileId),
         ]);
+        // タブ用：進行中（達成済み・終了日を過ぎたものを除く）のスケジュール。今開いているものは必ず入れる
+        const myId = getScheduleIdFromUrl();
+        const today = todayStr();
+        const tabs = (schedData || [])
+          .filter((row) => row.blob && row.blob.config)
+          .filter((row) => {
+            if (row.id === myId) return true;
+            const c = row.blob.config;
+            const st = computeOverallStats(c, row.blob.completions);
+            const done = (st.need > 0 && st.done >= st.need) || (!!c.endDate && c.endDate < today);
+            return !done;
+          })
+          .map((row) => ({ id: row.id, title: row.blob.config.title || "無題", theme: row.blob.config.theme || "girl", start: row.blob.config.startDate || "" }))
+          .sort((a, b) => (a.start === b.start ? a.title.localeCompare(b.title, "ja") : a.start < b.start ? -1 : 1));
         let total = 0;
         (schedData || []).forEach((row) => {
           const completions = (row.blob && row.blob.completions) || {};
@@ -874,6 +940,7 @@ export default function KidsScheduleApp() {
         total = Math.max(0, total);
         if (!cancelled) {
           setLinkedProfile({ name: (profData && profData.blob && profData.blob.name) || "", totalStamps: total });
+          setSiblingSchedules(tabs);
           const pPin = (profData && profData.blob && profData.blob.pin) || "";
           setProfilePin(pPin);
           const ownPin = config.pin && config.pin.length > 0 ? config.pin : "";
@@ -1513,7 +1580,8 @@ export default function KidsScheduleApp() {
   }
 
   return (
-    <div style={styles.appRoot}>
+    // タブを出すときは、いちばん下の内容がタブに隠れないように余白をとる
+    <div style={{ ...styles.appRoot, paddingBottom: view === "main" && siblingSchedules.length >= 2 ? "calc(56px + env(safe-area-inset-bottom))" : 0 }}>
       <GlobalStyle />
       <ShareBar profileId={config.profileId} profileName={linkedProfile ? linkedProfile.name : ""} />
       {view === "setup" && (
@@ -1537,6 +1605,9 @@ export default function KidsScheduleApp() {
             } catch (e) {}
           }}
         />
+      )}
+      {view === "main" && siblingSchedules.length >= 2 && (
+        <ScheduleTabs tabs={siblingSchedules} currentId={getScheduleIdFromUrl()} profileId={config.profileId} profileName={linkedProfile ? linkedProfile.name : ""} />
       )}
       {view === "main" && (
         <MainScreen
@@ -5082,6 +5153,8 @@ function GlobalStyle() {
       @media (max-width: 600px) {
         .memoBtn { flex-direction: column; gap: 0 !important; line-height: 1.1; font-size: 10px !important; padding: 3px 0 !important; }
       }
+      .noScrollbar { scrollbar-width: none; }
+      .noScrollbar::-webkit-scrollbar { display: none; }
       input::placeholder, textarea::placeholder {
         color: #cbd5db;
         font-weight: 400;
@@ -5329,7 +5402,8 @@ const styles = {
   commentBubble: { position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap", background: "#fff", color: "#FF6B8A", fontSize: 12, fontWeight: 900, padding: "3px 8px", borderRadius: 999, boxShadow: "0 4px 10px rgba(0,0,0,0.2)", animation: "floatComment 1.3s ease-out forwards", pointerEvents: "none", zIndex: 5 },
   dashMark: { color: "#c9d8e0", fontSize: 15, fontWeight: 700 },
 
-  toast: { position: "fixed", left: "50%", bottom: 20, transform: "translateX(-50%)", background: "#0B3D62", color: "#fff", padding: "12px 22px", borderRadius: 999, fontSize: 17, fontWeight: 700, boxShadow: "0 10px 24px rgba(0,0,0,0.3)", zIndex: 50, maxWidth: "90%", textAlign: "center" },
+  tabBar: { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 998, background: "rgba(11,61,98,0.92)", paddingBottom: "calc(6px + env(safe-area-inset-bottom))", boxShadow: "0 -6px 16px rgba(0,0,0,0.25)", backdropFilter: "blur(6px)" },
+  toast: { position: "fixed", left: "50%", bottom: 76, transform: "translateX(-50%)", background: "#0B3D62", color: "#fff", padding: "12px 22px", borderRadius: 999, fontSize: 17, fontWeight: 700, boxShadow: "0 10px 24px rgba(0,0,0,0.3)", zIndex: 50, maxWidth: "90%", textAlign: "center" },
 
   modalOverlay: { position: "fixed", inset: 0, background: "rgba(11,61,98,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 20 },
   modalCard: { background: "#fff", borderRadius: 20, padding: 26, maxWidth: 360, width: "100%", textAlign: "center", animation: "popIn 0.25s ease-out" },
