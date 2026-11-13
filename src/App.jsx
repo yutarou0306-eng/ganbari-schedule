@@ -588,7 +588,42 @@ function ScheduleTabs({ tabs, currentId, profileId, profileName }) {
     // 今のタブが見えるように横スクロール（ページ自体は動かさない）
     const row = rowRef.current, el = activeRef.current;
     if (row && el) row.scrollLeft = Math.max(0, el.offsetLeft - (row.clientWidth - el.offsetWidth) / 2);
+    updateArrows();
   }, [currentId, tabs.length]);
+  // 左右にまだタブがあるか（矢印ボタンを出すかどうか）
+  const [canL, setCanL] = useState(false);
+  const [canR, setCanR] = useState(false);
+  function updateArrows() {
+    const row = rowRef.current;
+    if (!row) return;
+    setCanL(row.scrollLeft > 4);
+    setCanR(row.scrollLeft + row.clientWidth < row.scrollWidth - 4);
+  }
+  useEffect(() => {
+    window.addEventListener("resize", updateArrows);
+    return () => window.removeEventListener("resize", updateArrows);
+  }, []);
+  // iPhoneでは画面下のスワイプがアプリ切り替えになるので、タップで送れる矢印を用意
+  function slide(dir) {
+    const row = rowRef.current;
+    if (!row) return;
+    const by = Math.max(120, row.clientWidth * 0.7) * dir;
+    if (row.scrollBy) row.scrollBy({ left: by, behavior: "smooth" });
+    else row.scrollLeft += by;
+  }
+  const arrowStyle = (on) => ({
+    flexShrink: 0,
+    width: 34,
+    alignSelf: "stretch",
+    border: "none",
+    background: "transparent",
+    color: on ? "#fff" : "rgba(255,255,255,0.25)",
+    fontSize: 22,
+    fontWeight: 900,
+    lineHeight: 1,
+    cursor: on ? "pointer" : "default",
+    padding: 0,
+  });
   const base = window.location.pathname;
   const tabStyle = (active) => ({
     flexShrink: 0,
@@ -608,8 +643,31 @@ function ScheduleTabs({ tabs, currentId, profileId, profileName }) {
   });
   const icon = (t) => (t === "boy" ? "🐉" : t === "diet" ? "🌿" : "🎀");
   return (
-    <div style={styles.tabBar}>
-      <div ref={rowRef} className="noScrollbar" style={{ position: "relative", display: "flex", gap: 4, overflowX: "auto", padding: "0 8px", alignItems: "flex-start", WebkitOverflowScrolling: "touch" }}>
+    <div style={{ ...styles.tabBar, display: "flex", alignItems: "stretch" }}>
+      {(canL || canR) && (
+        <button type="button" aria-label="左のタブへ" onClick={() => slide(-1)} disabled={!canL} style={arrowStyle(canL)}>
+          ‹
+        </button>
+      )}
+      <div
+        ref={rowRef}
+        onScroll={updateArrows}
+        className="noScrollbar"
+        style={{
+          position: "relative",
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          gap: 4,
+          overflowX: "auto",
+          padding: "0 4px",
+          alignItems: "flex-start",
+          WebkitOverflowScrolling: "touch",
+          // 続きがある側の端を少しぼかす
+          WebkitMaskImage: `linear-gradient(to right, ${canL ? "transparent" : "#000"} 0, #000 22px, #000 calc(100% - 22px), ${canR ? "transparent" : "#000"} 100%)`,
+          maskImage: `linear-gradient(to right, ${canL ? "transparent" : "#000"} 0, #000 22px, #000 calc(100% - 22px), ${canR ? "transparent" : "#000"} 100%)`,
+        }}
+      >
         {profileId && (
           <a href={`${base}?profile=${profileId}`} style={{ ...tabStyle(false), background: "rgba(197,144,29,0.9)" }}>
             🌟 {profileName || "スタンプ帳"}
@@ -624,6 +682,11 @@ function ScheduleTabs({ tabs, currentId, profileId, profileName }) {
           );
         })}
       </div>
+      {(canL || canR) && (
+        <button type="button" aria-label="右のタブへ" onClick={() => slide(1)} disabled={!canR} style={arrowStyle(canR)}>
+          ›
+        </button>
+      )}
     </div>
   );
 }
@@ -1581,7 +1644,7 @@ export default function KidsScheduleApp() {
 
   return (
     // タブを出すときは、いちばん下の内容がタブに隠れないように余白をとる
-    <div style={{ ...styles.appRoot, paddingBottom: view === "main" && siblingSchedules.length >= 2 ? "calc(56px + env(safe-area-inset-bottom))" : 0 }}>
+    <div style={{ ...styles.appRoot, paddingBottom: view === "main" && siblingSchedules.length >= 2 ? "calc(64px + env(safe-area-inset-bottom))" : 0 }}>
       <GlobalStyle />
       <ShareBar profileId={config.profileId} profileName={linkedProfile ? linkedProfile.name : ""} />
       {view === "setup" && (
@@ -5402,7 +5465,7 @@ const styles = {
   commentBubble: { position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", whiteSpace: "nowrap", background: "#fff", color: "#FF6B8A", fontSize: 12, fontWeight: 900, padding: "3px 8px", borderRadius: 999, boxShadow: "0 4px 10px rgba(0,0,0,0.2)", animation: "floatComment 1.3s ease-out forwards", pointerEvents: "none", zIndex: 5 },
   dashMark: { color: "#c9d8e0", fontSize: 15, fontWeight: 700 },
 
-  tabBar: { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 998, background: "rgba(11,61,98,0.92)", paddingBottom: "calc(6px + env(safe-area-inset-bottom))", boxShadow: "0 -6px 16px rgba(0,0,0,0.25)", backdropFilter: "blur(6px)" },
+  tabBar: { position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 998, background: "rgba(11,61,98,0.92)", paddingBottom: "calc(14px + env(safe-area-inset-bottom))", boxShadow: "0 -6px 16px rgba(0,0,0,0.25)", backdropFilter: "blur(6px)" },
   toast: { position: "fixed", left: "50%", bottom: 76, transform: "translateX(-50%)", background: "#0B3D62", color: "#fff", padding: "12px 22px", borderRadius: 999, fontSize: 17, fontWeight: 700, boxShadow: "0 10px 24px rgba(0,0,0,0.3)", zIndex: 50, maxWidth: "90%", textAlign: "center" },
 
   modalOverlay: { position: "fixed", inset: 0, background: "rgba(11,61,98,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: 20 },
