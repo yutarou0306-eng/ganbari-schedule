@@ -52,6 +52,22 @@ function hoursText(min) {
 function fmtDev(v) {
   return v === null || v === undefined ? "—" : Number(v).toFixed(1);
 }
+// 2科目（国語・算数）かどうか
+function isTwo(name) {
+  return /国語|算数|数学/.test(name || "");
+}
+// 2科目総合の数値（入力がなければ、国語・算数だけのテストなら総合と同じ、それ以外は点数の合計だけ）
+function twoOf(t) {
+  const subs = t.subjects || [];
+  if (t.totalDev2 != null || t.total2 != null) return { total: t.total2 ?? null, max: t.totalMax2 ?? null, dev: t.totalDev2 ?? null };
+  if (subs.length && subs.every((s) => isTwo(s.name))) return { total: t.total ?? null, max: t.totalMax ?? null, dev: t.totalDev ?? null };
+  const two = subs.filter((s) => isTwo(s.name));
+  if (!two.length) return { total: null, max: null, dev: null };
+  const sc = two.every((s) => s.score != null) ? two.reduce((a, s) => a + s.score, 0) : null;
+  const mx = two.every((s) => s.max != null) ? two.reduce((a, s) => a + s.max, 0) : null;
+  return { total: sc, max: mx, dev: null };
+}
+
 function genId() {
   return `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 }
@@ -268,11 +284,14 @@ export default function TestRecordsPage({ profile, studyLog, doNames, askParent,
   const windows = tests.map((t, i) => ({ from: i === 0 ? addDays(t.date, -FIRST_WINDOW_DAYS + 1) : addDays(tests[i - 1].date, 1), to: t.date }));
   const subjOf = (t, name) => (t.subjects || []).find((s) => s.name === name) || null;
 
-  const focusLinked = focus === "__total" ? null : links[focus] || [];
+  const twoNames = subjectNames.filter(isTwo);
+  const hasTwo = twoNames.length > 0;
+  const focusLinked =
+    focus === "__total" ? null : focus === "__two" ? [...new Set(twoNames.flatMap((n) => links[n] || []))] : links[focus] || [];
   const comboPoints = tests.map((t, i) => {
     const w = windows[i];
     const bar = focus === "__total" ? studyBetween(studyLog, w.from, w.to, null) : focusLinked.length ? studyBetween(studyLog, w.from, w.to, focusLinked) : 0;
-    const line = focus === "__total" ? num(t.totalDev) : num((subjOf(t, focus) || {}).dev);
+    const line = focus === "__total" ? num(t.totalDev) : focus === "__two" ? num(twoOf(t).dev) : num((subjOf(t, focus) || {}).dev);
     return { label: md(t.date), bar, line };
   });
 
@@ -307,7 +326,7 @@ export default function TestRecordsPage({ profile, studyLog, doNames, askParent,
     askParent("テストの結果を入力する", () => {
       const last = tests[tests.length - 1];
       const base = last && last.subjects && last.subjects.length ? last.subjects.map((s) => ({ name: s.name, max: s.max ?? "" })) : DEFAULT_SUBJECTS;
-      setEditing({ date: todayKey(), name: "", subjects: base.map((s) => ({ name: s.name, score: "", max: s.max === null || s.max === undefined ? "" : String(s.max), dev: "" })), total: "", totalMax: "", totalDev: "" });
+      setEditing({ date: todayKey(), name: "", subjects: base.map((s) => ({ name: s.name, score: "", max: s.max === null || s.max === undefined ? "" : String(s.max), dev: "" })), total: "", totalMax: "", totalDev: "", total2: "", totalMax2: "", totalDev2: "" });
     });
   }
   function startEdit(t) {
@@ -318,6 +337,9 @@ export default function TestRecordsPage({ profile, studyLog, doNames, askParent,
         total: t.total ?? "",
         totalMax: t.totalMax ?? "",
         totalDev: t.totalDev ?? "",
+        total2: t.total2 ?? "",
+        totalMax2: t.totalMax2 ?? "",
+        totalDev2: t.totalDev2 ?? "",
       });
     });
   }
@@ -356,6 +378,11 @@ export default function TestRecordsPage({ profile, studyLog, doNames, askParent,
               <div style={{ fontWeight: 900, color: INK, fontSize: 15.5, marginBottom: 8 }}>💪 がんばり（勉強時間）と偏差値</div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
                 <button onClick={() => setFocus("__total")} style={chip(focus === "__total")}>総合</button>
+                {hasTwo && (
+                  <button onClick={() => setFocus("__two")} style={chip(focus === "__two", "#0E7C86")}>
+                    2科目総合
+                  </button>
+                )}
                 {subjectNames.map((n) => (
                   <button key={n} onClick={() => setFocus(n)} style={chip(focus === n, colorOf(n))}>
                     {n}
@@ -364,7 +391,7 @@ export default function TestRecordsPage({ profile, studyLog, doNames, askParent,
               </div>
               {focus !== "__total" && focusLinked.length === 0 ? (
                 <div style={{ fontSize: 12.5, color: DOWN, marginBottom: 6 }}>
-                  「{focus}」につながったやることがないので、勉強時間は0になります。下の「🔗 科目とやることをつなぐ」から設定してください。
+                  「{focus === "__two" ? "国語・算数" : focus}」につながったやることがないので、勉強時間は0になります。下の「🔗 科目とやることをつなぐ」から設定してください。
                 </div>
               ) : focus !== "__total" ? (
                 <div style={{ fontSize: 12, color: SUB, marginBottom: 6 }}>勉強時間に数えるやること：{focusLinked.join("・")}</div>
@@ -410,13 +437,19 @@ export default function TestRecordsPage({ profile, studyLog, doNames, askParent,
                         </div>
                         <span style={{ fontSize: 11, color: "#8aa1b0", whiteSpace: "nowrap" }}>{open ? "▾ とじる" : "▸ くわしく"}</span>
                       </div>
-                      <div style={{ fontSize: 13.5, color: INK, marginTop: 3 }}>
-                        合計 <b>{t.total ?? "—"}</b>
-                        {t.totalMax ? <span style={{ color: SUB }}> / {t.totalMax}</span> : null}
-                        <Delta now={num(t.total)} prev={prev ? num(prev.total) : null} digits={0} unit="点" />
-                        <span style={{ marginLeft: 12 }}>総合偏差値</span> <b>{fmtDev(num(t.totalDev))}</b>
-                        <Delta now={num(t.totalDev)} prev={prev ? num(prev.totalDev) : null} />
-                      </div>
+                      {[
+                        ["総合", { total: t.total ?? null, max: t.totalMax ?? null, dev: t.totalDev ?? null }, prev ? { total: prev.total ?? null, dev: prev.totalDev ?? null } : null],
+                        ...(hasTwo ? [["2科目", twoOf(t), prev ? twoOf(prev) : null]] : []),
+                      ].map(([lab, v, pv]) => (
+                        <div key={lab} style={{ fontSize: 13.5, color: INK, marginTop: 3 }}>
+                          <span style={{ display: "inline-block", minWidth: 44, fontSize: 11.5, fontWeight: 800, color: lab === "総合" ? "#14588C" : "#0E7C86" }}>{lab}</span>
+                          <b>{v.total ?? "—"}</b>
+                          {v.max ? <span style={{ color: SUB }}> / {v.max}</span> : null}
+                          <Delta now={num(v.total)} prev={pv ? num(pv.total) : null} digits={0} unit="点" />
+                          <span style={{ marginLeft: 12 }}>偏差値</span> <b>{fmtDev(num(v.dev))}</b>
+                          <Delta now={num(v.dev)} prev={pv ? num(pv.dev) : null} />
+                        </div>
+                      ))}
                     </div>
                     {open && (
                       <div style={{ marginTop: 8, background: "#F7FAFC", borderRadius: 10, padding: "8px 10px" }}>
@@ -531,6 +564,13 @@ function TestForm({ initial, onSubmit, onCancel }) {
   const autoTotal = t.subjects.reduce((a, s) => a + (num(s.score) || 0), 0);
   const autoMax = t.subjects.reduce((a, s) => a + (num(s.max) || 0), 0);
   const anyScore = t.subjects.some((s) => num(s.score) !== null);
+  // 2科目総合（国語・算数）
+  const named = t.subjects.filter((s) => (s.name || "").trim());
+  const twoSubs = named.filter((s) => isTwo(s.name));
+  const onlyTwo = named.length > 0 && twoSubs.length === named.length; // 国語・算数だけのテスト → 総合と同じ
+  const autoTotal2 = twoSubs.reduce((a, s) => a + (num(s.score) || 0), 0);
+  const autoMax2 = twoSubs.reduce((a, s) => a + (num(s.max) || 0), 0);
+  const anyScore2 = twoSubs.some((s) => num(s.score) !== null);
 
   async function submit() {
     const subjects = t.subjects
@@ -541,15 +581,24 @@ function TestForm({ initial, onSubmit, onCancel }) {
     const names = subjects.map((s) => s.name);
     if (new Set(names).size !== names.length) return setErr("同じ名前の科目があります");
     setSaving(true);
+    const total = num(t.total) ?? (anyScore ? autoTotal : null);
+    const totalMax = num(t.totalMax) ?? (autoMax > 0 ? autoMax : null);
+    const totalDev = num(t.totalDev);
+    const two = onlyTwo
+      ? { total2: total, totalMax2: totalMax, totalDev2: totalDev }
+      : twoSubs.length
+      ? { total2: num(t.total2) ?? (anyScore2 ? autoTotal2 : null), totalMax2: num(t.totalMax2) ?? (autoMax2 > 0 ? autoMax2 : null), totalDev2: num(t.totalDev2) }
+      : { total2: null, totalMax2: null, totalDev2: null };
     try {
       await onSubmit({
         ...(t.id ? { id: t.id } : {}),
         date: t.date,
         name: (t.name || "").trim(),
         subjects,
-        total: num(t.total) ?? (anyScore ? autoTotal : null),
-        totalMax: num(t.totalMax) ?? (autoMax > 0 ? autoMax : null),
-        totalDev: num(t.totalDev),
+        total,
+        totalMax,
+        totalDev,
+        ...two,
       });
     } catch (e) {
       setErr("保存できませんでした。もう一度お試しください");
@@ -593,6 +642,7 @@ function TestForm({ initial, onSubmit, onCancel }) {
         ))}
         <button onClick={addSub} style={{ ...btn("#EAF4F9", "#14588C"), width: "100%", padding: "7px 0", fontSize: 13, marginBottom: 12 }}>＋ 科目を追加</button>
 
+        <div style={{ fontWeight: 900, color: "#14588C", fontSize: 13.5, marginBottom: 4 }}>{onlyTwo ? "総合（＝2科目総合）" : "総合（全科目）"}</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
           <div style={{ flex: 1 }}>
             <div style={label}>合計点</div>
@@ -607,7 +657,29 @@ function TestForm({ initial, onSubmit, onCancel }) {
             <input value={t.totalDev} onChange={(e) => set("totalDev", e.target.value)} inputMode="decimal" placeholder="55.0" style={{ ...inputStyle, textAlign: "right" }} />
           </div>
         </div>
-        <div style={{ fontSize: 11.5, color: SUB, marginBottom: 12 }}>合計点と満点の合計は、空欄なら科目の合計を自動で入れます。</div>
+        {!onlyTwo && twoSubs.length > 0 && (
+          <>
+            <div style={{ fontWeight: 900, color: "#0E7C86", fontSize: 13.5, margin: "10px 0 4px" }}>2科目総合（{twoSubs.map((x) => x.name.trim()).join("・")}）</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+              <div style={{ flex: 1 }}>
+                <div style={label}>合計点</div>
+                <input value={t.total2} onChange={(e) => set("total2", e.target.value)} inputMode="decimal" placeholder={anyScore2 ? String(autoTotal2) : "自動"} style={{ ...inputStyle, textAlign: "right" }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={label}>満点の合計</div>
+                <input value={t.totalMax2} onChange={(e) => set("totalMax2", e.target.value)} inputMode="decimal" placeholder={autoMax2 > 0 ? String(autoMax2) : "自動"} style={{ ...inputStyle, textAlign: "right" }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={label}>2科目偏差値</div>
+                <input value={t.totalDev2} onChange={(e) => set("totalDev2", e.target.value)} inputMode="decimal" placeholder="55.0" style={{ ...inputStyle, textAlign: "right" }} />
+              </div>
+            </div>
+          </>
+        )}
+        <div style={{ fontSize: 11.5, color: SUB, marginBottom: 12 }}>
+          合計点と満点の合計は、空欄なら科目の合計を自動で入れます。
+          {onlyTwo && "国語・算数だけのテストなので、2科目総合も同じ数値で記録します。"}
+        </div>
 
         {err && <div style={{ color: DOWN, fontSize: 13, fontWeight: 700, marginBottom: 8 }}>{err}</div>}
         <div style={{ display: "flex", gap: 8 }}>
