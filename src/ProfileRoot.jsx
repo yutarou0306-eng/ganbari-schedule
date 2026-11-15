@@ -5,6 +5,7 @@ import { upsertKnownProfile, removeKnownProfile } from "./profileRegistry.js";
 import { generateScheduleId } from "./scheduleId.js";
 import { getVariant, finalFormImage, stageImage, stageIndex, stageLabel, eggLabel, speciesLabel, computeCardStats, combineStats, combineLevel, levelFromPct, stageImageAt, stageCount, getGrandMasterCombo, speciesGroupsForTheme, GRAND_MASTER_COMBOS, STAT_LABELS, STAT_KEYS, STAT_MAX, MASTER_LEVEL } from "./mascots.js";
 import { todayPendingSubjects, computeOverallStats } from "./progress.js";
+import TestRecordsPage, { studyLogInBlob } from "./TestRecords.jsx";
 
 const bg = "linear-gradient(180deg, #0B3D62 0%, #14588C 42%, #2E9BC7 78%, #6FCFEB 100%)";
 // Backup PIN — always accepted alongside whatever PIN the parent set, in case
@@ -265,6 +266,7 @@ export default function ProfileRoot() {
   const [cardSortMode, setCardSortMode] = useState("species"); // "lv" | "species" | "stage" — ファミリアカードの並び順
   const [zukanPage, setZukanPage] = useState(false); // ファミリアずかんを表示中かどうか
   const [breedPage, setBreedPage] = useState(false); // 配合ページを表示中かどうか
+  const [testPage, setTestPage] = useState(false); // テストの記録ページを表示中かどうか
   const [openCardId, setOpenCardId] = useState(null); // card.id currently open in the detail view
   const [view, setView] = useState("main"); // main | editProfile | rewards
   const [redeemTarget, setRedeemTarget] = useState(null); // reward | null
@@ -342,6 +344,9 @@ export default function ProfileRoot() {
               (stats.need > 0 && stats.done >= stats.need) ||
               (!!row.blob.config.endDate && row.blob.config.endDate < localTodayKey()),
             achvTotals: totalAchievementsInBlob(row.blob),
+            // テストの記録用：日付・やること名・勉強時間（分）
+            studyLog: studyLogInBlob(row.blob),
+            doNames: row.blob.config.theme === "diet" ? [] : (row.blob.config.subjects || []).map((x) => (x.name || "").trim()).filter(Boolean),
           };
         });
       setSchedules(list);
@@ -878,6 +883,24 @@ export default function ProfileRoot() {
     return <ZukanPage gender={bookGender} hasDiet={hasDietSchedules} schedules={schedules} profile={profile} onClose={() => setZukanPage(false)} />;
   }
 
+  if (testPage) {
+    const doNames = [];
+    schedules.forEach((s) => (s.doNames || []).forEach((n) => !doNames.includes(n) && doNames.push(n)));
+    return (
+      <>
+        <TestRecordsPage
+          profile={profile}
+          studyLog={schedules.flatMap((s) => s.studyLog || [])}
+          doNames={doNames}
+          askParent={askParent}
+          onSave={({ tests, testLinks }) => saveProfile({ ...profile, tests, testLinks })}
+          onClose={() => setTestPage(false)}
+        />
+        {gateModalsJsx}
+      </>
+    );
+  }
+
   if (breedPage) {
     return (
       <>
@@ -1071,6 +1094,30 @@ export default function ProfileRoot() {
           </div>
 
         </div>
+
+        {bookGender !== "diet" && (
+          <>
+            <SectionTitle>📈 テストの記録</SectionTitle>
+            {(() => {
+              const ts = [...(profile.tests || [])].sort((a, b) => (a.date < b.date ? -1 : 1));
+              const last = ts[ts.length - 1];
+              const prev = ts[ts.length - 2];
+              const d = last && prev && last.totalDev != null && prev.totalDev != null ? last.totalDev - prev.totalDev : null;
+              return last ? (
+                <div style={{ fontSize: 13, color: "#EAF7FB", marginBottom: 8 }}>
+                  最新：{last.name || last.date.replace(/-/g, "/")}　総合偏差値 <b style={{ color: "#fff" }}>{last.totalDev != null ? Number(last.totalDev).toFixed(1) : "—"}</b>
+                  {d !== null && <b style={{ color: d >= 0 ? "#9FF0BE" : "#FFC59E" }}>{` ${d >= 0 ? "▲" : "▼"}${Math.abs(d).toFixed(1)}`}</b>}
+                </div>
+              ) : null;
+            })()}
+            <button
+              onClick={() => setTestPage(true)}
+              style={{ width: "100%", padding: "12px 0", borderRadius: 14, border: "none", background: "linear-gradient(135deg,#F6B94A,#E0763A)", color: "#fff", fontWeight: 800, fontSize: 14.5, cursor: "pointer", fontFamily: "inherit", marginBottom: 22 }}
+            >
+              📈 テストの記録とグラフを見る
+            </button>
+          </>
+        )}
 
         <SectionTitle>🎁 景品と交換</SectionTitle>
         <div style={{ marginBottom: 8 }}>
